@@ -112,7 +112,11 @@ select.pl{width:100%;border:1.5px solid #e7e5e4;border-radius:9px;padding:9px 11
 .stat-tile{background:#fff;border-radius:11px;border:1px solid #ebe9e6;padding:14px 16px;min-width:0;overflow:hidden}
 .stat-tile .slabel{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .stat-tile .val{font-family:'DM Mono',monospace;font-size:clamp(1rem,4.2vw,1.3rem);font-weight:600;letter-spacing:-.03em;margin-top:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.stat-tile .delta{font-size:.72rem;margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.stat-tile .delta{font-size:.72rem;margin-top:3px;overflow:hidden;text-overflow:ellipsis}
+.stat-breakdown{margin-top:6px;display:flex;flex-direction:column;gap:2px;font-size:.72rem;color:#78716c}
+.stat-breakdown .row{display:flex;justify-content:space-between;gap:8px;min-width:0}
+.stat-breakdown .row span:first-child{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.stat-breakdown .row .num{font-size:.72rem;overflow:hidden;text-overflow:ellipsis}
 .stat-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(135px,1fr));gap:12px;margin-bottom:18px}
 .hidden{display:none!important}
 #toast{position:fixed;bottom:22px;left:50%;transform:translateX(-50%);z-index:99;transition:opacity .2s}
@@ -166,9 +170,19 @@ html.dark{filter:invert(1) hue-rotate(180deg)}
 <!-- SIDEBAR -->
 <aside class="sidebar">
   <div class="worth-banner">
-    <div class="slabel" style="color:#57534e;margin-bottom:5px">Actual Total Worth</div>
-    <div class="num" id="sb-worth" style="font-size:1.45rem;font-weight:600;color:#fff">₹0.00</div>
-    <div style="font-size:.68rem;color:#57534e;margin-top:2px;line-height:1.5" id="sb-worth-breakdown">Bank + Cash − CC Dues</div>
+    <div class="slabel" style="color:#57534e;margin-bottom:5px">Liquid Cash Available</div>
+    <div class="num" id="sb-liquid-focus" style="font-size:1.45rem;font-weight:600;color:#fff">₹0.00</div>
+    <div style="display:flex;gap:12px;flex-wrap:wrap;margin-top:8px;line-height:1.3">
+      <div style="min-width:0">
+        <div style="font-size:.58rem;color:#78716c;text-transform:uppercase;letter-spacing:.08em">Net Worth</div>
+        <div class="num" id="sb-worth-secondary" style="font-size:.78rem;color:#f4f3f0">₹0.00</div>
+      </div>
+      <div style="min-width:0">
+        <div style="font-size:.58rem;color:#78716c;text-transform:uppercase;letter-spacing:.08em">Invested</div>
+        <div class="num" id="sb-invest-secondary" style="font-size:.78rem;color:#f4f3f0">₹0.00</div>
+      </div>
+    </div>
+    <div style="font-size:.68rem;color:#57534e;margin-top:6px;line-height:1.5">Bank + Cash − CC Dues</div>
   </div>
 
   <!-- CC Reminders -->
@@ -293,6 +307,8 @@ html.dark{filter:invert(1) hue-rotate(180deg)}
             <span class="num" style="font-size:.72rem;color:#a8a29e" id="b-pct">0%</span>
           </div>
         </div>
+        <!-- Cumulative Category Spend -->
+        <div class="card" id="cumulative-cat-widget"></div>
         <!-- Category Budget Cards -->
         <div class="card">
           <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:11px">
@@ -525,12 +541,23 @@ html.dark{filter:invert(1) hue-rotate(180deg)}
     <div style="margin-bottom:14px">
       <div class="an-sec-title">Portfolio Allocation</div>
       <div class="card">
-        <div style="display:flex;gap:14px;align-items:flex-start;flex-wrap:wrap">
-          <div style="width:160px;height:160px;flex-shrink:0;position:relative">
-            <canvas id="inv-alloc-donut"></canvas>
-            <div id="inv-alloc-empty" class="chart-empty hidden" style="position:absolute;inset:0">No holdings yet</div>
+        <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px">
+          <div class="card" style="padding:14px 14px 12px;min-width:0">
+            <span style="font-weight:600;font-size:.88rem;display:block;margin-bottom:10px">MF vs Stock Profit Share</span>
+            <div style="width:150px;height:150px;margin:0 auto 10px;position:relative">
+              <canvas id="inv-profit-donut"></canvas>
+              <div id="inv-profit-empty" class="chart-empty hidden" style="position:absolute;inset:0">No profit data yet</div>
+            </div>
+            <div id="inv-profit-leg" style="display:flex;flex-direction:column;gap:5px;min-width:0"></div>
           </div>
-          <div id="inv-alloc-leg" style="display:flex;flex-direction:column;gap:5px;flex:1;min-width:80px;justify-content:center"></div>
+          <div class="card" style="padding:14px 14px 12px;min-width:0">
+            <span style="font-weight:600;font-size:.88rem;display:block;margin-bottom:10px">MF vs Stock Allocation</span>
+            <div style="width:150px;height:150px;margin:0 auto 10px;position:relative">
+              <canvas id="inv-alloc-donut"></canvas>
+              <div id="inv-alloc-empty" class="chart-empty hidden" style="position:absolute;inset:0">No holdings yet</div>
+            </div>
+            <div id="inv-alloc-leg" style="display:flex;flex-direction:column;gap:5px;min-width:0"></div>
+          </div>
         </div>
       </div>
     </div>
@@ -638,6 +665,7 @@ html.dark{filter:invert(1) hue-rotate(180deg)}
           <select id="inv-hold-type" class="pl" onchange="toggleHoldLookupFields()">
             <option value="stock">Stock</option>
             <option value="mf">Mutual Fund</option>
+            <option value="sip">Mutual Fund (SIP Series)</option>
           </select>
         </div>
         <div><div class="slabel" style="margin-bottom:4px">Purchase Date</div>
@@ -663,10 +691,18 @@ html.dark{filter:invert(1) hue-rotate(180deg)}
         <input type="hidden" id="inv-hold-schemecode"/>
         <p id="inv-hold-mfpicked" style="font-size:.71rem;color:#166534;margin-top:4px"></p>
       </div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
-        <div><div class="slabel" style="margin-bottom:4px">Units / Quantity</div>
+      <div style="display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:8px">
+        <div style="min-width:0"><div class="slabel" id="inv-hold-units-label" style="margin-bottom:4px">Units / Quantity</div>
           <div class="fw"><input id="inv-hold-units" class="fi" type="number" min="0" step="0.001" placeholder="0"/></div></div>
-        <div><div class="slabel" style="margin-bottom:4px">Avg. Buy Price (₹/unit)</div>
+        <div style="min-width:0"><div class="slabel" id="inv-hold-buy-label" style="margin-bottom:4px">Avg. Buy Price (₹/unit)</div>
+          <div id="inv-hold-buy-mode-wrap" style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;width:100%;margin-bottom:6px">
+            <select id="inv-hold-buy-mode" class="pl" style="padding:6px 8px;font-size:.78rem;flex:1;min-width:150px" onchange="toggleHoldPriceMode()">
+              <option value="manual">Manual entry</option>
+              <option value="auto">Auto fetch by date</option>
+            </select>
+            <button id="inv-hold-buy-fetch-btn" type="button" class="btn-g" style="white-space:nowrap;flex:0 0 auto" onclick="fetchHoldPurchasePrice()">Fetch</button>
+          </div>
+          <p id="inv-hold-buy-hint" style="font-size:.71rem;color:#a8a29e;margin:0 0 6px"></p>
           <div class="fw"><div class="fp">₹</div><input id="inv-hold-buy" class="fi" type="number" min="0" step="0.01" placeholder="0.00"/></div></div>
       </div>
       <div><div class="slabel" style="margin-bottom:4px">Current NAV / Price (₹/unit)</div>
@@ -849,6 +885,7 @@ function normalizeState(){
 /* UI state */
 let txnType='expense',selExpCat=null,selIncCat=null,viewMK=null,viewFY=null,viewMode='month',activeTab='log',activeView='dashboard';
 let CH={};  // chart instances keyed by id
+let cumulativeCatSelection=[];
 
 /* Analytics range state */
 let anRange={mode:'this_month',from:null,to:null};
@@ -1061,11 +1098,21 @@ function getDueDateStatus(card){
 /* ── Sidebar ──────────────────────────────────────────────── */
 function renderSidebar(){
   const bal=computeBal();
-  const nw=document.getElementById('sb-worth');
-  nw.textContent=fmt(bal.netWorth);
-  nw.style.color=bal.netWorth>=0?'#86efac':'#fca5a5';
-  document.getElementById('sb-worth-breakdown').innerHTML=
-    `<span class="num" style="color:#a3e635">${fmt(bal.liquid)} liquid</span> &middot; <span class="num" style="color:#c4b5fd">${fmt(bal.investWorth)} invested</span>`;
+  const liquid=document.getElementById('sb-liquid-focus');
+  if(liquid){
+    liquid.textContent=fmt(bal.liquid);
+    liquid.style.color=bal.liquid>=0?'#86efac':'#fca5a5';
+  }
+  const nw=document.getElementById('sb-worth-secondary');
+  if(nw){
+    nw.textContent=fmt(bal.netWorth);
+    nw.style.color=bal.netWorth>=0?'#f4f3f0':'#fecaca';
+  }
+  const inv=document.getElementById('sb-invest-secondary');
+  if(inv){
+    inv.textContent=fmt(bal.investWorth);
+    inv.style.color='#f4f3f0';
+  }
 
   const remSec=document.getElementById('sb-reminders');
   const alerts=[];
@@ -1245,7 +1292,80 @@ const invHoldTypeLabel=t=>t==='mf'?'Mutual Fund':'Stock';
 function toggleHoldLookupFields(){
   const t=document.getElementById('inv-hold-type').value;
   document.getElementById('inv-hold-stock-wrap').classList.toggle('hidden',t!=='stock');
-  document.getElementById('inv-hold-mf-wrap').classList.toggle('hidden',t!=='mf');
+  document.getElementById('inv-hold-mf-wrap').classList.toggle('hidden',t==='stock');
+  document.getElementById('inv-hold-buy-mode-wrap').classList.toggle('hidden',t==='sip');
+  const unitsLabel=document.getElementById('inv-hold-units-label');
+  const buyLabel=document.getElementById('inv-hold-buy-label');
+  const unitsInput=document.getElementById('inv-hold-units');
+  const buyInput=document.getElementById('inv-hold-buy');
+  if(t==='sip'){
+    unitsLabel.textContent='Monthly SIP Amount (₹)';
+    buyLabel.textContent='Duration (months)';
+    unitsInput.step='0.01';
+    unitsInput.placeholder='2500';
+    buyInput.step='1';
+    buyInput.placeholder='36';
+    document.getElementById('inv-hold-mf-wrap').classList.remove('hidden');
+  }else{
+    unitsLabel.textContent='Units / Quantity';
+    buyLabel.textContent='Avg. Buy Price (₹/unit)';
+    unitsInput.step='0.001';
+    unitsInput.placeholder='0';
+    buyInput.step='0.01';
+    buyInput.placeholder='0.00';
+    document.getElementById('inv-hold-mf-wrap').classList.toggle('hidden',t!=='mf');
+  }
+  toggleHoldPriceMode();
+}
+
+function toggleHoldPriceMode(){
+  const type=document.getElementById('inv-hold-type').value;
+  const modeWrap=document.getElementById('inv-hold-buy-mode-wrap');
+  const mode=document.getElementById('inv-hold-buy-mode').value;
+  const hint=document.getElementById('inv-hold-buy-hint');
+  const fetchBtn=document.getElementById('inv-hold-buy-fetch-btn');
+  const buyInput=document.getElementById('inv-hold-buy');
+  if(type==='sip'){
+    modeWrap.classList.add('hidden');
+    hint.textContent='';
+    fetchBtn.textContent='Fetch';
+    buyInput.readOnly=false;
+    return;
+  }
+  modeWrap.classList.remove('hidden');
+  buyInput.readOnly=false;
+  fetchBtn.textContent=mode==='auto'?'Fetch now':'Fetch';
+  hint.textContent=mode==='auto'
+    ?'Auto fetch uses the purchase date to fill this price. You can still edit it manually before saving.'
+    :'Manual entry is enabled. Use Fetch if you want to populate the price from the purchase date.';
+}
+
+async function resolveHoldPurchasePrice(type,date,symbol,schemeCode){
+  if(type==='stock'){
+    if(!symbol)throw new Error('Enter an NSE symbol first');
+    return await fetchStockPrice(symbol,date);
+  }
+  if(type==='mf'){
+    if(!schemeCode)throw new Error('Select an AMFI scheme first');
+    return await fetchMFNav(schemeCode,date);
+  }
+  throw new Error('Price fetch is only available for stocks and mutual funds');
+}
+
+async function fetchHoldPurchasePrice(){
+  const type=document.getElementById('inv-hold-type').value;
+  const date=document.getElementById('inv-hold-date').value;
+  const symbol=document.getElementById('inv-hold-symbol').value.trim().toUpperCase();
+  const schemeCode=document.getElementById('inv-hold-schemecode').value.trim();
+  if(type==='sip'){toast('Price fetch is not used for SIP series');return;}
+  if(!date){toast('Select a purchase date');return;}
+  try{
+    const price=await resolveHoldPurchasePrice(type,date,symbol,schemeCode);
+    document.getElementById('inv-hold-buy').value=price;
+    toast(`Fetched ${type==='mf'?'NAV':'price'} for ${date}`);
+  }catch(e){
+    toast(e?.message||'Could not fetch price');
+  }
 }
 
 async function searchMF(){
@@ -1257,7 +1377,15 @@ async function searchMF(){
     const res=await fetch(`https://api.mfapi.in/mf/search?q=${encodeURIComponent(q)}`);
     const list=await res.json();
     if(!Array.isArray(list)||!list.length){wrap.innerHTML='<div style="font-size:.75rem;color:#a8a29e;padding:4px 2px">No matches</div>';return;}
-    wrap.innerHTML=list.slice(0,8).map(f=>`<div class="sb-item" style="cursor:pointer" onclick="pickMF('${f.schemeCode}',${JSON.stringify(f.schemeName)})"><span class="sb-name">${esc(f.schemeName)}</span></div>`).join('');
+    wrap.innerHTML=list.slice(0,8).map(f=>{
+      const code=esc(String(f.schemeCode||''));
+      const name=esc(String(f.schemeName||''));
+      return `<div class="sb-item" style="cursor:pointer" role="button" tabindex="0" data-mf-code="${code}" data-mf-name="${name}"><span class="sb-name">${name}</span></div>`;
+    }).join('');
+    wrap.querySelectorAll('[data-mf-code]').forEach(el=>{
+      el.addEventListener('click',()=>pickMF(el.dataset.mfCode||'',el.dataset.mfName||''));
+      el.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();pickMF(el.dataset.mfCode||'',el.dataset.mfName||'');}});
+    });
   }catch(e){
     wrap.innerHTML='<div style="font-size:.75rem;color:#ef4444;padding:4px 2px">Search failed — try again</div>';
   }
@@ -1351,6 +1479,7 @@ function openInvHoldModal(accId, holdId){
     if(!h)return;
     fillInvHoldAccOpts(h.accountId);
     document.getElementById('inv-hold-type').value=h.type;
+    document.getElementById('inv-hold-buy-mode').value=h.buyPriceMode||'manual';
     setDateVal('inv-hold-date',h.date||'');
     document.getElementById('inv-hold-name').value=h.name;
     document.getElementById('inv-hold-units').value=h.units;
@@ -1361,9 +1490,14 @@ function openInvHoldModal(accId, holdId){
       document.getElementById('inv-hold-schemecode').value=h.schemeCode;
       document.getElementById('inv-hold-mfpicked').textContent=`Linked to scheme ${h.schemeCode}`;
     }
+    if(h.type==='sip'){
+      document.getElementById('inv-hold-units').value=h.monthlyAmount||'';
+      document.getElementById('inv-hold-buy').value=h.durationMonths||'';
+    }
   }else{
     fillInvHoldAccOpts(accId);
     document.getElementById('inv-hold-type').value='stock';
+    document.getElementById('inv-hold-buy-mode').value='manual';
     setDateVal('inv-hold-date',today());
     document.getElementById('inv-hold-name').value='';
     document.getElementById('inv-hold-units').value='';
@@ -1375,7 +1509,7 @@ function openInvHoldModal(accId, holdId){
   updateInvHoldCashHint();
 }
 
-function saveInvHolding(){
+async function saveInvHolding(){
   const id=document.getElementById('inv-hold-id').value;
   const accountId=document.getElementById('inv-hold-acc').value;
   const type=document.getElementById('inv-hold-type').value;
@@ -1386,29 +1520,93 @@ function saveInvHolding(){
   const nav=Number(document.getElementById('inv-hold-nav').value)||0;
   const symbol=document.getElementById('inv-hold-symbol').value.trim().toUpperCase();
   const schemeCode=document.getElementById('inv-hold-schemecode').value.trim();
+  const buyMode=document.getElementById('inv-hold-buy-mode').value;
   if(!accountId){toast('Select an account');return;}
   if(!name){toast('Enter a name');return;}
-  if(units<=0){toast('Enter units/quantity');return;}
+  if(units<=0){toast(type==='sip'?'Enter monthly SIP amount':'Enter units/quantity');return;}
   if(!date){toast('Select a purchase date');return;}
-  const newAmount=units*buyPrice;
+  const isSip=type==='sip';
+  const sipAmount=isSip?units:0;
+  const sipMonths=isSip?Math.max(0,Math.floor(buyPrice)):0;
+  let buyPriceToSave=buyPrice;
+  if(!isSip&&buyMode==='auto'){
+    try{
+      buyPriceToSave=await resolveHoldPurchasePrice(type,date,symbol,schemeCode);
+      document.getElementById('inv-hold-buy').value=buyPriceToSave;
+    }catch(e){
+      toast(e?.message||'Could not fetch price');
+      return;
+    }
+  }
+  const newAmount=isSip?sipAmount*sipMonths:units*buyPriceToSave;
   const bal=computeBal();
   if(id){
     const h=state.investments.holdings.find(x=>x.id===id);
     if(!h)return;
-    const oldAmount=(Number(h.units)||0)*(Number(h.buyPrice)||0);
+    const oldAmount=h.type==='sip'
+      ?((Number(h.monthlyAmount)||0)*(Number(h.durationMonths)||0))
+      :(Number(h.units)||0)*(Number(h.buyPrice)||0);
     const sameAcc=h.accountId===accountId;
     const availForThis=(bal.iv[accountId]||0)+(sameAcc?oldAmount:0);
     if(newAmount>availForThis){toast(`Insufficient cash — only ${fmt(availForThis)} available in this account`);return;}
-    Object.assign(h,{accountId,type,date,name,units,buyPrice,nav,symbol,schemeCode});
-    const txn=state.transactions.find(x=>x.id===h.txnId);
-    if(txn)Object.assign(txn,{date,accountId,amount:newAmount,name,units,buyPrice});
-    else{const tx={id:uid(),type:'invest',date,accountId,amount:newAmount,name,units,buyPrice,holdingId:h.id};state.transactions.push(tx);h.txnId=tx.id;}
+    if(h.type==='sip'&&h.seriesTxnIds?.length){
+      state.transactions=state.transactions.filter(x=>!h.seriesTxnIds.includes(x.id));
+    }else if(h.txnId){
+      state.transactions=state.transactions.filter(x=>x.id!==h.txnId);
+    }
+    Object.assign(h,{accountId,type,date,name,units:isSip?sipAmount:units,buyPrice:isSip?sipMonths:buyPriceToSave,nav,symbol,schemeCode,monthlyAmount:isSip?sipAmount:undefined,durationMonths:isSip?sipMonths:undefined,buyPriceMode:isSip?undefined:buyMode});
+    if(isSip){
+      if(!schemeCode){toast('Select an AMFI scheme for SIP series');return;}
+      if(!sipMonths){toast('Enter a valid SIP duration');return;}
+      const liveNav=nav||await fetchMFNav(schemeCode);
+      const start=new Date(date+'T00:00:00');
+      const series=[];
+      let totalUnits=0;
+      for(let i=0;i<sipMonths;i++){
+        const d=new Date(start);
+        d.setMonth(d.getMonth()-i);
+        const txnDate=dateToStr(d);
+        const invested=sipAmount;
+        const unitsBought=invested/liveNav;
+        totalUnits+=unitsBought;
+        series.push({id:uid(),type:'invest',date:txnDate,accountId,amount:invested,name,units:unitsBought,buyPrice:liveNav,holdingId:h.id,schemeCode,sipMonth:i+1});
+      }
+      series.sort((a,b)=>a.date.localeCompare(b.date));
+      state.transactions.push(...series);
+      Object.assign(h,{units:totalUnits,buyPrice:sipAmount,nav:liveNav,txnId:series[series.length-1]?.id||'',seriesTxnIds:series.map(t=>t.id),monthlyAmount:sipAmount,durationMonths:sipMonths,sipSeries:true});
+    }else{
+      const txn=state.transactions.find(x=>x.id===h.txnId);
+      if(txn)Object.assign(txn,{date,accountId,amount:newAmount,name,units,buyPrice:buyPriceToSave});
+      else{const tx={id:uid(),type:'invest',date,accountId,amount:newAmount,name,units,buyPrice:buyPriceToSave,holdingId:h.id};state.transactions.push(tx);h.txnId=tx.id;}
+    }
   }else{
     const avail=bal.iv[accountId]||0;
     if(newAmount>avail){toast(`Insufficient cash — only ${fmt(avail)} available in this account. Transfer funds first.`);return;}
-    const hid=uid(),tid=uid();
-    state.investments.holdings.push({id:hid,accountId,type,date,name,units,buyPrice,nav,symbol,schemeCode,txnId:tid});
-    state.transactions.push({id:tid,type:'invest',date,accountId,amount:newAmount,name,units,buyPrice,holdingId:hid});
+    if(isSip){
+      if(!schemeCode){toast('Select an AMFI scheme for SIP series');return;}
+      if(!sipMonths){toast('Enter a valid SIP duration');return;}
+      const liveNav=nav||await fetchMFNav(schemeCode);
+      const start=new Date(date+'T00:00:00');
+      const hid=uid();
+      const series=[];
+      let totalUnits=0;
+      for(let i=0;i<sipMonths;i++){
+        const d=new Date(start);
+        d.setMonth(d.getMonth()-i);
+        const txnDate=dateToStr(d);
+        const invested=sipAmount;
+        const unitsBought=invested/liveNav;
+        totalUnits+=unitsBought;
+        series.push({id:uid(),type:'invest',date:txnDate,accountId,amount:invested,name,units:unitsBought,buyPrice:liveNav,holdingId:hid,schemeCode,sipMonth:i+1});
+      }
+      series.sort((a,b)=>a.date.localeCompare(b.date));
+      state.transactions.push(...series);
+      state.investments.holdings.push({id:hid,accountId,type,date,name,units:totalUnits,buyPrice:sipAmount,nav:liveNav,symbol,schemeCode,txnId:series[series.length-1]?.id||'',seriesTxnIds:series.map(t=>t.id),monthlyAmount:sipAmount,durationMonths:sipMonths,sipSeries:true});
+    }else{
+      const hid=uid(),tid=uid();
+      state.investments.holdings.push({id:hid,accountId,type,date,name,units,buyPrice:buyPriceToSave,nav,symbol,schemeCode,txnId:tid,buyPriceMode:buyMode});
+      state.transactions.push({id:tid,type:'invest',date,accountId,amount:newAmount,name,units,buyPrice:buyPriceToSave,holdingId:hid});
+    }
   }
   saveState();closeModal('modal-inv-hold');rebuildAll();
   toast(`Holding ${id?'updated':'added'}`);
@@ -1418,7 +1616,10 @@ function confirmDeleteInvHolding(id){
   const h=state.investments.holdings.find(x=>x.id===id);
   document.getElementById('confirm-body').textContent=`Delete "${h?h.name:'holding'}"? The invested amount will be returned to the account's available cash. This cannot be undone.`;
   document.getElementById('confirm-ok-btn').onclick=()=>{
-    if(h)state.transactions=state.transactions.filter(x=>x.id!==h.txnId);
+    if(h){
+      const ids=h.seriesTxnIds?.length?h.seriesTxnIds:[h.txnId];
+      state.transactions=state.transactions.filter(x=>!ids.includes(x.id));
+    }
     state.investments.holdings=state.investments.holdings.filter(x=>x.id!==id);
     saveState();rebuildAll();toast('Holding deleted');
     closeModal('modal-confirm');
@@ -1433,21 +1634,59 @@ function holdMetrics(h){
 }
 
 /* ── Live price fetching ──────────────────────────────────── */
-async function fetchMFNav(schemeCode){
-  const res=await fetch(`https://api.mfapi.in/mf/${schemeCode}/latest`);
-  if(!res.ok)throw new Error('mfapi request failed');
+function isoToDmy(iso){
+  const [y,m,d]=iso.split('-');
+  return `${d}-${m}-${y}`;
+}
+
+function timestampToIsoIndia(ts){
+  return new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Kolkata',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date(ts*1000));
+}
+
+async function fetchMFNav(schemeCode,date=''){
+  if(!date){
+    const res=await fetch(`https://api.mfapi.in/mf/${encodeURIComponent(schemeCode)}`);
+    if(!res.ok)throw new Error('MF history request failed');
+    const j=await res.json();
+    const nav=Number(j?.data?.[0]?.nav);
+    if(!nav)throw new Error('No NAV returned');
+    return nav;
+  }
+  const res=await fetch(`https://api.mfapi.in/mf/${encodeURIComponent(schemeCode)}`);
+  if(!res.ok)throw new Error('MF history request failed');
   const j=await res.json();
-  const nav=Number(j?.data?.[0]?.nav);
-  if(!nav)throw new Error('No NAV returned');
+  const target=Date.parse(`${date}T00:00:00`);
+  const history=Array.isArray(j?.data)?j.data:[];
+  const match=history.find(item=>Date.parse(`${item.date.split('-').reverse().join('-')}T00:00:00`)<=target);
+  const nav=Number(match?.nav);
+  if(!nav)throw new Error('No NAV returned for the selected date');
   return nav;
 }
-async function fetchStockPrice(symbol){
-  if(!STOCK_PROXY_URL||STOCK_PROXY_URL.includes('PASTE-YOUR'))throw new Error('Stock price proxy not configured yet');
-  const res=await fetch(`${STOCK_PROXY_URL}?symbol=${encodeURIComponent(symbol)}`);
-  if(!res.ok)throw new Error('Price proxy request failed');
+async function fetchStockPrice(symbol,date=''){
+  if(!date){
+    if(!STOCK_PROXY_URL||STOCK_PROXY_URL.includes('PASTE-YOUR'))throw new Error('Stock price proxy not configured yet');
+    const res=await fetch(`${STOCK_PROXY_URL}?symbol=${encodeURIComponent(symbol)}`);
+    if(!res.ok)throw new Error('Price proxy request failed');
+    const j=await res.json();
+    const price=Number(j.price);
+    if(!price)throw new Error('No price returned');
+    return price;
+  }
+  const target=Date.parse(`${date}T00:00:00`);
+  const start=Math.floor((target-10*24*60*60*1000)/1000);
+  const end=Math.floor((target+24*60*60*1000)/1000);
+  const res=await fetch(`https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}.NS?period1=${start}&period2=${end}&interval=1d&includePrePost=false&events=div%2Csplits`);
+  if(!res.ok)throw new Error('Historical price request failed');
   const j=await res.json();
-  const price=Number(j.price);
-  if(!price)throw new Error('No price returned');
+  const result=j?.chart?.result?.[0];
+  const timestamps=result?.timestamp||[];
+  const closes=result?.indicators?.quote?.[0]?.close||[];
+  const points=timestamps
+    .map((ts,i)=>({date:timestampToIsoIndia(ts),close:Number(closes[i])}))
+    .filter(p=>p.date&&Number.isFinite(p.close))
+    .filter(p=>Date.parse(`${p.date}T00:00:00`)<=target);
+  const price=points.length?points[points.length-1].close:NaN;
+  if(!price)throw new Error('No price returned for the selected date');
   return price;
 }
 async function refreshAllPrices(){
@@ -1477,37 +1716,70 @@ function renderInvestments(){
   holdings.forEach(h=>{const m=holdMetrics(h);totInvested+=m.invested;totCurrent+=m.currentValue;});
   const totGain=totCurrent-totInvested, totGainPct=totInvested>0?(totGain/totInvested)*100:0;
   const gc=totGain>=0?'#166534':'#ef4444';
+  const invBuckets={MF:{invested:0,current:0,profit:0},Stock:{invested:0,current:0,profit:0}};
+  holdings.forEach(h=>{
+    const key=h.type==='stock'?'Stock':'MF';
+    const m=holdMetrics(h);
+    invBuckets[key].invested+=m.invested;
+    invBuckets[key].current+=m.currentValue;
+    invBuckets[key].profit+=m.gain;
+  });
+  const bucketReturnPct=v=>v.invested>0?(v.profit/v.invested)*100:0;
   document.getElementById('inv-stat-tiles').innerHTML=[
     {label:'Available Cash',val:fmt(bal.totInvCash),color:'#1d4ed8',sub:'Transferred, not yet invested'},
-    {label:'Current Value',val:fmt(totCurrent),color:'#1c1917',sub:`${holdings.length} holding(s)`},
-    {label:'Total Gain / Loss',val:fmt(totGain),color:gc,sub:totGain>=0?'Unrealized profit':'Unrealized loss'},
-    {label:'Overall Return',val:`${totGainPct>=0?'+':''}${totGainPct.toFixed(2)}%`,color:gc,sub:'Since purchase'},
-  ].map(({label,val,color,sub})=>`
+    {label:'Current Value',val:fmt(totCurrent),color:'#1c1917',sub:`${holdings.length} holding(s)`,breakdown:[['Stocks (Equity)',fmt(invBuckets.Stock.current)],['Mutual Funds',fmt(invBuckets.MF.current)]]},
+    {label:'Total Gain / Loss',val:fmt(totGain),color:gc,sub:totGain>=0?'Unrealized profit':'Unrealized loss',breakdown:[['Stocks (Equity)',`${invBuckets.Stock.profit>=0?'+':''}${fmt(invBuckets.Stock.profit)}`],['Mutual Funds',`${invBuckets.MF.profit>=0?'+':''}${fmt(invBuckets.MF.profit)}`]]},
+    {label:'Overall Return',val:`${totGainPct>=0?'+':''}${totGainPct.toFixed(2)}%`,color:gc,sub:'Since purchase',breakdown:[['Stocks (Equity)',`${bucketReturnPct(invBuckets.Stock)>=0?'+':''}${bucketReturnPct(invBuckets.Stock).toFixed(2)}%`],['Mutual Funds',`${bucketReturnPct(invBuckets.MF)>=0?'+':''}${bucketReturnPct(invBuckets.MF).toFixed(2)}%`]]},
+  ].map(({label,val,color,sub,breakdown})=>`
     <div class="stat-tile">
       <div class="slabel">${label}</div>
       <div class="val" style="color:${color}">${val}</div>
       <div class="delta" style="color:#a8a29e">${sub}</div>
+      ${breakdown?`<div class="stat-breakdown">${breakdown.map(([name,value])=>`<div class="row"><span>${esc(name)}</span><span class="num">${value}</span></div>`).join('')}</div>`:''}
     </div>`).join('');
 
-  const accData=accounts.map(a=>{
-    const cv=holdings.filter(h=>h.accountId===a.id).reduce((s,h)=>s+holdMetrics(h).currentValue,0);
-    return{name:a.name,cv};
-  }).filter(a=>a.cv>0);
-  document.getElementById('inv-alloc-empty').classList.toggle('hidden',accData.length>0);
-  if(accData.length){
-    const bgs=accData.map((_,i)=>IDOTS[i%IDOTS.length]+'26');
-    const fgs=accData.map((_,i)=>IDOTS[i%IDOTS.length]);
+  const profitData=[
+    {label:`MF ${invBuckets.MF.profit<0?'Loss':'Profit'}`,value:Math.abs(invBuckets.MF.profit),raw:invBuckets.MF.profit},
+    {label:`Stock ${invBuckets.Stock.profit<0?'Loss':'Profit'}`,value:Math.abs(invBuckets.Stock.profit),raw:invBuckets.Stock.profit},
+  ].filter(x=>x.value>0);
+  const profitEmpty=!profitData.length;
+  document.getElementById('inv-profit-empty').classList.toggle('hidden',!profitEmpty);
+  if(profitEmpty){
+    destroyChart('invProfit');
+    document.getElementById('inv-profit-leg').innerHTML='';
+  }else{
+    const profitBgs=['#dcfce7','#dbeafe'];
+    const profitFgs=['#16a34a','#2563eb'];
+    destroyChart('invProfit');
+    CH.invProfit=new Chart(document.getElementById('inv-profit-donut').getContext('2d'),{
+      type:'doughnut',
+      data:{labels:profitData.map(d=>d.label),datasets:[{data:profitData.map(d=>d.value),backgroundColor:profitBgs.slice(0,profitData.length),borderColor:profitFgs.slice(0,profitData.length),borderWidth:2,hoverOffset:4}]},
+      options:{cutout:'67%',plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>` ${fmt(c.raw)}`}}},responsive:true,maintainAspectRatio:true}
+    });
+    const totalProfit=profitData.reduce((s,d)=>s+d.value,0);
+    document.getElementById('inv-profit-leg').innerHTML=profitData.map((d,i)=>`<div style="display:flex;align-items:center;gap:5px;min-width:0"><span style="width:8px;height:8px;border-radius:2px;background:${profitFgs[i]};flex-shrink:0"></span><span style="font-size:.75rem;color:#57534e;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(d.label)}</span><span class="num" style="font-size:.7rem;color:#a8a29e">${((d.value/totalProfit)*100).toFixed(0)}%</span></div>`).join('');
+  }
+
+  const allocData=[
+    {label:'MF',value:invBuckets.MF.current},
+    {label:'Stock',value:invBuckets.Stock.current},
+  ].filter(x=>x.value>0);
+  const allocEmpty=!allocData.length;
+  document.getElementById('inv-alloc-empty').classList.toggle('hidden',!allocEmpty);
+  if(allocEmpty){
+    destroyChart('invAlloc');
+    document.getElementById('inv-alloc-leg').innerHTML='';
+  }else{
+    const allocBgs=['#f0fdf4','#eff6ff'];
+    const allocFgs=['#16a34a','#2563eb'];
     destroyChart('invAlloc');
     CH.invAlloc=new Chart(document.getElementById('inv-alloc-donut').getContext('2d'),{
       type:'doughnut',
-      data:{labels:accData.map(a=>a.name),datasets:[{data:accData.map(a=>a.cv),backgroundColor:fgs,borderColor:'#fff',borderWidth:2,hoverOffset:4}]},
+      data:{labels:allocData.map(d=>d.label),datasets:[{data:allocData.map(d=>d.value),backgroundColor:allocBgs.slice(0,allocData.length),borderColor:allocFgs.slice(0,allocData.length),borderWidth:2,hoverOffset:4}]},
       options:{cutout:'67%',plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>' '+fmt(c.raw)}}},responsive:true,maintainAspectRatio:true}
     });
-    const tot=accData.reduce((s,a)=>s+a.cv,0);
-    document.getElementById('inv-alloc-leg').innerHTML=accData.map((a,i)=>`<div style="display:flex;align-items:center;gap:5px"><span style="width:8px;height:8px;border-radius:2px;background:${IDOTS[i%IDOTS.length]};flex-shrink:0"></span><span style="font-size:.75rem;color:#57534e;flex:1">${esc(a.name)}</span><span class="num" style="font-size:.7rem;color:#a8a29e">${((a.cv/tot)*100).toFixed(0)}%</span></div>`).join('');
-  }else{
-    destroyChart('invAlloc');
-    document.getElementById('inv-alloc-leg').innerHTML='';
+    const totalAlloc=allocData.reduce((s,d)=>s+d.value,0);
+    document.getElementById('inv-alloc-leg').innerHTML=allocData.map((d,i)=>`<div style="display:flex;align-items:center;gap:5px;min-width:0"><span style="width:8px;height:8px;border-radius:2px;background:${allocFgs[i]};flex-shrink:0"></span><span style="font-size:.75rem;color:#57534e;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(d.label)}</span><span class="num" style="font-size:.7rem;color:#a8a29e">${((d.value/totalAlloc)*100).toFixed(0)}%</span></div>`).join('');
   }
 
   const wrap=document.getElementById('inv-accounts-wrap');
@@ -1638,6 +1910,54 @@ function setTxn(type){
     const btn=document.getElementById(`tt-${t}`);
     btn.className='ttb'+(t===type?(t==='expense'?' ae':t==='income'?' ai':' at'):'');
     document.getElementById(`form-${t}`)[t===type?'classList':'classList'][t===type?'remove':'add']('hidden');
+  });
+}
+
+function calculateCumulativeTotal(selectedCats){
+  return txnsForMK(curMK())
+    .filter(t=>t.type==='expense'&&selectedCats.includes(t.category))
+    .reduce((sum,t)=>sum+Number(t.amount),0);
+}
+
+function renderCumulativeCategoryWidget(){
+  const wrap=document.getElementById('cumulative-cat-widget');
+  if(!wrap)return;
+  const cats=state.categories.expense||[];
+  const activeCats=cumulativeCatSelection.length?cumulativeCatSelection:cats.slice(0,1);
+  const total=calculateCumulativeTotal(activeCats);
+  wrap.innerHTML=`
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:10px">
+      <span style="font-weight:600;font-size:.88rem">Cumulative Category Spend</span>
+      <span class="slabel">${mkLabel(curMK())}</span>
+    </div>
+    <div style="margin-bottom:10px">
+      <div style="font-size:.72rem;color:#78716c;margin-bottom:6px">Select categories</div>
+      <div id="cumulative-cat-list" style="display:flex;flex-wrap:wrap;gap:6px"></div>
+    </div>
+    <div style="display:flex;justify-content:space-between;align-items:baseline">
+      <span style="font-size:.72rem;color:#a8a29e">Current month total</span>
+      <span class="num" id="cumulative-cat-total" style="font-size:.92rem;font-weight:600;color:#1c1917">${fmt(total)}</span>
+    </div>`;
+  const list=document.getElementById('cumulative-cat-list');
+  if(!cats.length){
+    list.innerHTML='<div style="font-size:.78rem;color:#c4bfba">No expense categories available</div>';
+    return;
+  }
+  cats.forEach((cat,i)=>{
+    const col=cpal(i);
+    const label=document.createElement('label');
+    label.className='chip';
+    label.style.background=col.bg;
+    label.style.color=col.fg;
+    label.style.display='inline-flex';
+    label.style.alignItems='center';
+    label.style.gap='6px';
+    label.innerHTML=`<input type="checkbox" data-cat="${esc(cat)}" ${activeCats.includes(cat)?'checked':''} style="accent-color:${col.fg};margin:0"> <span>${esc(cat)}</span>`;
+    label.querySelector('input').onchange=()=>{
+      cumulativeCatSelection=Array.from(list.querySelectorAll('input[data-cat]:checked')).map(inp=>inp.dataset.cat);
+      renderCumulativeCategoryWidget();
+    };
+    list.appendChild(label);
   });
 }
 function quickTransferIn(accountId){
@@ -2322,6 +2642,7 @@ function rebuildAll(){
   buildMonthList();
   renderSidebar();
   renderBudget();
+  renderCumulativeCategoryWidget();
   renderWeekly();
   renderTxnLog();
   fillExpInst();fillIncInst();fillTransferOpts();

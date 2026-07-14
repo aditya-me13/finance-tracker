@@ -1914,7 +1914,7 @@ function setTxn(type){
 }
 
 function calculateCumulativeTotal(selectedCats){
-  return txnsForMK(curMK())
+  return curViewTxns()
     .filter(t=>t.type==='expense'&&selectedCats.includes(t.category))
     .reduce((sum,t)=>sum+Number(t.amount),0);
 }
@@ -1925,17 +1925,19 @@ function renderCumulativeCategoryWidget(){
   const cats=state.categories.expense||[];
   const activeCats=cumulativeCatSelection.length?cumulativeCatSelection:cats.slice(0,1);
   const total=calculateCumulativeTotal(activeCats);
+  const scopeLabel=viewMode==='fy'?fyLabel(viewFY):mkLabel(viewMK);
+  const scopeText=viewMode==='fy'?'Current FY total':'Current month total';
   wrap.innerHTML=`
     <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:10px">
       <span style="font-weight:600;font-size:.88rem">Cumulative Category Spend</span>
-      <span class="slabel">${mkLabel(curMK())}</span>
+      <span class="slabel">${scopeLabel}</span>
     </div>
     <div style="margin-bottom:10px">
       <div style="font-size:.72rem;color:#78716c;margin-bottom:6px">Select categories</div>
       <div id="cumulative-cat-list" style="display:flex;flex-wrap:wrap;gap:6px"></div>
     </div>
     <div style="display:flex;justify-content:space-between;align-items:baseline">
-      <span style="font-size:.72rem;color:#a8a29e">Current month total</span>
+      <span style="font-size:.72rem;color:#a8a29e">${scopeText}</span>
       <span class="num" id="cumulative-cat-total" style="font-size:.92rem;font-weight:600;color:#1c1917">${fmt(total)}</span>
     </div>`;
   const list=document.getElementById('cumulative-cat-list');
@@ -2033,11 +2035,13 @@ function updateViewLabel(){
 function onMonthChange(){
   viewMK=document.getElementById('month-sel').value;
   updateViewLabel();
+  renderCumulativeCategoryWidget();
   renderTxnLog();if(activeTab==='charts')renderQuickCharts();
 }
 function onFYChange(){
   viewFY=document.getElementById('fy-sel').value;
   updateViewLabel();
+  renderCumulativeCategoryWidget();
   renderTxnLog();if(activeTab==='charts')renderQuickCharts();
 }
 function setViewMode(mode){
@@ -2047,6 +2051,7 @@ function setViewMode(mode){
   document.getElementById('month-sel').classList.toggle('hidden',mode!=='month');
   document.getElementById('fy-sel').classList.toggle('hidden',mode!=='fy');
   updateViewLabel();
+  renderCumulativeCategoryWidget();
   renderTxnLog();if(activeTab==='charts')renderQuickCharts();
 }
 

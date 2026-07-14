@@ -6,20 +6,34 @@
 <title>Finance Tracker</title>
 <script src="https://cdn.tailwindcss.com"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
-<script src="https://accounts.google.com/gsi/client" async defer></script>
-<script src="https://apis.google.com/js/api.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet"/>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 body{font-family:'DM Sans',sans-serif;background:#f4f3f0;color:#1c1917;min-height:100vh}
 ::-webkit-scrollbar{width:5px;height:5px}::-webkit-scrollbar-thumb{background:#d6d3d1;border-radius:99px}
-.num{font-family:'DM Mono',monospace;letter-spacing:-.02em}
+.num{font-family:'DM Mono',monospace;letter-spacing:-.02em;white-space:nowrap}
 .shell{display:grid;grid-template-columns:248px 1fr;grid-template-rows:50px 1fr;min-height:100vh}
 .topbar{grid-column:1/-1;background:#fff;border-bottom:1px solid #ebe9e6;display:flex;align-items:center;justify-content:space-between;padding:0 18px;position:sticky;top:0;z-index:40}
 .sidebar{background:#fff;border-right:1px solid #ebe9e6;overflow-y:auto;padding:14px 0 24px;position:sticky;top:50px;height:calc(100vh - 50px)}
 .main{overflow-y:auto;padding:18px}
-@media(max-width:860px){.shell{grid-template-columns:1fr}.sidebar{position:static;height:auto;border-right:none;border-bottom:1px solid #ebe9e6}}
+@media(max-width:860px){.shell{grid-template-columns:1fr}.sidebar{position:static;height:auto;border-right:none;border-bottom:1px solid #ebe9e6}#dash-grid{grid-template-columns:1fr!important}}
+@media(max-width:600px){
+  .shell{grid-template-rows:auto 1fr}
+  .topbar{flex-wrap:wrap;height:auto;min-height:50px;padding:9px 12px;row-gap:8px}
+  .nav-tabs{order:3;width:100%}
+  .nav-tab{flex:1;padding:6px 4px;font-size:.76rem}
+}
 input[type="date"]{min-width:0;width:100%}
+.date-trigger{display:flex;align-items:center;justify-content:space-between;gap:6px;padding:9px 11px;border:1px solid #e7e5e4;border-radius:8px;background:#fff;cursor:pointer;font-family:'DM Mono',monospace;font-size:.85rem;color:#1c1917;width:100%}
+.date-trigger:hover{border-color:#d6d3d1}
+.date-trigger svg{flex-shrink:0;color:#a8a29e}
+.wheel-wrap{position:relative;display:flex;gap:2px;justify-content:center;height:180px}
+.wheel-col{flex:1;height:100%;overflow-y:scroll;scroll-snap-type:y mandatory;scrollbar-width:none;-ms-overflow-style:none;position:relative;z-index:1}
+.wheel-col::-webkit-scrollbar{display:none}
+.wheel-item{height:36px;display:flex;align-items:center;justify-content:center;font-size:.85rem;color:#c4bfba;scroll-snap-align:center;font-family:'DM Mono',monospace;font-weight:500;user-select:none}
+.wheel-spacer{height:72px;flex-shrink:0}
+.wheel-item.sel{color:#1c1917;font-weight:700;font-size:.95rem}
+.wheel-highlight{position:absolute;top:72px;left:0;right:0;height:36px;border-top:1.5px solid #e7e5e4;border-bottom:1.5px solid #e7e5e4;pointer-events:none;background:#faf9f7;border-radius:7px;z-index:0}
 select.pl{min-width:0}
 .card{background:#fff;border-radius:12px;border:1px solid #ebe9e6;padding:17px 19px;overflow:hidden}
 .slabel{font-size:.61rem;font-weight:700;letter-spacing:.09em;text-transform:uppercase;color:#a8a29e}
@@ -95,9 +109,11 @@ select.pl{width:100%;border:1.5px solid #e7e5e4;border-radius:9px;padding:9px 11
 .range-btn{padding:5px 11px;border-radius:7px;font-size:.78rem;font-weight:500;cursor:pointer;border:1.5px solid #e7e5e4;background:#fff;color:#57534e;font-family:'DM Sans',sans-serif;transition:all .15s}
 .range-btn.active{background:#1c1917;color:#fff;border-color:#1c1917}
 /* Stat tile */
-.stat-tile{background:#fff;border-radius:11px;border:1px solid #ebe9e6;padding:14px 16px}
-.stat-tile .val{font-family:'DM Mono',monospace;font-size:1.3rem;font-weight:600;letter-spacing:-.03em;margin-top:4px}
-.stat-tile .delta{font-size:.72rem;margin-top:3px}
+.stat-tile{background:#fff;border-radius:11px;border:1px solid #ebe9e6;padding:14px 16px;min-width:0;overflow:hidden}
+.stat-tile .slabel{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.stat-tile .val{font-family:'DM Mono',monospace;font-size:clamp(1rem,4.2vw,1.3rem);font-weight:600;letter-spacing:-.03em;margin-top:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.stat-tile .delta{font-size:.72rem;margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.stat-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(135px,1fr));gap:12px;margin-bottom:18px}
 .hidden{display:none!important}
 #toast{position:fixed;bottom:22px;left:50%;transform:translateX(-50%);z-index:99;transition:opacity .2s}
 #toast.hiding{opacity:0}
@@ -108,17 +124,20 @@ select.pl{width:100%;border:1.5px solid #e7e5e4;border-radius:9px;padding:9px 11
 .theme-btn{width:27px;height:27px;border-radius:7px;border:1.5px solid #e7e5e4;background:#fff;cursor:pointer;display:flex;align-items:center;justify-content:center;color:#57534e;transition:all .15s;flex-shrink:0}
 .theme-btn:hover{background:#faf9f7}
 html.dark{filter:invert(1) hue-rotate(180deg)}
+/* Investments */
+.badge-sm{display:inline-flex;align-items:center;padding:2px 8px;border-radius:99px;font-size:.66rem;font-weight:600;white-space:nowrap;flex-shrink:0}
+.hold-card{padding:9px 4px;border-bottom:1px solid #f4f3f0}
+.hold-card:last-child{border-bottom:none}
+.hold-card-top{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:5px}
+.hold-name{font-size:.82rem;font-weight:500;color:#292524;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;min-width:70px}
+.hold-gain{font-size:.79rem;font-weight:600;white-space:nowrap;flex-shrink:0}
+.hold-meta{display:flex;flex-wrap:wrap;gap:3px 14px;font-size:.72rem;color:#a8a29e}
+.hold-meta b{color:#57534e;font-family:'DM Mono',monospace;font-weight:600;white-space:nowrap;margin-left:3px}
+.hold-actions{display:flex;gap:2px;justify-content:flex-end;margin-top:2px}
 </style>
 </head>
 <body>
-<div id="auth-gate" style="position:fixed;inset:0;background:#f4f3f0;z-index:200;display:flex;align-items:center;justify-content:center">
-  <div style="text-align:center">
-    <div style="font-weight:600;font-size:1.1rem;margin-bottom:14px">Finance Tracker</div>
-    <button id="signin-btn" class="btn-p" style="padding:10px 22px">Sign in with Google</button>
-    <div id="auth-status" style="font-size:.8rem;color:#a8a29e;margin-top:10px"></div>
-  </div>
-</div>
-<div class="shell">
+<div class="shell" style="display:none">
 
 <!-- TOPBAR -->
 <header class="topbar">
@@ -130,6 +149,7 @@ html.dark{filter:invert(1) hue-rotate(180deg)}
   </div>
   <div class="nav-tabs">
     <button class="nav-tab active" id="nav-dash" onclick="switchView('dashboard')">Dashboard</button>
+    <button class="nav-tab" id="nav-invest" onclick="switchView('invest')">Investments</button>
     <button class="nav-tab" id="nav-analytics" onclick="switchView('analytics')">Analytics</button>
   </div>
   <div style="display:flex;align-items:center;gap:5px">
@@ -148,7 +168,7 @@ html.dark{filter:invert(1) hue-rotate(180deg)}
   <div class="worth-banner">
     <div class="slabel" style="color:#57534e;margin-bottom:5px">Actual Total Worth</div>
     <div class="num" id="sb-worth" style="font-size:1.45rem;font-weight:600;color:#fff">₹0.00</div>
-    <div style="font-size:.68rem;color:#57534e;margin-top:2px">Bank + Cash − CC Dues</div>
+    <div style="font-size:.68rem;color:#57534e;margin-top:2px;line-height:1.5" id="sb-worth-breakdown">Bank + Cash − CC Dues</div>
   </div>
 
   <!-- CC Reminders -->
@@ -193,7 +213,9 @@ html.dark{filter:invert(1) hue-rotate(180deg)}
               <div style="min-width:0"><div class="slabel" style="margin-bottom:4px">Amount (INR)</div>
                 <div class="fw"><div class="fp">₹</div><input id="e-amt" class="fi" type="number" min="0" step="0.01" placeholder="0.00"/></div>
               </div>
-              <div style="min-width:0"><div class="slabel" style="margin-bottom:4px">Date</div><input id="e-date" type="date" class="pl" style="padding:9px 8px;width:100%"/></div>
+              <div style="min-width:0"><div class="slabel" style="margin-bottom:4px">Date</div>
+                <div class="date-trigger" onclick="openDatePicker('e-date')"><span id="e-date-disp">Select date</span><svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg></div>
+                <input id="e-date" type="hidden"/></div>
             </div>
             <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:9px">
               <div><div class="slabel" style="margin-bottom:4px">Account Type</div>
@@ -215,7 +237,9 @@ html.dark{filter:invert(1) hue-rotate(180deg)}
               <div style="min-width:0"><div class="slabel" style="margin-bottom:4px">Amount (INR)</div>
                 <div class="fw"><div class="fp">₹</div><input id="i-amt" class="fi" type="number" min="0" step="0.01" placeholder="0.00"/></div>
               </div>
-              <div style="min-width:0"><div class="slabel" style="margin-bottom:4px">Date</div><input id="i-date" type="date" class="pl" style="padding:9px 8px;width:100%"/></div>
+              <div style="min-width:0"><div class="slabel" style="margin-bottom:4px">Date</div>
+                <div class="date-trigger" onclick="openDatePicker('i-date')"><span id="i-date-disp">Select date</span><svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg></div>
+                <input id="i-date" type="hidden"/></div>
             </div>
             <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:9px">
               <div><div class="slabel" style="margin-bottom:4px">Credit To</div>
@@ -237,7 +261,9 @@ html.dark{filter:invert(1) hue-rotate(180deg)}
               <div style="min-width:0"><div class="slabel" style="margin-bottom:4px">Amount (INR)</div>
                 <div class="fw"><div class="fp">₹</div><input id="t-amt" class="fi" type="number" min="0" step="0.01" placeholder="0.00"/></div>
               </div>
-              <div style="min-width:0"><div class="slabel" style="margin-bottom:4px">Date</div><input id="t-date" type="date" class="pl" style="padding:9px 8px;width:100%"/></div>
+              <div style="min-width:0"><div class="slabel" style="margin-bottom:4px">Date</div>
+                <div class="date-trigger" onclick="openDatePicker('t-date')"><span id="t-date-disp">Select date</span><svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg></div>
+                <input id="t-date" type="hidden"/></div>
             </div>
             <div style="display:grid;grid-template-columns:1fr auto 1fr;gap:6px;align-items:end;margin-bottom:9px">
               <div><div class="slabel" style="margin-bottom:4px">From</div><select id="t-from" class="pl" style="width:100%"></select></div>
@@ -287,9 +313,14 @@ html.dark{filter:invert(1) hue-rotate(180deg)}
       <!-- RIGHT -->
       <div style="display:flex;flex-direction:column;gap:13px">
         <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap">
-          <div style="display:flex;align-items:center;gap:8px">
+          <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+            <div class="tg" style="flex-shrink:0">
+              <button class="tp active" id="vmode-month" onclick="setViewMode('month')">Month</button>
+              <button class="tp" id="vmode-fy" onclick="setViewMode('fy')">Financial Year</button>
+            </div>
             <span class="slabel">Viewing:</span>
-            <select id="month-sel" onchange="onMonthChange()" class="pl" style="padding:6px 10px;font-size:.78rem"></select>
+            <select id="month-sel" onchange="onMonthChange()" class="pl" style="padding:6px 10px;font-size:.78rem;width:auto"></select>
+            <select id="fy-sel" onchange="onFYChange()" class="pl hidden" style="padding:6px 10px;font-size:.78rem;width:auto"></select>
           </div>
           <div class="tg">
             <button class="tp active" id="tab-log" onclick="switchTab('log')">Transactions</button>
@@ -347,12 +378,15 @@ html.dark{filter:invert(1) hue-rotate(180deg)}
             <button class="range-btn" id="rng-3m" onclick="setRange('3_months')">3 Months</button>
             <button class="range-btn" id="rng-6m" onclick="setRange('6_months')">6 Months</button>
             <button class="range-btn" id="rng-yr" onclick="setRange('this_year')">This Year</button>
+            <button class="range-btn" id="rng-fy" onclick="setRange('this_fy')">This FY</button>
             <button class="range-btn" id="rng-custom" onclick="setRange('custom')">Custom</button>
           </div>
-          <div id="custom-range-row" class="hidden" style="display:flex;align-items:center;gap:6px">
-            <input type="date" id="rng-from" class="pl" style="padding:5px 9px;font-size:.78rem" onchange="applyCustomRange()"/>
+          <div id="custom-range-row" class="hidden" style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
+            <div class="date-trigger" style="padding:5px 9px;font-size:.78rem;width:auto" onclick="openDatePicker('rng-from')"><span id="rng-from-disp">Select date</span></div>
+            <input id="rng-from" type="hidden"/>
             <span style="font-size:.78rem;color:#a8a29e">to</span>
-            <input type="date" id="rng-to" class="pl" style="padding:5px 9px;font-size:.78rem" onchange="applyCustomRange()"/>
+            <div class="date-trigger" style="padding:5px 9px;font-size:.78rem;width:auto" onclick="openDatePicker('rng-to')"><span id="rng-to-disp">Select date</span></div>
+            <input id="rng-to" type="hidden"/>
           </div>
           <div id="rng-display" style="font-size:.72rem;color:#a8a29e"></div>
         </div>
@@ -360,7 +394,7 @@ html.dark{filter:invert(1) hue-rotate(180deg)}
     </div>
 
     <!-- Summary Stat Tiles -->
-    <div id="an-stat-tiles" style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:18px"></div>
+    <div id="an-stat-tiles" class="stat-grid"></div>
 
     <!-- Section A: Budget vs Actuals -->
     <div style="margin-bottom:14px">
@@ -470,7 +504,61 @@ html.dark{filter:invert(1) hue-rotate(180deg)}
       </div>
     </div>
   </div>
+
+  <!-- INVESTMENTS -->
+  <div id="view-invest" class="hidden">
+    <div style="margin-bottom:18px;display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:12px">
+      <div>
+        <h2 style="font-weight:600;font-size:1rem">Investments</h2>
+        <p style="font-size:.78rem;color:#a8a29e;margin-top:2px">Demat accounts &amp; mutual funds — included in your net worth</p>
+      </div>
+      <div style="display:flex;gap:8px">
+        <button class="btn-g" onclick="refreshAllPrices()" id="refresh-prices-btn">↻ Refresh Prices</button>
+        <button class="btn-p" onclick="openInvAccModal()">+ Add Account</button>
+      </div>
+    </div>
+
+    <!-- Summary Stat Tiles -->
+    <div id="inv-stat-tiles" class="stat-grid"></div>
+
+    <!-- Allocation -->
+    <div style="margin-bottom:14px">
+      <div class="an-sec-title">Portfolio Allocation</div>
+      <div class="card">
+        <div style="display:flex;gap:14px;align-items:flex-start;flex-wrap:wrap">
+          <div style="width:160px;height:160px;flex-shrink:0;position:relative">
+            <canvas id="inv-alloc-donut"></canvas>
+            <div id="inv-alloc-empty" class="chart-empty hidden" style="position:absolute;inset:0">No holdings yet</div>
+          </div>
+          <div id="inv-alloc-leg" style="display:flex;flex-direction:column;gap:5px;flex:1;min-width:80px;justify-content:center"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Accounts & Holdings -->
+    <div id="inv-accounts-wrap" style="display:flex;flex-direction:column;gap:14px"></div>
+  </div>
 </main>
+</div>
+
+<!-- AUTH GATE -->
+<div id="auth-gate" class="mo">
+  <div class="mb narrow">
+    <div style="display:flex;align-items:center;gap:9px;margin-bottom:18px">
+      <div style="width:27px;height:27px;background:#1c1917;border-radius:7px;display:flex;align-items:center;justify-content:center">
+        <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="#fff" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 11h.01M12 11h.01M15 11h.01M4 19h16a2 2 0 002-2V7a2 2 0 00-2-2H4a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
+      </div>
+      <span style="font-weight:600;font-size:.93rem">Finance Tracker</span>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:10px">
+      <div class="fw"><input id="auth-email" class="fi" type="email" placeholder="Email" autocomplete="username"/></div>
+      <div class="fw"><input id="auth-pass" class="fi" type="password" placeholder="Password" autocomplete="current-password"/></div>
+      <div id="auth-err" style="font-size:.76rem;color:#be123c;display:none"></div>
+      <button class="btn-p" style="width:100%" id="auth-signin-btn" onclick="doSignIn()">Sign In</button>
+      <button class="btn-g" style="width:100%" id="auth-signup-btn" onclick="doSignUp()">Create Account</button>
+      <p style="font-size:.71rem;color:#a8a29e;text-align:center;margin-top:2px">Your data syncs privately to your own Firebase project.</p>
+    </div>
+  </div>
 </div>
 
 <!-- MODAL: Add Account -->
@@ -504,6 +592,91 @@ html.dark{filter:invert(1) hue-rotate(180deg)}
     <div style="display:flex;gap:8px;margin-top:16px">
       <button class="btn-g" style="flex:1" onclick="closeModal('modal-ac')">Cancel</button>
       <button class="btn-p" style="flex:1" id="ac-save-btn" onclick="saveAccount()">Add</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: Add/Edit Investment Account -->
+<div id="modal-inv-acc" class="mo hidden" onclick="if(event.target.id==='modal-inv-acc')closeModal('modal-inv-acc')">
+  <div class="mb">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+      <h3 style="font-weight:600;font-size:.93rem" id="modal-inv-acc-title">Add Investment Account</h3>
+      <button class="btn-i" onclick="closeModal('modal-inv-acc')"><svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg></button>
+    </div>
+    <input type="hidden" id="inv-acc-id"/>
+    <div style="display:flex;flex-direction:column;gap:11px">
+      <div><div class="slabel" style="margin-bottom:4px">Account Type</div>
+        <select id="inv-acc-type" class="pl">
+          <option value="demat">Demat Account</option>
+          <option value="mf">Mutual Fund Platform</option>
+        </select>
+      </div>
+      <div><div class="slabel" style="margin-bottom:4px">Account Name</div>
+        <div class="fw"><input id="inv-acc-name" class="fi" type="text" placeholder="e.g. Zerodha, Groww"/></div></div>
+    </div>
+    <div style="display:flex;gap:8px;margin-top:16px">
+      <button class="btn-g" style="flex:1" onclick="closeModal('modal-inv-acc')">Cancel</button>
+      <button class="btn-p" style="flex:1" id="inv-acc-save-btn" onclick="saveInvAccount()">Add</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: Add/Edit Holding -->
+<div id="modal-inv-hold" class="mo hidden" onclick="if(event.target.id==='modal-inv-hold')closeModal('modal-inv-hold')">
+  <div class="mb">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+      <h3 style="font-weight:600;font-size:.93rem" id="modal-inv-hold-title">Add Holding</h3>
+      <button class="btn-i" onclick="closeModal('modal-inv-hold')"><svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg></button>
+    </div>
+    <input type="hidden" id="inv-hold-id"/>
+    <div style="display:flex;flex-direction:column;gap:11px">
+      <div><div class="slabel" style="margin-bottom:4px">Account</div>
+        <select id="inv-hold-acc" class="pl" onchange="updateInvHoldCashHint()"></select>
+        <p id="inv-hold-cash-hint" style="font-size:.71rem;color:#a8a29e;margin-top:4px"></p></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+        <div><div class="slabel" style="margin-bottom:4px">Holding Type</div>
+          <select id="inv-hold-type" class="pl" onchange="toggleHoldLookupFields()">
+            <option value="stock">Stock</option>
+            <option value="mf">Mutual Fund</option>
+          </select>
+        </div>
+        <div><div class="slabel" style="margin-bottom:4px">Purchase Date</div>
+          <div class="date-trigger" onclick="openDatePicker('inv-hold-date')"><span id="inv-hold-date-disp">Select date</span><svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg></div>
+          <input id="inv-hold-date" type="hidden"/></div>
+      </div>
+      <div><div class="slabel" style="margin-bottom:4px">Name</div>
+        <div class="fw"><input id="inv-hold-name" class="fi" type="text" placeholder="e.g. HDFC Bank, Parag Parikh Flexi Cap"/></div></div>
+      <!-- Stock symbol lookup -->
+      <div id="inv-hold-stock-wrap">
+        <div class="slabel" style="margin-bottom:4px">NSE Symbol (for live price)</div>
+        <div class="fw"><input id="inv-hold-symbol" class="fi" type="text" placeholder="e.g. RELIANCE, TCS, INFY"/></div>
+        <p style="font-size:.71rem;color:#a8a29e;margin-top:4px">Used by "Refresh Prices" to fetch the latest NSE quote.</p>
+      </div>
+      <!-- MF scheme lookup -->
+      <div id="inv-hold-mf-wrap" class="hidden">
+        <div class="slabel" style="margin-bottom:4px">Find AMFI Scheme (for live NAV)</div>
+        <div style="display:flex;gap:6px">
+          <div class="fw" style="flex:1"><input id="inv-hold-mfsearch" class="fi" type="text" placeholder="Search fund name, e.g. Parag Parikh Flexi Cap"/></div>
+          <button type="button" class="btn-g" onclick="searchMF()">Search</button>
+        </div>
+        <div id="inv-hold-mfresults" style="max-height:140px;overflow-y:auto;margin-top:4px"></div>
+        <input type="hidden" id="inv-hold-schemecode"/>
+        <p id="inv-hold-mfpicked" style="font-size:.71rem;color:#166534;margin-top:4px"></p>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+        <div><div class="slabel" style="margin-bottom:4px">Units / Quantity</div>
+          <div class="fw"><input id="inv-hold-units" class="fi" type="number" min="0" step="0.001" placeholder="0"/></div></div>
+        <div><div class="slabel" style="margin-bottom:4px">Avg. Buy Price (₹/unit)</div>
+          <div class="fw"><div class="fp">₹</div><input id="inv-hold-buy" class="fi" type="number" min="0" step="0.01" placeholder="0.00"/></div></div>
+      </div>
+      <div><div class="slabel" style="margin-bottom:4px">Current NAV / Price (₹/unit)</div>
+        <div class="fw"><div class="fp">₹</div><input id="inv-hold-nav" class="fi" type="number" min="0" step="0.01" placeholder="0.00"/></div>
+        <p style="font-size:.71rem;color:#a8a29e;margin-top:4px">Filled automatically by "Refresh Prices" — you can still edit it manually.</p>
+      </div>
+    </div>
+    <div style="display:flex;gap:8px;margin-top:16px">
+      <button class="btn-g" style="flex:1" onclick="closeModal('modal-inv-hold')">Cancel</button>
+      <button class="btn-p" style="flex:1" id="inv-hold-save-btn" onclick="saveInvHolding()">Add</button>
     </div>
   </div>
 </div>
@@ -561,16 +734,59 @@ html.dark{filter:invert(1) hue-rotate(180deg)}
   </div>
 </div>
 
+<!-- MODAL: Date Wheel Picker -->
+<div id="modal-datewheel" class="mo hidden" onclick="if(event.target.id==='modal-datewheel')closeModal('modal-datewheel')">
+  <div class="mb" style="max-width:280px">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
+      <h3 style="font-weight:600;font-size:.93rem">Select Date</h3>
+      <button class="btn-i" onclick="closeModal('modal-datewheel')"><svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg></button>
+    </div>
+    <div class="wheel-wrap">
+      <div class="wheel-highlight"></div>
+      <div class="wheel-col" id="wheel-day" onscroll="onWheelScroll(this)"></div>
+      <div class="wheel-col" id="wheel-month" onscroll="onWheelScroll(this)"></div>
+      <div class="wheel-col" id="wheel-year" onscroll="onWheelScroll(this)"></div>
+    </div>
+    <button class="btn-p" style="width:100%;margin-top:14px" onclick="confirmDatePicker()">Done</button>
+  </div>
+</div>
+
 <!-- Toast -->
 <div id="toast" class="hidden">
   <div style="background:#1c1917;color:#fff;font-size:.82rem;font-weight:500;padding:9px 17px;border-radius:9px;box-shadow:0 4px 20px rgba(0,0,0,.18)" id="toast-msg"></div>
 </div>
 
+<!-- Firebase SDK (compat build — no bundler needed) -->
+<script src="https://www.gstatic.com/firebasejs/12.15.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/12.15.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/12.15.0/firebase-firestore-compat.js"></script>
+
 <script>
+/* ================================================================
+   CLOUD CONFIG — fill these in after you finish the setup steps
+================================================================ */
+// 1) Paste your Firebase project config here (Firebase console → Project settings → Your apps → SDK setup and configuration)
+const firebaseConfig = {
+  apiKey: "AIzaSyCJBpPQ644MJ_3s20XwkBS2rqAyKiimYls",
+  authDomain: "finance-tracker-1ed79.firebaseapp.com",
+  projectId: "finance-tracker-1ed79",
+  storageBucket: "finance-tracker-1ed79.firebasestorage.app",
+  messagingSenderId: "411022965468",
+  appId: "1:411022965468:web:5bdf85870237a1a0cc9219",
+  measurementId: "G-FEMBDZWP6Y"
+};
+// 2) Paste your deployed Cloudflare Worker URL here (used only for live stock prices)
+const STOCK_PROXY_URL = "https://orange-band-a22e.mehtaaditya1307.workers.dev";
+
+firebase.initializeApp(firebaseConfig);
+const auth = firebase.auth();
+const db = firebase.firestore();
+let currentUid = null;
+
 /* ================================================================
    STATE v4
    cards now include: { id, name, limit, startDue, dueDay, remindDays }
-   New: categoryBudgets, date-range analytics state
+   Holdings now include: { symbol } for stocks, { schemeCode } for MFs
 ================================================================ */
 const CHIP_COLORS=[
   {bg:'#fce7f3',fg:'#9d174d'},{bg:'#ede9fe',fg:'#5b21b6'},{bg:'#dbeafe',fg:'#1e40af'},
@@ -582,152 +798,56 @@ const cpal=i=>CHIP_COLORS[i%CHIP_COLORS.length];
 const BDOTS=['#3b82f6','#6366f1','#0ea5e9','#8b5cf6','#06b6d4','#14b8a6'];
 const CDOTS=['#f59e0b','#ef4444','#ec4899','#f97316','#a855f7','#e11d48'];
 const CASHDOT='#22c55e';
+const IDOTS=['#0ea5e9','#8b5cf6','#f59e0b','#14b8a6','#ec4899','#6366f1'];
 const DEF_EXP=['Food','Travel','Shopping','Bills','Entertainment','Investment'];
 const DEF_INC=['Salary','Freelance','Refund','Interest','Gift','Other'];
 
-/* ── Google Sheets config ─────────────────────────────────── */
-const CLIENT_ID = '913527573213-ggl1cou05g9oq6ilekill71lvt104qek.apps.googleusercontent.com'; // <-- fill in from Google Cloud Console
-const SPREADSHEET_ID = '1ZiEExT0A-KP8XmvIRI7V783ai9Umic-3f8UPVCtskgE';                  // <-- fill in from your Sheet's URL
-const SCOPES = 'https://www.googleapis.com/auth/spreadsheets';
-
-let tokenClient, accessToken=null;
-
-let state={banks:[],cards:[],cash:{startBalance:0},categories:{expense:[...DEF_EXP],income:[...DEF_INC]},monthlyBudget:0,categoryBudgets:{},transactions:[]};
-
-function gapiLoad(){
-  return new Promise(resolve=>{
-    gapi.load('client', async ()=>{
-      await gapi.client.init({});
-      await gapi.client.load('https://sheets.googleapis.com/$discovery/rest?version=v4');
-      resolve();
-    });
-  });
-}
-
-function initAuth(){
-  tokenClient=google.accounts.oauth2.initTokenClient({
-    client_id:CLIENT_ID,
-    scope:SCOPES,
-    callback: async (resp)=>{
-      if(resp.error){document.getElementById('auth-status').textContent='Sign-in failed: '+resp.error;return;}
-      accessToken=resp.access_token;
-      gapi.client.setToken({access_token:accessToken});
-      document.getElementById('auth-status').textContent='Loading your data…';
-      try{
-        await loadStateFromSheets();
-      }catch(e){
-        document.getElementById('auth-status').textContent='Could not load sheet — check SPREADSHEET_ID / tab names.';
-        console.error(e);
-        return;
-      }
-      document.getElementById('auth-gate').classList.add('hidden');
-      rebuildAll();
-      updateRangeDisplay();
-    }
-  });
-  document.getElementById('signin-btn').onclick=()=>tokenClient.requestAccessToken({prompt:'consent'});
-  // Try silent sign-in first (no popup) in case a session already exists
-  tokenClient.requestAccessToken({prompt:''});
-}
-
-/* Re-request a token on auth errors (expired after ~1hr), then retry once */
-async function withAuthRetry(fn){
-  try{ return await fn(); }
-  catch(e){
-    if(e && e.status===401){
-      await new Promise(res=>{
-        tokenClient.callback=(resp)=>{
-          if(!resp.error){accessToken=resp.access_token;gapi.client.setToken({access_token:accessToken});}
-          res();
-        };
-        tokenClient.requestAccessToken({prompt:''});
-      });
-      return fn();
-    }
-    throw e;
-  }
-}
-
-/* ── Sheets read/write helpers ────────────────────────────── */
-async function sheetGetValues(range){
-  const r=await withAuthRetry(()=>gapi.client.sheets.spreadsheets.values.get({spreadsheetId:SPREADSHEET_ID,range}));
-  return r.result.values||[];
-}
-async function sheetSetValues(range,values){
-  return withAuthRetry(()=>gapi.client.sheets.spreadsheets.values.update({
-    spreadsheetId:SPREADSHEET_ID,range,valueInputOption:'RAW',resource:{values}
-  }));
-}
-async function sheetClearAndSet(sheetName,headerRow,rows){
-  await withAuthRetry(()=>gapi.client.sheets.spreadsheets.values.clear({spreadsheetId:SPREADSHEET_ID,range:sheetName}));
-  await sheetSetValues(`${sheetName}!A1`,[headerRow,...rows]);
-}
-
-async function loadStateFromSheets(){
-  const[txRows,bankRows,cardRows,cashRows,catRows,budRows]=await Promise.all([
-    sheetGetValues('Transactions!A2:J'),
-    sheetGetValues('Banks!A2:C'),
-    sheetGetValues('Cards!A2:F'),
-    sheetGetValues('Cash!A2:A'),
-    sheetGetValues('Categories!A2:B'),
-    sheetGetValues('Budgets!A2:B'),
-  ]);
-
-  state.transactions=txRows.filter(r=>r[0]).map(r=>({
-    id:r[0],date:r[1],type:r[2],amount:Number(r[3])||0,category:r[4],
-    acType:r[5]||undefined,acId:r[6]||undefined,desc:r[7]||'',
-    fromKey:r[8]||undefined,toKey:r[9]||undefined
-  }));
-  state.banks=bankRows.filter(r=>r[0]).map(r=>({id:r[0],name:r[1],startBalance:Number(r[2])||0}));
-  state.cards=cardRows.filter(r=>r[0]).map(r=>({id:r[0],name:r[1],limit:Number(r[2])||0,startDue:Number(r[3])||0,dueDay:r[4]||'',remindDays:r[5]||''}));
-  state.cash={startBalance:cashRows[0]?Number(cashRows[0][0])||0:0};
-
-  const expCats=catRows.filter(r=>r[0]==='expense').map(r=>r[1]);
-  const incCats=catRows.filter(r=>r[0]==='income').map(r=>r[1]);
-  state.categories={
-    expense:expCats.length?expCats:[...DEF_EXP],
-    income:incCats.length?incCats:[...DEF_INC]
-  };
-
-  state.categoryBudgets={};
-  budRows.filter(r=>r[0]).forEach(r=>{state.categoryBudgets[r[0]]=Number(r[1])||0;});
-}
-
+/* ── Local cache (instant load / offline fallback) + cloud sync ── */
+const loadLocalCache=()=>{try{const r=localStorage.getItem('ft_v4');if(r)return JSON.parse(r);}catch(e){}return null;};
 let _saveTimer=null;
 function saveState(){
-  // Debounced so rapid edits batch into one write instead of one per action.
+  try{localStorage.setItem('ft_v4',JSON.stringify(state));}catch(e){}
+  if(!currentUid)return;
   clearTimeout(_saveTimer);
-  _saveTimer=setTimeout(saveStateToSheets,600);
+  _saveTimer=setTimeout(()=>{
+    db.collection('users').doc(currentUid).set({data:JSON.stringify(state),updatedAt:Date.now()})
+      .catch(()=>toast('Cloud sync failed — saved locally, will retry next change'));
+  },700);
+}
+async function loadStateFromCloud(){
+  try{
+    const snap=await db.collection('users').doc(currentUid).get();
+    if(snap.exists && snap.data() && snap.data().data){
+      state=JSON.parse(snap.data().data);
+    }else{
+      const local=loadLocalCache();
+      if(local)state=local;
+    }
+  }catch(e){
+    const local=loadLocalCache();
+    if(local)state=local;
+    toast('Could not reach cloud — showing local copy');
+  }
+  normalizeState();
 }
 
-async function saveStateToSheets(){
-  if(!accessToken)return;
-  const txRows=state.transactions.map(t=>[t.id,t.date,t.type,t.amount,t.category||'',t.acType||'',t.acId||'',t.desc||'',t.fromKey||'',t.toKey||'']);
-  const bankRows=state.banks.map(b=>[b.id,b.name,b.startBalance]);
-  const cardRows=state.cards.map(c=>[c.id,c.name,c.limit,c.startDue,c.dueDay,c.remindDays]);
-  const catRows=[
-    ...state.categories.expense.map(name=>['expense',name]),
-    ...state.categories.income.map(name=>['income',name])
-  ];
-  const budRows=Object.entries(state.categoryBudgets).map(([k,v])=>[k,v]);
-
-  try{
-    await Promise.all([
-      sheetClearAndSet('Transactions',['id','date','type','amount','category','acType','acId','desc','fromKey','toKey'],txRows),
-      sheetClearAndSet('Banks',['id','name','startBalance'],bankRows),
-      sheetClearAndSet('Cards',['id','name','limit','startDue','dueDay','remindDays'],cardRows),
-      sheetSetValues('Cash!A2',[[state.cash.startBalance]]),
-      sheetClearAndSet('Categories',['type','name'],catRows),
-      sheetClearAndSet('Budgets',['category','monthlyLimit'],budRows),
-    ]);
-  }catch(e){
-    console.error('Save to Sheets failed',e);
-    toast('Save failed — check connection');
-  }
+let state={banks:[],cards:[],cash:{startBalance:0},categories:{expense:[...DEF_EXP],income:[...DEF_INC]},monthlyBudget:0,categoryBudgets:{},transactions:[],investments:{accounts:[],holdings:[]}};
+function normalizeState(){
+  if(!state.banks)state.banks=[];
+  if(!state.cards)state.cards=[];
+  if(!state.cash)state.cash={startBalance:0};
+  if(!state.categories)state.categories={expense:[...DEF_EXP],income:[...DEF_INC]};
+  if(!state.categories.expense)state.categories.expense=[...DEF_EXP];
+  if(!state.categories.income)state.categories.income=[...DEF_INC];
+  if(!state.transactions)state.transactions=[];
+  if(!state.categoryBudgets)state.categoryBudgets={};
+  if(!state.investments)state.investments={accounts:[],holdings:[]};
+  if(!state.investments.accounts)state.investments.accounts=[];
+  if(!state.investments.holdings)state.investments.holdings=[];
 }
 
 /* UI state */
-let txnType='expense',selExpCat=null,selIncCat=null,viewMK=null,activeTab='log',activeView='dashboard';
+let txnType='expense',selExpCat=null,selIncCat=null,viewMK=null,viewFY=null,viewMode='month',activeTab='log',activeView='dashboard';
 let CH={};  // chart instances keyed by id
 
 /* Analytics range state */
@@ -743,6 +863,10 @@ const today=()=>{const d=new Date();return`${d.getFullYear()}-${pad(d.getMonth()
 const mkOf=s=>s.slice(0,7);
 const curMK=()=>today().slice(0,7);
 const mkLabel=k=>{const[y,m]=k.split('-');return new Date(+y,+m-1,1).toLocaleDateString('en-IN',{month:'long',year:'numeric'});};
+const fyOf=s=>{const y=Number(s.slice(0,4)),m=Number(s.slice(5,7));return String(m>=4?y:y-1);};
+const curFY=()=>fyOf(today());
+const fyLabel=fy=>`FY ${fy}-${String(Number(fy)+1).slice(-2)}`;
+const fyRange=fy=>({from:`${fy}-04-01`,to:`${Number(fy)+1}-03-31`});
 const fmt=n=>'₹'+Number(n).toLocaleString('en-IN',{minimumFractionDigits:2,maximumFractionDigits:2});
 const esc=s=>String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 const dateToStr=d=>`${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
@@ -757,10 +881,110 @@ function toast(msg,ms=2400){
 const openModal=id=>document.getElementById(id).classList.remove('hidden');
 const closeModal=id=>document.getElementById(id).classList.add('hidden');
 
+/* ── Auth ─────────────────────────────────────────────────── */
+function showAuthErr(msg){
+  const el=document.getElementById('auth-err');
+  el.textContent=msg;el.style.display='block';
+}
+function doSignIn(){
+  const email=document.getElementById('auth-email').value.trim();
+  const pass=document.getElementById('auth-pass').value;
+  if(!email||!pass){showAuthErr('Enter email and password');return;}
+  document.getElementById('auth-err').style.display='none';
+  auth.signInWithEmailAndPassword(email,pass).catch(e=>showAuthErr(e.message));
+}
+function doSignUp(){
+  const email=document.getElementById('auth-email').value.trim();
+  const pass=document.getElementById('auth-pass').value;
+  if(!email||!pass){showAuthErr('Enter email and password');return;}
+  if(pass.length<6){showAuthErr('Password must be at least 6 characters');return;}
+  document.getElementById('auth-err').style.display='none';
+  auth.createUserWithEmailAndPassword(email,pass).catch(e=>showAuthErr(e.message));
+}
+auth.onAuthStateChanged(async user=>{
+  if(user){
+    currentUid=user.uid;
+    document.getElementById('auth-gate').classList.add('hidden');
+    document.querySelector('.shell').style.display='grid';
+    await loadStateFromCloud();
+    boot();
+  }else{
+    currentUid=null;
+    document.getElementById('auth-gate').classList.remove('hidden');
+    document.querySelector('.shell').style.display='none';
+  }
+});
+
+/* ── Date Wheel Picker ────────────────────────────────────── */
+const MONTH_NAMES=['January','February','March','April','May','June','July','August','September','October','November','December'];
+const WHEEL_ITEM_H=36;
+const fmtDMY=iso=>{if(!iso)return'Select date';const[y,m,d]=iso.split('-');return`${d}.${m}.${y}`;};
+function setDateVal(id,iso){
+  const el=document.getElementById(id);if(el)el.value=iso||'';
+  const disp=document.getElementById(id+'-disp');
+  if(disp)disp.textContent=fmtDMY(iso);
+}
+function daysInMonth(year,monthIdx){return new Date(year,monthIdx+1,0).getDate();}
+function buildWheelCol(el,items,selIdx){
+  const spacer='<div class="wheel-spacer"></div>';
+  el.innerHTML=spacer+items.map((label,i)=>`<div class="wheel-item${i===selIdx?' sel':''}">${label}</div>`).join('')+spacer;
+  el._items=items;
+  el.scrollTop=selIdx*WHEEL_ITEM_H;
+  markSelected(el,selIdx);
+}
+function markSelected(el,idx){
+  el.querySelectorAll('.wheel-item').forEach((c,i)=>c.classList.toggle('sel',i===idx));
+}
+function wheelIndex(el){return Math.max(0,Math.min(el._items.length-1,Math.round(el.scrollTop/WHEEL_ITEM_H)));}
+function onWheelScroll(el){
+  clearTimeout(el._st);
+  el._st=setTimeout(()=>{
+    const idx=wheelIndex(el);
+    markSelected(el,idx);
+    if(el.id==='wheel-month'||el.id==='wheel-year')syncDayWheel();
+  },120);
+}
+function syncDayWheel(){
+  const dEl=document.getElementById('wheel-day'),mEl=document.getElementById('wheel-month'),yEl=document.getElementById('wheel-year');
+  const monthIdx=wheelIndex(mEl),year=Number(yEl._items[wheelIndex(yEl)]);
+  const curDay=Number(dEl._items[wheelIndex(dEl)]);
+  const dc=daysInMonth(year,monthIdx);
+  if(dEl._items.length!==dc||curDay>dc){
+    const newDay=Math.min(curDay,dc);
+    buildWheelCol(dEl,Array.from({length:dc},(_,i)=>String(i+1).padStart(2,'0')),newDay-1);
+  }
+}
+let _dateTargetId=null;
+function openDatePicker(targetId){
+  _dateTargetId=targetId;
+  const cur=document.getElementById(targetId).value;
+  const base=cur?new Date(cur+'T00:00:00'):new Date();
+  const year=base.getFullYear(),monthIdx=base.getMonth(),day=base.getDate();
+  const dc=daysInMonth(year,monthIdx);
+  const years=[];for(let y=year-7;y<=year+3;y++)years.push(String(y));
+  openModal('modal-datewheel');
+  requestAnimationFrame(()=>{
+    buildWheelCol(document.getElementById('wheel-day'),Array.from({length:dc},(_,i)=>String(i+1).padStart(2,'0')),Math.min(day,dc)-1);
+    buildWheelCol(document.getElementById('wheel-month'),MONTH_NAMES,monthIdx);
+    buildWheelCol(document.getElementById('wheel-year'),years,years.indexOf(String(year)));
+  });
+}
+function confirmDatePicker(){
+  const dEl=document.getElementById('wheel-day'),mEl=document.getElementById('wheel-month'),yEl=document.getElementById('wheel-year');
+  const day=dEl._items[wheelIndex(dEl)],monthIdx=wheelIndex(mEl),year=yEl._items[wheelIndex(yEl)];
+  const iso=`${year}-${pad(monthIdx+1)}-${day}`;
+  if(_dateTargetId){
+    setDateVal(_dateTargetId,iso);
+    if(_dateTargetId==='rng-from'||_dateTargetId==='rng-to')applyCustomRange();
+  }
+  closeModal('modal-datewheel');
+}
+
 /* ── Delete Confirmation ──────────────────────────────────── */
 function confirmDelete(id){
   const t=state.transactions.find(x=>x.id===id);
   if(!t)return;
+  if(t.type==='invest'){toast('Edit or delete this holding from the Investments tab');return;}
   _pendingDeleteId=id;
   let desc='';
   if(t.type==='expense')desc=`${t.category} — ${fmt(t.amount)} on ${fmtDate(t.date)}`;
@@ -783,6 +1007,7 @@ function computeBal(){
   const bk={};state.banks.forEach(b=>bk[b.id]=Number(b.startBalance)||0);
   let ca=Number(state.cash.startBalance)||0;
   const cd={};state.cards.forEach(c=>cd[c.id]=Number(c.startDue)||0);
+  const iv={};state.investments.accounts.forEach(a=>iv[a.id]=0);
   for(const t of state.transactions){
     const a=Number(t.amount)||0;
     if(t.type==='expense'){
@@ -799,13 +1024,20 @@ function computeBal(){
         const[k,id]=key.split(':');
         if(k==='bank'&&bk[id]!==undefined)bk[id]+=sign*a;
         else if(k==='cc'&&cd[id]!==undefined)cd[id]-=sign*a;
+        else if(k==='inv'&&iv[id]!==undefined)iv[id]+=sign*a;
       };
       mv(t.fromKey,-1);mv(t.toKey,+1);
+    }else if(t.type==='invest'){
+      if(iv[t.accountId]!==undefined)iv[t.accountId]-=a;
     }
   }
   const totBank=Object.values(bk).reduce((s,v)=>s+v,0);
   const totCC=Object.values(cd).reduce((s,v)=>s+v,0);
-  return{bk,ca,cd,totBank,totCC,netWorth:totBank+ca-totCC};
+  const totInvCash=Object.values(iv).reduce((s,v)=>s+v,0);
+  const totHoldingsValue=state.investments.holdings.reduce((s,h)=>s+(Number(h.units)||0)*(Number(h.nav)||0),0);
+  const liquid=totBank+ca-totCC;
+  const investWorth=totInvCash+totHoldingsValue;
+  return{bk,ca,cd,iv,totBank,totCC,totInvCash,totHoldingsValue,liquid,investWorth,netWorth:liquid+investWorth};
 }
 
 /* ── CC Due Date logic ────────────────────────────────────── */
@@ -814,7 +1046,6 @@ function getDueDateStatus(card){
   const now=new Date();
   const day=parseInt(card.dueDay,10);
   const remind=parseInt(card.remindDays,10)||5;
-  // Compute next due date
   let due=new Date(now.getFullYear(),now.getMonth(),day);
   if(due<now)due=new Date(now.getFullYear(),now.getMonth()+1,day);
   const diffMs=due-now;
@@ -833,8 +1064,9 @@ function renderSidebar(){
   const nw=document.getElementById('sb-worth');
   nw.textContent=fmt(bal.netWorth);
   nw.style.color=bal.netWorth>=0?'#86efac':'#fca5a5';
+  document.getElementById('sb-worth-breakdown').innerHTML=
+    `<span class="num" style="color:#a3e635">${fmt(bal.liquid)} liquid</span> &middot; <span class="num" style="color:#c4b5fd">${fmt(bal.investWorth)} invested</span>`;
 
-  // CC Reminders
   const remSec=document.getElementById('sb-reminders');
   const alerts=[];
   state.cards.forEach(c=>{
@@ -859,12 +1091,11 @@ function renderSidebar(){
     remSec.style.display='none';
   }
 
-  // Banks
   const sbB=document.getElementById('sb-banks');
   sbB.innerHTML=!state.banks.length?'<div style="font-size:.74rem;color:#c4bfba;padding:3px 8px">No accounts yet</div>':
     state.banks.map((b,i)=>{const v=bal.bk[b.id]||0;return`<div class="sb-item" style="align-items:center;gap:6px">
       <span class="sb-dot" style="background:${BDOTS[i%BDOTS.length]};margin-top:0;flex-shrink:0"></span>
-      <span class="sb-name" style="flex:1">${esc(b.name)}</span>
+      <span class="sb-name" style="flex:1" title="${esc(b.name)}">${esc(b.name)}</span>
       <span class="sb-amt${v<0?' neg':''}">${fmt(v)}</span>
       <button class="btn-i" onclick="openEditModal('bank','${b.id}')" title="Edit" style="padding:2px;flex-shrink:0">
         <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
@@ -894,7 +1125,7 @@ function renderSidebar(){
       return`<div class="sb-item" style="flex-direction:column;align-items:flex-start;gap:5px">
         <div style="display:flex;align-items:center;gap:8px;width:100%">
           <span class="sb-dot" style="background:${CDOTS[i%CDOTS.length]};flex-shrink:0"></span>
-          <span class="sb-name" style="flex:1">${esc(c.name)}</span>
+          <span class="sb-name" style="flex:1" title="${esc(c.name)}">${esc(c.name)}</span>
           <span class="sb-amt${due>0?' neg':''}">${fmt(due)}</span>
           <button class="btn-i" onclick="openEditModal('cc','${c.id}')" title="Edit" style="padding:2px;flex-shrink:0"><svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg></button>
           <button class="btn-i" onclick="confirmDeleteAccount('cc','${c.id}')" title="Delete" style="padding:2px;flex-shrink:0" onmouseover="this.style.color='#ef4444'" onmouseout="this.style.color='#c4bfba'"><svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg></button>
@@ -909,7 +1140,6 @@ function renderSidebar(){
 }
 
 /* ── Account Modal ────────────────────────────────────────── */
-/* Editing state */
 let _editAcType=null, _editAcId=null;
 
 function _configModal(type, isEdit){
@@ -917,10 +1147,8 @@ function _configModal(type, isEdit){
   const isCash=type==='cash', isBank=type==='bank', isCC=type==='cc';
   document.getElementById('ac-name-lbl').textContent=isBank?'Account Name':isCC?'Card Name':'';
   document.getElementById('ac-name').placeholder=isBank?'e.g. HDFC Savings':isCC?'e.g. ICICI Amazon Pay':'';
-  // Show/hide field groups
   document.getElementById('ac-bal-wrap').classList.toggle('hidden', isCC||isCash);
   ['ac-lim-wrap','ac-due-wrap','ac-duedate-wrap'].forEach(id=>document.getElementById(id).classList.toggle('hidden',!isCC));
-  // Cash special: just show balance
   if(isCash){
     document.getElementById('ac-bal-wrap').classList.remove('hidden');
     document.getElementById('ac-bal-lbl').textContent='Cash Balance (INR)';
@@ -1010,6 +1238,349 @@ function confirmDeleteAccount(type, id){
   openModal('modal-confirm');
 }
 
+/* ── Investments ──────────────────────────────────────────── */
+const invAccTypeLabel=t=>t==='demat'?'Demat Account':'Mutual Fund Platform';
+const invHoldTypeLabel=t=>t==='mf'?'Mutual Fund':'Stock';
+
+function toggleHoldLookupFields(){
+  const t=document.getElementById('inv-hold-type').value;
+  document.getElementById('inv-hold-stock-wrap').classList.toggle('hidden',t!=='stock');
+  document.getElementById('inv-hold-mf-wrap').classList.toggle('hidden',t!=='mf');
+}
+
+async function searchMF(){
+  const q=document.getElementById('inv-hold-mfsearch').value.trim();
+  const wrap=document.getElementById('inv-hold-mfresults');
+  if(!q){wrap.innerHTML='';return;}
+  wrap.innerHTML='<div style="font-size:.75rem;color:#a8a29e;padding:4px 2px">Searching…</div>';
+  try{
+    const res=await fetch(`https://api.mfapi.in/mf/search?q=${encodeURIComponent(q)}`);
+    const list=await res.json();
+    if(!Array.isArray(list)||!list.length){wrap.innerHTML='<div style="font-size:.75rem;color:#a8a29e;padding:4px 2px">No matches</div>';return;}
+    wrap.innerHTML=list.slice(0,8).map(f=>`<div class="sb-item" style="cursor:pointer" onclick="pickMF('${f.schemeCode}',${JSON.stringify(f.schemeName)})"><span class="sb-name">${esc(f.schemeName)}</span></div>`).join('');
+  }catch(e){
+    wrap.innerHTML='<div style="font-size:.75rem;color:#ef4444;padding:4px 2px">Search failed — try again</div>';
+  }
+}
+function pickMF(code,name){
+  document.getElementById('inv-hold-schemecode').value=code;
+  if(!document.getElementById('inv-hold-name').value.trim())document.getElementById('inv-hold-name').value=name;
+  document.getElementById('inv-hold-mfresults').innerHTML='';
+  document.getElementById('inv-hold-mfpicked').textContent=`Linked to scheme ${code} — ${name}`;
+}
+
+function openInvAccModal(id){
+  document.getElementById('inv-acc-id').value=id||'';
+  const isEdit=!!id;
+  document.getElementById('modal-inv-acc-title').textContent=isEdit?'Edit Investment Account':'Add Investment Account';
+  document.getElementById('inv-acc-save-btn').textContent=isEdit?'Save Changes':'Add';
+  if(isEdit){
+    const a=state.investments.accounts.find(x=>x.id===id);
+    if(!a)return;
+    document.getElementById('inv-acc-type').value=a.type;
+    document.getElementById('inv-acc-name').value=a.name;
+  }else{
+    document.getElementById('inv-acc-type').value='demat';
+    document.getElementById('inv-acc-name').value='';
+  }
+  openModal('modal-inv-acc');
+}
+
+function saveInvAccount(){
+  const id=document.getElementById('inv-acc-id').value;
+  const type=document.getElementById('inv-acc-type').value;
+  const name=document.getElementById('inv-acc-name').value.trim();
+  if(!name){toast('Enter an account name');return;}
+  if(id){
+    const a=state.investments.accounts.find(x=>x.id===id);
+    if(a){a.type=type;a.name=name;}
+  }else{
+    state.investments.accounts.push({id:uid(),type,name});
+  }
+  saveState();closeModal('modal-inv-acc');rebuildAll();
+  toast(`Investment account ${id?'updated':'added'}`);
+}
+
+function confirmDeleteInvAccount(id){
+  const a=state.investments.accounts.find(x=>x.id===id);
+  const name=a?a.name:'account';
+  const holdCount=state.investments.holdings.filter(h=>h.accountId===id).length;
+  document.getElementById('confirm-body').textContent=`Delete "${name}"? This will also delete ${holdCount} holding(s) and their linked transactions. This cannot be undone.`;
+  document.getElementById('confirm-ok-btn').onclick=()=>{
+    state.investments.accounts=state.investments.accounts.filter(x=>x.id!==id);
+    state.investments.holdings=state.investments.holdings.filter(h=>h.accountId!==id);
+    state.transactions=state.transactions.filter(t=>!(t.type==='invest'&&t.accountId===id));
+    saveState();rebuildAll();toast('Investment account deleted');
+    closeModal('modal-confirm');
+  };
+  openModal('modal-confirm');
+}
+
+function fillInvHoldAccOpts(selectedId){
+  const s=document.getElementById('inv-hold-acc');
+  if(!state.investments.accounts.length){s.innerHTML='<option value="">No accounts — add one first</option>';return;}
+  s.innerHTML=state.investments.accounts.map(a=>`<option value="${a.id}">${esc(a.name)} (${invAccTypeLabel(a.type)})</option>`).join('');
+  if(selectedId)s.value=selectedId;
+}
+
+function updateInvHoldCashHint(){
+  const accId=document.getElementById('inv-hold-acc').value;
+  const hint=document.getElementById('inv-hold-cash-hint');
+  if(!accId){hint.textContent='';return;}
+  const bal=computeBal();
+  const editId=document.getElementById('inv-hold-id').value;
+  let avail=bal.iv[accId]||0;
+  if(editId){const h=state.investments.holdings.find(x=>x.id===editId);if(h&&h.accountId===accId)avail+=(Number(h.units)||0)*(Number(h.buyPrice)||0);}
+  hint.innerHTML=`Available cash in this account: <b>${fmt(avail)}</b>`;
+  hint.style.color=avail>0?'#a8a29e':'#ef4444';
+}
+
+function openInvHoldModal(accId, holdId){
+  if(!state.investments.accounts.length){toast('Add an investment account first');return;}
+  document.getElementById('inv-hold-id').value=holdId||'';
+  const isEdit=!!holdId;
+  document.getElementById('modal-inv-hold-title').textContent=isEdit?'Edit Holding':'Add Holding';
+  document.getElementById('inv-hold-save-btn').textContent=isEdit?'Save Changes':'Add';
+  document.getElementById('inv-hold-mfresults').innerHTML='';
+  document.getElementById('inv-hold-mfpicked').textContent='';
+  document.getElementById('inv-hold-mfsearch').value='';
+  document.getElementById('inv-hold-schemecode').value='';
+  document.getElementById('inv-hold-symbol').value='';
+  if(isEdit){
+    const h=state.investments.holdings.find(x=>x.id===holdId);
+    if(!h)return;
+    fillInvHoldAccOpts(h.accountId);
+    document.getElementById('inv-hold-type').value=h.type;
+    setDateVal('inv-hold-date',h.date||'');
+    document.getElementById('inv-hold-name').value=h.name;
+    document.getElementById('inv-hold-units').value=h.units;
+    document.getElementById('inv-hold-buy').value=h.buyPrice;
+    document.getElementById('inv-hold-nav').value=h.nav;
+    document.getElementById('inv-hold-symbol').value=h.symbol||'';
+    if(h.schemeCode){
+      document.getElementById('inv-hold-schemecode').value=h.schemeCode;
+      document.getElementById('inv-hold-mfpicked').textContent=`Linked to scheme ${h.schemeCode}`;
+    }
+  }else{
+    fillInvHoldAccOpts(accId);
+    document.getElementById('inv-hold-type').value='stock';
+    setDateVal('inv-hold-date',today());
+    document.getElementById('inv-hold-name').value='';
+    document.getElementById('inv-hold-units').value='';
+    document.getElementById('inv-hold-buy').value='';
+    document.getElementById('inv-hold-nav').value='';
+  }
+  toggleHoldLookupFields();
+  openModal('modal-inv-hold');
+  updateInvHoldCashHint();
+}
+
+function saveInvHolding(){
+  const id=document.getElementById('inv-hold-id').value;
+  const accountId=document.getElementById('inv-hold-acc').value;
+  const type=document.getElementById('inv-hold-type').value;
+  const date=document.getElementById('inv-hold-date').value;
+  const name=document.getElementById('inv-hold-name').value.trim();
+  const units=Number(document.getElementById('inv-hold-units').value)||0;
+  const buyPrice=Number(document.getElementById('inv-hold-buy').value)||0;
+  const nav=Number(document.getElementById('inv-hold-nav').value)||0;
+  const symbol=document.getElementById('inv-hold-symbol').value.trim().toUpperCase();
+  const schemeCode=document.getElementById('inv-hold-schemecode').value.trim();
+  if(!accountId){toast('Select an account');return;}
+  if(!name){toast('Enter a name');return;}
+  if(units<=0){toast('Enter units/quantity');return;}
+  if(!date){toast('Select a purchase date');return;}
+  const newAmount=units*buyPrice;
+  const bal=computeBal();
+  if(id){
+    const h=state.investments.holdings.find(x=>x.id===id);
+    if(!h)return;
+    const oldAmount=(Number(h.units)||0)*(Number(h.buyPrice)||0);
+    const sameAcc=h.accountId===accountId;
+    const availForThis=(bal.iv[accountId]||0)+(sameAcc?oldAmount:0);
+    if(newAmount>availForThis){toast(`Insufficient cash — only ${fmt(availForThis)} available in this account`);return;}
+    Object.assign(h,{accountId,type,date,name,units,buyPrice,nav,symbol,schemeCode});
+    const txn=state.transactions.find(x=>x.id===h.txnId);
+    if(txn)Object.assign(txn,{date,accountId,amount:newAmount,name,units,buyPrice});
+    else{const tx={id:uid(),type:'invest',date,accountId,amount:newAmount,name,units,buyPrice,holdingId:h.id};state.transactions.push(tx);h.txnId=tx.id;}
+  }else{
+    const avail=bal.iv[accountId]||0;
+    if(newAmount>avail){toast(`Insufficient cash — only ${fmt(avail)} available in this account. Transfer funds first.`);return;}
+    const hid=uid(),tid=uid();
+    state.investments.holdings.push({id:hid,accountId,type,date,name,units,buyPrice,nav,symbol,schemeCode,txnId:tid});
+    state.transactions.push({id:tid,type:'invest',date,accountId,amount:newAmount,name,units,buyPrice,holdingId:hid});
+  }
+  saveState();closeModal('modal-inv-hold');rebuildAll();
+  toast(`Holding ${id?'updated':'added'}`);
+}
+
+function confirmDeleteInvHolding(id){
+  const h=state.investments.holdings.find(x=>x.id===id);
+  document.getElementById('confirm-body').textContent=`Delete "${h?h.name:'holding'}"? The invested amount will be returned to the account's available cash. This cannot be undone.`;
+  document.getElementById('confirm-ok-btn').onclick=()=>{
+    if(h)state.transactions=state.transactions.filter(x=>x.id!==h.txnId);
+    state.investments.holdings=state.investments.holdings.filter(x=>x.id!==id);
+    saveState();rebuildAll();toast('Holding deleted');
+    closeModal('modal-confirm');
+  };
+  openModal('modal-confirm');
+}
+
+function holdMetrics(h){
+  const invested=h.units*h.buyPrice, currentValue=h.units*h.nav;
+  const gain=currentValue-invested, gainPct=invested>0?(gain/invested)*100:0;
+  return{invested,currentValue,gain,gainPct};
+}
+
+/* ── Live price fetching ──────────────────────────────────── */
+async function fetchMFNav(schemeCode){
+  const res=await fetch(`https://api.mfapi.in/mf/${schemeCode}/latest`);
+  if(!res.ok)throw new Error('mfapi request failed');
+  const j=await res.json();
+  const nav=Number(j?.data?.[0]?.nav);
+  if(!nav)throw new Error('No NAV returned');
+  return nav;
+}
+async function fetchStockPrice(symbol){
+  if(!STOCK_PROXY_URL||STOCK_PROXY_URL.includes('PASTE-YOUR'))throw new Error('Stock price proxy not configured yet');
+  const res=await fetch(`${STOCK_PROXY_URL}?symbol=${encodeURIComponent(symbol)}`);
+  if(!res.ok)throw new Error('Price proxy request failed');
+  const j=await res.json();
+  const price=Number(j.price);
+  if(!price)throw new Error('No price returned');
+  return price;
+}
+async function refreshAllPrices(){
+  const holdings=state.investments.holdings;
+  if(!holdings.length){toast('No holdings to refresh');return;}
+  const btn=document.getElementById('refresh-prices-btn');
+  if(btn){btn.disabled=true;btn.textContent='Refreshing…';}
+  let ok=0,fail=0;
+  for(const h of holdings){
+    try{
+      let price=null;
+      if(h.type==='mf'&&h.schemeCode)price=await fetchMFNav(h.schemeCode);
+      else if(h.type==='stock'&&h.symbol)price=await fetchStockPrice(h.symbol);
+      if(price){h.nav=price;ok++;}else fail++;
+    }catch(e){fail++;}
+  }
+  saveState();rebuildAll();
+  if(btn){btn.disabled=false;btn.textContent='↻ Refresh Prices';}
+  toast(fail?`Updated ${ok} price(s), ${fail} failed (missing symbol/scheme or lookup error)`:`Updated ${ok} price(s)`,3200);
+}
+
+function renderInvestments(){
+  const accounts=state.investments.accounts, holdings=state.investments.holdings;
+  const bal=computeBal();
+
+  let totInvested=0, totCurrent=0;
+  holdings.forEach(h=>{const m=holdMetrics(h);totInvested+=m.invested;totCurrent+=m.currentValue;});
+  const totGain=totCurrent-totInvested, totGainPct=totInvested>0?(totGain/totInvested)*100:0;
+  const gc=totGain>=0?'#166534':'#ef4444';
+  document.getElementById('inv-stat-tiles').innerHTML=[
+    {label:'Available Cash',val:fmt(bal.totInvCash),color:'#1d4ed8',sub:'Transferred, not yet invested'},
+    {label:'Current Value',val:fmt(totCurrent),color:'#1c1917',sub:`${holdings.length} holding(s)`},
+    {label:'Total Gain / Loss',val:fmt(totGain),color:gc,sub:totGain>=0?'Unrealized profit':'Unrealized loss'},
+    {label:'Overall Return',val:`${totGainPct>=0?'+':''}${totGainPct.toFixed(2)}%`,color:gc,sub:'Since purchase'},
+  ].map(({label,val,color,sub})=>`
+    <div class="stat-tile">
+      <div class="slabel">${label}</div>
+      <div class="val" style="color:${color}">${val}</div>
+      <div class="delta" style="color:#a8a29e">${sub}</div>
+    </div>`).join('');
+
+  const accData=accounts.map(a=>{
+    const cv=holdings.filter(h=>h.accountId===a.id).reduce((s,h)=>s+holdMetrics(h).currentValue,0);
+    return{name:a.name,cv};
+  }).filter(a=>a.cv>0);
+  document.getElementById('inv-alloc-empty').classList.toggle('hidden',accData.length>0);
+  if(accData.length){
+    const bgs=accData.map((_,i)=>IDOTS[i%IDOTS.length]+'26');
+    const fgs=accData.map((_,i)=>IDOTS[i%IDOTS.length]);
+    destroyChart('invAlloc');
+    CH.invAlloc=new Chart(document.getElementById('inv-alloc-donut').getContext('2d'),{
+      type:'doughnut',
+      data:{labels:accData.map(a=>a.name),datasets:[{data:accData.map(a=>a.cv),backgroundColor:fgs,borderColor:'#fff',borderWidth:2,hoverOffset:4}]},
+      options:{cutout:'67%',plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>' '+fmt(c.raw)}}},responsive:true,maintainAspectRatio:true}
+    });
+    const tot=accData.reduce((s,a)=>s+a.cv,0);
+    document.getElementById('inv-alloc-leg').innerHTML=accData.map((a,i)=>`<div style="display:flex;align-items:center;gap:5px"><span style="width:8px;height:8px;border-radius:2px;background:${IDOTS[i%IDOTS.length]};flex-shrink:0"></span><span style="font-size:.75rem;color:#57534e;flex:1">${esc(a.name)}</span><span class="num" style="font-size:.7rem;color:#a8a29e">${((a.cv/tot)*100).toFixed(0)}%</span></div>`).join('');
+  }else{
+    destroyChart('invAlloc');
+    document.getElementById('inv-alloc-leg').innerHTML='';
+  }
+
+  const wrap=document.getElementById('inv-accounts-wrap');
+  if(!accounts.length){
+    wrap.innerHTML=`<div class="card" style="text-align:center;padding:32px 16px">
+      <div style="font-size:.85rem;color:#78716c;margin-bottom:10px">No investment accounts yet</div>
+      <button class="btn-p" onclick="openInvAccModal()">+ Add Your First Account</button>
+    </div>`;
+    return;
+  }
+  wrap.innerHTML=accounts.map((a,i)=>{
+    const accHoldings=holdings.filter(h=>h.accountId===a.id);
+    const invSum=accHoldings.reduce((s,h)=>s+holdMetrics(h).invested,0);
+    const curSum=accHoldings.reduce((s,h)=>s+holdMetrics(h).currentValue,0);
+    const gainSum=curSum-invSum, gainPctSum=invSum>0?(gainSum/invSum)*100:0;
+    const color=IDOTS[i%IDOTS.length], gc2=gainSum>=0?'#166534':'#ef4444';
+    const availCash=bal.iv[a.id]||0;
+    const rows=!accHoldings.length?
+      `<div style="font-size:.78rem;color:#c4bfba;padding:10px 4px">No holdings yet</div>`:
+      accHoldings.map(h=>{
+        const m=holdMetrics(h),hgc=m.gain>=0?'#166534':'#ef4444';
+        const lookupTag=h.type==='mf'?(h.schemeCode?`<span class="badge-sm" style="background:#f0fdf4;color:#166534" title="AMFI scheme code">#${h.schemeCode}</span>`:''):(h.symbol?`<span class="badge-sm" style="background:#eff6ff;color:#1d4ed8" title="NSE symbol">${esc(h.symbol)}</span>`:'');
+        return`<div class="hold-card">
+          <div class="hold-card-top">
+            <span class="badge-sm" style="background:${h.type==='mf'?'#ede9fe':'#dbeafe'};color:${h.type==='mf'?'#5b21b6':'#1e40af'}">${h.type==='mf'?'MF':'Stock'}</span>
+            <span class="hold-name" title="${esc(h.name)}">${esc(h.name)}</span>
+            ${lookupTag}
+            <span class="hold-gain num" style="color:${hgc}">${m.gain>=0?'+':''}${m.gainPct.toFixed(1)}%</span>
+          </div>
+          <div class="hold-meta">
+            <span>Units<b>${h.units}</b></span>
+            <span>Buy<b>${fmt(h.buyPrice)}</b></span>
+            <span>NAV<b>${fmt(h.nav)}</b></span>
+            <span>Value<b style="color:#57534e">${fmt(m.currentValue)}</b></span>
+          </div>
+          <div class="hold-actions">
+            <button class="btn-i" onclick="openInvHoldModal(null,'${h.id}')" title="Edit"><svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg></button>
+            <button class="btn-i" onclick="confirmDeleteInvHolding('${h.id}')" title="Delete" onmouseover="this.style.color='#ef4444'" onmouseout="this.style.color='#c4bfba'"><svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg></button>
+          </div>
+        </div>`;
+      }).join('');
+    return`<div class="card">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:11px;flex-wrap:wrap;gap:8px">
+        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;min-width:0">
+          <span class="sb-dot" style="background:${color};width:9px;height:9px;flex-shrink:0"></span>
+          <span style="font-weight:600;font-size:.88rem">${esc(a.name)}</span>
+          <span class="badge-sm" style="background:#f4f3f0;color:#78716c">${invAccTypeLabel(a.type)}</span>
+          <span class="badge-sm" style="background:#eff6ff;color:#1d4ed8" title="Uninvested cash available">${fmt(availCash)} cash</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:10px">
+          <div style="text-align:right">
+            <div class="num" style="font-size:.85rem;font-weight:600">${fmt(curSum)}</div>
+            <div style="font-size:.68rem;color:${gc2}">${gainSum>=0?'+':''}${fmt(gainSum)} (${gainPctSum>=0?'+':''}${gainPctSum.toFixed(1)}%)</div>
+          </div>
+          <button class="btn-i" onclick="openInvAccModal('${a.id}')" title="Edit"><svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg></button>
+          <button class="btn-i" onclick="confirmDeleteInvAccount('${a.id}')" title="Delete" onmouseover="this.style.color='#ef4444'" onmouseout="this.style.color='#c4bfba'"><svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg></button>
+        </div>
+      </div>
+      <div>${rows}</div>
+      <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap">
+        <button class="sb-add" style="width:auto;height:auto;padding:5px 10px;border-radius:7px;display:inline-flex;gap:5px;align-items:center;border-style:dashed" onclick="quickTransferIn('${a.id}')">
+          <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.5"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/></svg>
+          <span style="font-size:.75rem;font-weight:500">Transfer In</span>
+        </button>
+        <button class="sb-add" style="width:auto;height:auto;padding:5px 10px;border-radius:7px;display:inline-flex;gap:5px;align-items:center;border-style:dashed" onclick="openInvHoldModal('${a.id}')">
+          <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.5"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/></svg>
+          <span style="font-size:.75rem;font-weight:500">Add Holding</span>
+        </button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
 /* ── Dropdowns ────────────────────────────────────────────── */
 function fillExpInst(){
   const t=document.getElementById('e-actype').value,s=document.getElementById('e-inst');
@@ -1029,6 +1600,7 @@ function fillTransferOpts(){
   state.banks.forEach(b=>html+=`<option value="bank:${b.id}">${esc(b.name)} (Bank)</option>`);
   html+='<option value="cash">Cash</option>';
   state.cards.forEach(c=>html+=`<option value="cc:${c.id}">${esc(c.name)} (CC Bill)</option>`);
+  state.investments.accounts.forEach(a=>html+=`<option value="inv:${a.id}">${esc(a.name)} (Investment)</option>`);
   document.getElementById('t-from').innerHTML=html;
   document.getElementById('t-to').innerHTML=html;
   if(document.getElementById('t-to').options.length>1)document.getElementById('t-to').selectedIndex=1;
@@ -1067,6 +1639,13 @@ function setTxn(type){
     btn.className='ttb'+(t===type?(t==='expense'?' ae':t==='income'?' ai':' at'):'');
     document.getElementById(`form-${t}`)[t===type?'classList':'classList'][t===type?'remove':'add']('hidden');
   });
+}
+function quickTransferIn(accountId){
+  switchView('dashboard');
+  setTxn('transfer');
+  fillTransferOpts();
+  document.getElementById('t-to').value='inv:'+accountId;
+  setTimeout(()=>document.getElementById('form-transfer').scrollIntoView({behavior:'smooth',block:'center'}),50);
 }
 
 /* ── Submit ───────────────────────────────────────────────── */
@@ -1114,11 +1693,40 @@ function buildMonthList(){
   sel.innerHTML=sorted.map(k=>`<option value="${k}">${mkLabel(k)}</option>`).join('');
   sel.value=(prev&&sorted.includes(prev))?prev:curMK();
   viewMK=sel.value;
-  document.getElementById('log-month-label').textContent=mkLabel(viewMK);
+  buildFYList();
+  updateViewLabel();
+}
+function buildFYList(){
+  const cur=Number(curFY());
+  const keys=new Set();
+  for(let y=cur-5;y<=cur;y++)keys.add(String(y));
+  state.transactions.forEach(t=>keys.add(fyOf(t.date)));
+  const sorted=Array.from(keys).sort().reverse();
+  const sel=document.getElementById('fy-sel'),prev=sel.value;
+  sel.innerHTML=sorted.map(k=>`<option value="${k}">${fyLabel(k)}</option>`).join('');
+  sel.value=(prev&&sorted.includes(prev))?prev:curFY();
+  viewFY=sel.value;
+}
+function updateViewLabel(){
+  document.getElementById('log-month-label').textContent=viewMode==='fy'?fyLabel(viewFY):mkLabel(viewMK);
 }
 function onMonthChange(){
   viewMK=document.getElementById('month-sel').value;
-  document.getElementById('log-month-label').textContent=mkLabel(viewMK);
+  updateViewLabel();
+  renderTxnLog();if(activeTab==='charts')renderQuickCharts();
+}
+function onFYChange(){
+  viewFY=document.getElementById('fy-sel').value;
+  updateViewLabel();
+  renderTxnLog();if(activeTab==='charts')renderQuickCharts();
+}
+function setViewMode(mode){
+  viewMode=mode;
+  document.getElementById('vmode-month').classList.toggle('active',mode==='month');
+  document.getElementById('vmode-fy').classList.toggle('active',mode==='fy');
+  document.getElementById('month-sel').classList.toggle('hidden',mode!=='month');
+  document.getElementById('fy-sel').classList.toggle('hidden',mode!=='fy');
+  updateViewLabel();
   renderTxnLog();if(activeTab==='charts')renderQuickCharts();
 }
 
@@ -1126,10 +1734,13 @@ function onMonthChange(){
 function switchView(v){
   activeView=v;
   document.getElementById('view-dashboard').classList.toggle('hidden',v!=='dashboard');
+  document.getElementById('view-invest').classList.toggle('hidden',v!=='invest');
   document.getElementById('view-analytics').classList.toggle('hidden',v!=='analytics');
   document.getElementById('nav-dash').classList.toggle('active',v==='dashboard');
+  document.getElementById('nav-invest').classList.toggle('active',v==='invest');
   document.getElementById('nav-analytics').classList.toggle('active',v==='analytics');
   if(v==='analytics')renderAnalytics();
+  if(v==='invest')renderInvestments();
 }
 function switchTab(tab){
   activeTab=tab;
@@ -1143,12 +1754,14 @@ function switchTab(tab){
 
 /* ── Txn Log ──────────────────────────────────────────────── */
 function txnsForMK(mk){return state.transactions.filter(t=>mkOf(t.date)===mk);}
+function txnsForFY(fy){const{from,to}=fyRange(fy);return state.transactions.filter(t=>t.date>=from&&t.date<=to);}
 function txnsInRange(from,to){return state.transactions.filter(t=>t.date>=from&&t.date<=to);}
+function curViewTxns(){return viewMode==='fy'?txnsForFY(viewFY):txnsForMK(viewMK);}
 
 function renderTxnLog(){
   const list=document.getElementById('txn-list');
-  const txns=txnsForMK(viewMK).slice().sort((a,b)=>b.date.localeCompare(a.date)||b.id.localeCompare(a.id));
-  if(!txns.length){list.innerHTML='<div style="text-align:center;padding:26px 0;font-size:.83rem;color:#a8a29e">No transactions this month.</div>';return;}
+  const txns=curViewTxns().slice().sort((a,b)=>b.date.localeCompare(a.date)||b.id.localeCompare(a.id));
+  if(!txns.length){list.innerHTML=`<div style="text-align:center;padding:26px 0;font-size:.83rem;color:#a8a29e">No transactions this ${viewMode==='fy'?'financial year':'month'}.</div>`;return;}
   const grouped={};txns.forEach(t=>{if(!grouped[t.date])grouped[t.date]=[];grouped[t.date].push(t);});
   const dates=Object.keys(grouped).sort().reverse();
   list.innerHTML='';
@@ -1178,6 +1791,10 @@ function buildRow(t,canDel){
     iconBg='#f0fdf4';iconTxt='IN';mainLabel=esc(t.category);
     subLabel=acLabel(t.destType,t.destId)+(t.desc?' &middot; '+esc(t.desc):'');
     amtStr='+'+fmt(t.amount);amtCol='#166534';
+  }else if(t.type==='invest'){
+    iconBg='#ede9fe';iconTxt='IV';mainLabel='Invested — '+esc(t.name||'Holding');
+    subLabel=trLabel('inv:'+t.accountId)+(t.units?` &middot; ${t.units} units @ ${fmt(t.buyPrice)}`:'');
+    amtStr=fmt(t.amount);amtCol='#7c3aed';canDel=false;
   }else{
     iconBg='#eff6ff';iconTxt='TR';mainLabel='Transfer';
     subLabel=trLabel(t.fromKey)+' &rarr; '+trLabel(t.toKey)+(t.note?' &middot; '+esc(t.note):'');
@@ -1207,6 +1824,7 @@ function trLabel(key){
   const[k,id]=key.split(':');
   if(k==='bank'){const b=state.banks.find(x=>x.id===id);return b?esc(b.name):'Bank';}
   if(k==='cc'){const c=state.cards.find(x=>x.id===id);return c?esc(c.name):'Card';}
+  if(k==='inv'){const a=state.investments.accounts.find(x=>x.id===id);return a?esc(a.name):'Investment';}
   return key;
 }
 function fmtDate(s){
@@ -1243,14 +1861,14 @@ function renderBudget(){
     const ci=state.categories.expense.indexOf(cat),col=cpal(ci>=0?ci:0);
     const card=document.createElement('div');card.className='cat-bud-card'+(co?' over':cw?' warn':'');
     card.innerHTML=`
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
-        <div style="display:flex;align-items:center;gap:6px">
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:6px">
+        <div style="display:flex;align-items:center;gap:6px;min-width:0;flex-shrink:1">
           <span style="width:7px;height:7px;border-radius:50%;background:${col.fg};flex-shrink:0;display:inline-block"></span>
-          <span style="font-size:.82rem;font-weight:500">${esc(cat)}</span>
-          ${cw&&!co?'<span style="font-size:.67rem;background:#fef3c7;color:#92400e;padding:1px 6px;border-radius:99px;font-weight:500">Warning</span>':''}
-          ${co?'<span style="font-size:.67rem;background:#fee2e2;color:#be123c;padding:1px 6px;border-radius:99px;font-weight:500">Over Budget</span>':''}
+          <span style="font-size:.82rem;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0" title="${esc(cat)}">${esc(cat)}</span>
+          ${cw&&!co?'<span style="font-size:.67rem;background:#fef3c7;color:#92400e;padding:1px 6px;border-radius:99px;font-weight:500;flex-shrink:0">Warning</span>':''}
+          ${co?'<span style="font-size:.67rem;background:#fee2e2;color:#be123c;padding:1px 6px;border-radius:99px;font-weight:500;flex-shrink:0">Over Budget</span>':''}
         </div>
-        <span class="num" style="font-size:.73rem;color:${co?'#ef4444':cw?'#d97706':'#78716c'}">${fmt(catSpent)} / ${fmt(catBud)}</span>
+        <span class="num" style="font-size:.73rem;color:${co?'#ef4444':cw?'#d97706':'#78716c'};flex-shrink:0">${fmt(catSpent)} / ${fmt(catBud)}</span>
       </div>
       <div class="pt"><div class="pf ${co?'po':cw?'pw':'ps'}" style="width:${cpct}%"></div></div>`;
     catList.appendChild(card);
@@ -1324,6 +1942,26 @@ function renderBarChart(mk,exps){
   });
 }
 
+function renderBarChartFY(fy,exps){
+  const fyStartYear=Number(fy);
+  const data=Array(12).fill(0);
+  exps.forEach(e=>{
+    const[ey,em]=e.date.split('-').map(Number);
+    const idx=em>=4?em-4:em+8;
+    data[idx]+=Number(e.amount);
+  });
+  document.getElementById('bar-label').textContent=fyLabel(fy);
+  const labels=['Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec','Jan','Feb','Mar'];
+  destroyChart('bar');
+  CH.bar=new Chart(document.getElementById('chart-bar').getContext('2d'),{
+    type:'bar',
+    data:{labels,datasets:[{data,backgroundColor:'#e7e5e4',borderRadius:3,hoverBackgroundColor:'#a8a29e'}]},
+    options:{...baseOpts({plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>' '+fmt(c.raw)}}}}),
+      scales:{x:{grid:{display:false},ticks:{font:{family:'DM Mono',size:9},color:'#c4bfba'}},
+        y:{grid:{color:'#f4f3f0'},ticks:{font:{family:'DM Mono',size:9},color:'#c4bfba',callback:v=>v>=1000?`₹${(v/1000).toFixed(0)}k`:`₹${v}`}}}}
+  });
+}
+
 function buildDonut(key,canvasId,legId,labels,data,bgs,fgs,emptyMsg){
   const empty=!labels.length;
   const leg=document.getElementById(legId);
@@ -1338,15 +1976,13 @@ function buildDonut(key,canvasId,legId,labels,data,bgs,fgs,emptyMsg){
 }
 
 function renderQuickCharts(){
-  const exps=txnsForMK(viewMK).filter(t=>t.type==='expense');
-  renderBarChart(viewMK,exps);
-  // Expense donut
+  const exps=curViewTxns().filter(t=>t.type==='expense');
+  if(viewMode==='fy')renderBarChartFY(viewFY,exps);else renderBarChart(viewMK,exps);
   const et={};exps.forEach(e=>{et[e.category]=(et[e.category]||0)+Number(e.amount);});
   const el=Object.keys(et),ed=el.map(l=>et[l]);
   buildDonut('qDonut','chart-donut','donut-leg',el,ed,
     el.map((_,i)=>{const idx=state.categories.expense.indexOf(_);return cpal(idx>=0?idx:i).bg;}),
     el.map((_,i)=>{const idx=state.categories.expense.indexOf(_);return cpal(idx>=0?idx:i).fg;}),'No expenses');
-  // Mode donut
   const bkT=exps.filter(e=>e.acType==='bank').reduce((s,e)=>s+Number(e.amount),0);
   const caT=exps.filter(e=>e.acType==='cash').reduce((s,e)=>s+Number(e.amount),0);
   const ccT=exps.filter(e=>e.acType==='cc').reduce((s,e)=>s+Number(e.amount),0);
@@ -1372,6 +2008,7 @@ function getRangeDates(){
     case'3_months':from=dateToStr(new Date(y,m-2,1));to=dateToStr(new Date(y,m+1,0));break;
     case'6_months':from=dateToStr(new Date(y,m-5,1));to=dateToStr(new Date(y,m+1,0));break;
     case'this_year':from=`${y}-01-01`;to=`${y}-12-31`;break;
+    case'this_fy':{const fy=curFY();from=`${fy}-04-01`;to=`${Number(fy)+1}-03-31`;break;}
     case'custom':from=anRange.from||dateToStr(new Date(y,m,1));to=anRange.to||dateToStr(new Date(y,m+1,0));break;
     default:from=dateToStr(new Date(y,m,1));to=dateToStr(new Date(y,m+1,0));
   }
@@ -1380,8 +2017,8 @@ function getRangeDates(){
 
 function setRange(mode){
   anRange.mode=mode;
-  ['this','last','3m','6m','yr','custom'].forEach(k=>document.getElementById('rng-'+k)?.classList.remove('active'));
-  const map={this_month:'rng-this',last_month:'rng-last','3_months':'rng-3m','6_months':'rng-6m',this_year:'rng-yr',custom:'rng-custom'};
+  ['this','last','3m','6m','yr','fy','custom'].forEach(k=>document.getElementById('rng-'+k)?.classList.remove('active'));
+  const map={this_month:'rng-this',last_month:'rng-last','3_months':'rng-3m','6_months':'rng-6m',this_year:'rng-yr',this_fy:'rng-fy',custom:'rng-custom'};
   document.getElementById(map[mode])?.classList.add('active');
   const crow=document.getElementById('custom-range-row');
   if(mode==='custom'){crow.classList.remove('hidden');crow.style.display='flex';}
@@ -1413,21 +2050,14 @@ function renderAnalytics(){
   const totalInc=incs.reduce((s,t)=>s+Number(t.amount),0);
   const surplus=totalInc-totalSpent;
 
-  // Stat tiles
   renderStatTiles(totalSpent,totalInc,surplus,exps,incs);
-  // Section A
   renderBvaChart(exps,from,to);
-  // Section B
   renderAnExpDonut(exps);
   renderAnIncDonut(incs);
-  // Section C: cashflow
   renderCashflowChart(from,to,surplus);
-  // Section D: hist by mode
   renderHistChart();
-  // Section E: trend + top cats
   renderTrendChart(exps,from,to);
   renderTopCategories(exps);
-  // Section F: net worth + savings
   renderNetWorthChart();
   renderSavingsRate(totalSpent,totalInc);
 }
@@ -1501,7 +2131,6 @@ function renderAnIncDonut(incs){
 }
 
 function renderCashflowChart(from,to,surplus){
-  // Group by month within range
   const mkSet=new Set();
   state.transactions.filter(t=>t.date>=from&&t.date<=to).forEach(t=>mkSet.add(mkOf(t.date)));
   const months=Array.from(mkSet).sort();
@@ -1559,14 +2188,11 @@ function renderTrendChart(exps,from,to){
   const empty=document.getElementById('an-trend-empty');
   if(!exps.length){empty.classList.remove('hidden');destroyChart('trend');return;}
   empty.classList.add('hidden');
-  // Group by date
   const byDate={};
   exps.forEach(e=>{byDate[e.date]=(byDate[e.date]||0)+Number(e.amount);});
-  // Fill all dates in range
   const dates=[],data=[];
   const cur=new Date(from+'T00:00:00'),end=new Date(to+'T00:00:00');
   while(cur<=end){const k=dateToStr(cur);dates.push(k);data.push(byDate[k]||0);cur.setDate(cur.getDate()+1);}
-  // Running average (7-day)
   const avg=data.map((_,i)=>{const w=data.slice(Math.max(0,i-3),i+4);return w.reduce((a,b)=>a+b,0)/w.length;});
   const shortD=d=>{const[,,day]=d.split('-');return parseInt(day,10);};
   destroyChart('trend');
@@ -1607,14 +2233,12 @@ function renderTopCategories(exps){
 }
 
 function renderNetWorthChart(){
-  // Compute net worth snapshot at end of each calendar month
   const allMKs=new Set([curMK()]);
   state.transactions.forEach(t=>allMKs.add(mkOf(t.date)));
   const months=Array.from(allMKs).sort();
   const empty=document.getElementById('an-nw-empty');
   if(months.length<1){empty.classList.remove('hidden');destroyChart('nw');return;}
   empty.classList.add('hidden');
-  // For each month, compute NW from all txns UP TO end of that month
   const nwData=months.map(mk=>{
     const[y,m]=mk.split('-').map(Number);
     const endDate=dateToStr(new Date(y,m,0));
@@ -1686,6 +2310,7 @@ function importData(ev){
       if(!imp.banks)imp.banks=[];if(!imp.cards)imp.cards=[];
       if(!imp.cash)imp.cash={startBalance:imp.config?.cashBase||0};
       if(!imp.categoryBudgets)imp.categoryBudgets={};
+      if(!imp.investments)imp.investments={accounts:[],holdings:[]};
       state=imp;saveState();rebuildAll();toast('Data imported');
     }catch{toast('Import failed: invalid file');}
   });
@@ -1703,9 +2328,9 @@ function rebuildAll(){
   renderChips('expense');renderChips('income');
   if(activeTab==='charts')renderQuickCharts();
   if(activeView==='analytics')renderAnalytics();
+  if(activeView==='invest')renderInvestments();
 }
 
-/* ── Init ─────────────────────────────────────────────────── */
 /* ── Theme Toggle ─────────────────────────────────────────── */
 const SUN_PATH='M12 3v1m0 16v1m9-9h-1M4 12H3m15.36 6.36l-.7-.7M6.34 6.34l-.7-.7m12.02 0l-.7.7M6.34 17.66l-.7.7M16 12a4 4 0 11-8 0 4 4 0 018 0z';
 const MOON_PATH='M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z';
@@ -1720,27 +2345,19 @@ function toggleTheme(){
 }
 applyTheme(localStorage.getItem('ft-theme')||(window.matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light'));
 
-function init(){
+/* ── Boot (runs once per successful sign-in) ─────────────── */
+function boot(){
   const t=today();
   ['e-date','i-date','t-date'].forEach(id=>document.getElementById(id).value=t);
-  // Default custom range to current month
   const[y,m]=t.split('-');
   document.getElementById('rng-from').value=`${y}-${m}-01`;
   document.getElementById('rng-to').value=t;
   const mq=window.matchMedia('(max-width:860px)');
   const setGrid=()=>{document.getElementById('dash-grid').style.gridTemplateColumns=mq.matches?'1fr':'360px 1fr';};
   mq.addEventListener('change',setGrid);setGrid();
-  // Analytics grid responsiveness
-  const setAnGrid=()=>{
-    document.getElementById('an-stat-tiles').style.gridTemplateColumns=mq.matches?'1fr 1fr':'repeat(4,1fr)';
-  };
-  mq.addEventListener('change',setAnGrid);setAnGrid();
   rebuildAll();
   updateRangeDisplay();
 }
-init(); // sets up date pickers/listeners; harmless that state is still empty here —
-        // rebuildAll() runs again once Google sign-in resolves and data has loaded
-gapiLoad().then(initAuth);
 </script>
 </body>
 </html>

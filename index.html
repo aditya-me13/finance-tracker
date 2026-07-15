@@ -528,7 +528,8 @@ html.dark{filter:invert(1) hue-rotate(180deg)}
         <h2 style="font-weight:600;font-size:1rem">Investments</h2>
         <p style="font-size:.78rem;color:#a8a29e;margin-top:2px">Demat accounts &amp; mutual funds — included in your net worth</p>
       </div>
-      <div style="display:flex;gap:8px">
+      <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;justify-content:flex-end">
+        <div id="inv-top-summary" style="min-width:230px;max-width:310px"></div>
         <button class="btn-g" onclick="refreshAllPrices()" id="refresh-prices-btn">↻ Refresh Prices</button>
         <button class="btn-p" onclick="openInvAccModal()">+ Add Account</button>
       </div>
@@ -660,6 +661,19 @@ html.dark{filter:invert(1) hue-rotate(180deg)}
       <div><div class="slabel" style="margin-bottom:4px">Account</div>
         <select id="inv-hold-acc" class="pl" onchange="updateInvHoldCashHint()"></select>
         <p id="inv-hold-cash-hint" style="font-size:.71rem;color:#a8a29e;margin-top:4px"></p></div>
+      <div style="display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:8px">
+        <div style="min-width:0">
+          <div class="slabel" style="margin-bottom:4px">Funding Source</div>
+          <select id="inv-hold-fund-mode" class="pl" onchange="toggleHoldFundingFields()">
+            <option value="inv">Investment Account Cash</option>
+            <option value="bank">Direct Bank Account (UPI)</option>
+          </select>
+        </div>
+        <div id="inv-hold-bank-wrap" class="hidden" style="min-width:0">
+          <div class="slabel" style="margin-bottom:4px">Bank Account</div>
+          <select id="inv-hold-bank" class="pl" onchange="updateInvHoldCashHint()"></select>
+        </div>
+      </div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
         <div><div class="slabel" style="margin-bottom:4px">Holding Type</div>
           <select id="inv-hold-type" class="pl" onchange="toggleHoldLookupFields()">
@@ -884,6 +898,7 @@ function normalizeState(){
 
 /* UI state */
 let txnType='expense',selExpCat=null,selIncCat=null,viewMK=null,viewFY=null,viewMode='month',activeTab='log',activeView='dashboard';
+let invSummaryMode='cash';
 let CH={};  // chart instances keyed by id
 let cumulativeCatSelection=[];
 
@@ -1065,7 +1080,12 @@ function computeBal(){
       };
       mv(t.fromKey,-1);mv(t.toKey,+1);
     }else if(t.type==='invest'){
-      if(iv[t.accountId]!==undefined)iv[t.accountId]-=a;
+      if(t.sourceKey){
+        const[k,id]=t.sourceKey.split(':');
+        if(k==='bank'&&bk[id]!==undefined)bk[id]-=a;
+        else if(k==='inv'&&iv[id]!==undefined)iv[id]-=a;
+        else if(iv[t.accountId]!==undefined)iv[t.accountId]-=a;
+      }else if(iv[t.accountId]!==undefined)iv[t.accountId]-=a;
     }
   }
   const totBank=Object.values(bk).reduce((s,v)=>s+v,0);
@@ -1451,15 +1471,81 @@ function fillInvHoldAccOpts(selectedId){
   if(selectedId)s.value=selectedId;
 }
 
+function fillInvHoldBankOpts(selectedId){
+  const s=document.getElementById('inv-hold-bank');
+  if(!state.banks.length){s.innerHTML='<option value="">No banks added</option>';return;}
+  s.innerHTML=state.banks.map(b=>`<option value="${b.id}">${esc(b.name)}</option>`).join('');
+  if(selectedId)s.value=selectedId;
+}
+
+function toggleHoldFundingFields(){
+  const fundMode=document.getElementById('inv-hold-fund-mode').value;
+  document.getElementById('inv-hold-bank-wrap').classList.toggle('hidden',fundMode!=='bank');
+  updateInvHoldCashHint();
+}
+
+function renderInvTopSummary(){
+  const wrap=document.getElementById('inv-top-summary');
+  if(!wrap)return;
+  const holdings=state.investments.holdings||[];
+  const buckets={MF:{invested:0,current:0},Stock:{invested:0,current:0}};
+  holdings.forEach(h=>{
+    const key=h.type==='stock'?'Stock':'MF';
+    const m=holdMetrics(h);
+    buckets[key].invested+=m.invested;
+    buckets[key].current+=m.currentValue;
+  });
+  const bal=computeBal();
+  const totalInvested=buckets.MF.invested+buckets.Stock.invested;
+  const totalCurrent=buckets.MF.current+buckets.Stock.current;
+  const cashValue=bal.totInvCash+bal.ca+bal.totBank-bal.totCC;
+  const mode=invSummaryMode;
+  const mainLabel=mode==='cash'?'Overall Cash':'Total Amount Invested';
+  const mainValue=mode==='cash'?fmt(cashValue):fmt(totalInvested);
+  const subLine=mode==='cash'?'Across bank, cash and investment balances':'MF + Stocks';
+  const rows=mode==='cash'
+    ?[`<div class="row"><span>Investment cash</span><span class="num">${fmt(bal.totInvCash)}</span></div>`,`<div class="row"><span>Bank + cash</span><span class="num">${fmt(bal.totBank+bal.ca)}</span></div>`]
+    :[`<div class="row"><span>Stocks (Equity)</span><span class="num">${fmt(buckets.Stock.invested)}</span></div>`,`<div class="row"><span>Mutual Funds</span><span class="num">${fmt(buckets.MF.invested)}</span></div>`];
+  wrap.innerHTML=`
+    <div class="stat-tile" style="padding:10px 12px">
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:8px">
+        <div>
+          <div class="slabel" style="margin:0">${mainLabel}</div>
+          <div class="val" style="color:#1c1917;font-size:clamp(.96rem,3.8vw,1.15rem);margin-top:2px">${mainValue}</div>
+        </div>
+        <button type="button" class="btn-g" style="padding:6px 9px;font-size:.74rem;white-space:nowrap" onclick="toggleInvSummaryMode()">${mode==='cash'?'Show invested':'Show cash'}</button>
+      </div>
+      <div class="delta" style="color:#a8a29e">${subLine}</div>
+      ${mode==='cash'?'':`<div class="stat-breakdown">${rows.join('')}</div>`}
+    </div>`;
+}
+
+function toggleInvSummaryMode(){
+  invSummaryMode=invSummaryMode==='cash'?'invested':'cash';
+  renderInvTopSummary();
+}
+
 function updateInvHoldCashHint(){
   const accId=document.getElementById('inv-hold-acc').value;
   const hint=document.getElementById('inv-hold-cash-hint');
-  if(!accId){hint.textContent='';return;}
   const bal=computeBal();
   const editId=document.getElementById('inv-hold-id').value;
-  let avail=bal.iv[accId]||0;
-  if(editId){const h=state.investments.holdings.find(x=>x.id===editId);if(h&&h.accountId===accId)avail+=(Number(h.units)||0)*(Number(h.buyPrice)||0);}
-  hint.innerHTML=`Available cash in this account: <b>${fmt(avail)}</b>`;
+  const fundMode=document.getElementById('inv-hold-fund-mode')?.value||'inv';
+  const bankId=document.getElementById('inv-hold-bank')?.value||'';
+  const h=editId?state.investments.holdings.find(x=>x.id===editId):null;
+  if(!accId){hint.textContent='';return;}
+  let avail=0,label='';
+  if(fundMode==='bank'){
+    if(!bankId){hint.textContent='Select a bank account';hint.style.color='#a8a29e';return;}
+    avail=bal.bk[bankId]||0;
+    label='Available cash in this bank account';
+    if(h&&h.sourceKey===`bank:${bankId}`)avail+=(Number(h.units)||0)*(Number(h.buyPrice)||0);
+  }else{
+    avail=bal.iv[accId]||0;
+    label='Available cash in this investment account';
+    if(h&&h.accountId===accId&&(!h.sourceKey||h.sourceKey===`inv:${accId}`))avail+=(Number(h.units)||0)*(Number(h.buyPrice)||0);
+  }
+  hint.innerHTML=`${label}: <b>${fmt(avail)}</b>`;
   hint.style.color=avail>0?'#a8a29e':'#ef4444';
 }
 
@@ -1478,6 +1564,9 @@ function openInvHoldModal(accId, holdId){
     const h=state.investments.holdings.find(x=>x.id===holdId);
     if(!h)return;
     fillInvHoldAccOpts(h.accountId);
+    const fundMode=h.sourceKey&&h.sourceKey.startsWith('bank:')?'bank':'inv';
+    document.getElementById('inv-hold-fund-mode').value=fundMode;
+    fillInvHoldBankOpts(h.sourceKey&&h.sourceKey.startsWith('bank:')?h.sourceKey.split(':')[1]:'');
     document.getElementById('inv-hold-type').value=h.type;
     document.getElementById('inv-hold-buy-mode').value=h.buyPriceMode||'manual';
     setDateVal('inv-hold-date',h.date||'');
@@ -1496,6 +1585,8 @@ function openInvHoldModal(accId, holdId){
     }
   }else{
     fillInvHoldAccOpts(accId);
+    document.getElementById('inv-hold-fund-mode').value='inv';
+    fillInvHoldBankOpts(state.banks[0]?.id||'');
     document.getElementById('inv-hold-type').value='stock';
     document.getElementById('inv-hold-buy-mode').value='manual';
     setDateVal('inv-hold-date',today());
@@ -1505,6 +1596,7 @@ function openInvHoldModal(accId, holdId){
     document.getElementById('inv-hold-nav').value='';
   }
   toggleHoldLookupFields();
+  toggleHoldFundingFields();
   openModal('modal-inv-hold');
   updateInvHoldCashHint();
 }
@@ -1521,6 +1613,9 @@ async function saveInvHolding(){
   const symbol=document.getElementById('inv-hold-symbol').value.trim().toUpperCase();
   const schemeCode=document.getElementById('inv-hold-schemecode').value.trim();
   const buyMode=document.getElementById('inv-hold-buy-mode').value;
+  const fundMode=document.getElementById('inv-hold-fund-mode').value;
+  const bankId=document.getElementById('inv-hold-bank').value;
+  const sourceKey=fundMode==='bank'?`bank:${bankId}`:`inv:${accountId}`;
   if(!accountId){toast('Select an account');return;}
   if(!name){toast('Enter a name');return;}
   if(units<=0){toast(type==='sip'?'Enter monthly SIP amount':'Enter units/quantity');return;}
@@ -1546,15 +1641,15 @@ async function saveInvHolding(){
     const oldAmount=h.type==='sip'
       ?((Number(h.monthlyAmount)||0)*(Number(h.durationMonths)||0))
       :(Number(h.units)||0)*(Number(h.buyPrice)||0);
-    const sameAcc=h.accountId===accountId;
-    const availForThis=(bal.iv[accountId]||0)+(sameAcc?oldAmount:0);
+    const sameSource=(h.sourceKey||`inv:${h.accountId}`)===sourceKey;
+    const availForThis=(fundMode==='bank'?(bal.bk[bankId]||0):(bal.iv[accountId]||0))+(sameSource?oldAmount:0);
     if(newAmount>availForThis){toast(`Insufficient cash — only ${fmt(availForThis)} available in this account`);return;}
     if(h.type==='sip'&&h.seriesTxnIds?.length){
       state.transactions=state.transactions.filter(x=>!h.seriesTxnIds.includes(x.id));
     }else if(h.txnId){
       state.transactions=state.transactions.filter(x=>x.id!==h.txnId);
     }
-    Object.assign(h,{accountId,type,date,name,units:isSip?sipAmount:units,buyPrice:isSip?sipMonths:buyPriceToSave,nav,symbol,schemeCode,monthlyAmount:isSip?sipAmount:undefined,durationMonths:isSip?sipMonths:undefined,buyPriceMode:isSip?undefined:buyMode});
+    Object.assign(h,{accountId,type,date,name,units:isSip?sipAmount:units,buyPrice:isSip?sipMonths:buyPriceToSave,nav,symbol,schemeCode,monthlyAmount:isSip?sipAmount:undefined,durationMonths:isSip?sipMonths:undefined,buyPriceMode:isSip?undefined:buyMode,sourceKey});
     if(isSip){
       if(!schemeCode){toast('Select an AMFI scheme for SIP series');return;}
       if(!sipMonths){toast('Enter a valid SIP duration');return;}
@@ -1569,19 +1664,20 @@ async function saveInvHolding(){
         const invested=sipAmount;
         const unitsBought=invested/liveNav;
         totalUnits+=unitsBought;
-        series.push({id:uid(),type:'invest',date:txnDate,accountId,amount:invested,name,units:unitsBought,buyPrice:liveNav,holdingId:h.id,schemeCode,sipMonth:i+1});
+        series.push({id:uid(),type:'invest',date:txnDate,accountId,amount:invested,name,units:unitsBought,buyPrice:liveNav,holdingId:h.id,schemeCode,sipMonth:i+1,sourceKey});
       }
       series.sort((a,b)=>a.date.localeCompare(b.date));
       state.transactions.push(...series);
-      Object.assign(h,{units:totalUnits,buyPrice:sipAmount,nav:liveNav,txnId:series[series.length-1]?.id||'',seriesTxnIds:series.map(t=>t.id),monthlyAmount:sipAmount,durationMonths:sipMonths,sipSeries:true});
+      Object.assign(h,{units:totalUnits,buyPrice:sipAmount,nav:liveNav,txnId:series[series.length-1]?.id||'',seriesTxnIds:series.map(t=>t.id),monthlyAmount:sipAmount,durationMonths:sipMonths,sipSeries:true,sourceKey});
     }else{
       const txn=state.transactions.find(x=>x.id===h.txnId);
-      if(txn)Object.assign(txn,{date,accountId,amount:newAmount,name,units,buyPrice:buyPriceToSave});
-      else{const tx={id:uid(),type:'invest',date,accountId,amount:newAmount,name,units,buyPrice:buyPriceToSave,holdingId:h.id};state.transactions.push(tx);h.txnId=tx.id;}
+      if(txn)Object.assign(txn,{date,accountId,amount:newAmount,name,units,buyPrice:buyPriceToSave,sourceKey});
+      else{const tx={id:uid(),type:'invest',date,accountId,amount:newAmount,name,units,buyPrice:buyPriceToSave,holdingId:h.id,sourceKey};state.transactions.push(tx);h.txnId=tx.id;}
     }
   }else{
     const avail=bal.iv[accountId]||0;
-    if(newAmount>avail){toast(`Insufficient cash — only ${fmt(avail)} available in this account. Transfer funds first.`);return;}
+    const directAvail=fundMode==='bank'?(bal.bk[bankId]||0):avail;
+    if(newAmount>directAvail){toast(`Insufficient cash — only ${fmt(directAvail)} available in this account${fundMode==='bank'?' / bank account':''}.`);return;}
     if(isSip){
       if(!schemeCode){toast('Select an AMFI scheme for SIP series');return;}
       if(!sipMonths){toast('Enter a valid SIP duration');return;}
@@ -1597,15 +1693,15 @@ async function saveInvHolding(){
         const invested=sipAmount;
         const unitsBought=invested/liveNav;
         totalUnits+=unitsBought;
-        series.push({id:uid(),type:'invest',date:txnDate,accountId,amount:invested,name,units:unitsBought,buyPrice:liveNav,holdingId:hid,schemeCode,sipMonth:i+1});
+        series.push({id:uid(),type:'invest',date:txnDate,accountId,amount:invested,name,units:unitsBought,buyPrice:liveNav,holdingId:hid,schemeCode,sipMonth:i+1,sourceKey});
       }
       series.sort((a,b)=>a.date.localeCompare(b.date));
       state.transactions.push(...series);
-      state.investments.holdings.push({id:hid,accountId,type,date,name,units:totalUnits,buyPrice:sipAmount,nav:liveNav,symbol,schemeCode,txnId:series[series.length-1]?.id||'',seriesTxnIds:series.map(t=>t.id),monthlyAmount:sipAmount,durationMonths:sipMonths,sipSeries:true});
+      state.investments.holdings.push({id:hid,accountId,type,date,name,units:totalUnits,buyPrice:sipAmount,nav:liveNav,symbol,schemeCode,txnId:series[series.length-1]?.id||'',seriesTxnIds:series.map(t=>t.id),monthlyAmount:sipAmount,durationMonths:sipMonths,sipSeries:true,sourceKey});
     }else{
       const hid=uid(),tid=uid();
-      state.investments.holdings.push({id:hid,accountId,type,date,name,units,buyPrice:buyPriceToSave,nav,symbol,schemeCode,txnId:tid,buyPriceMode:buyMode});
-      state.transactions.push({id:tid,type:'invest',date,accountId,amount:newAmount,name,units,buyPrice:buyPriceToSave,holdingId:hid});
+      state.investments.holdings.push({id:hid,accountId,type,date,name,units,buyPrice:buyPriceToSave,nav,symbol,schemeCode,txnId:tid,buyPriceMode:buyMode,sourceKey});
+      state.transactions.push({id:tid,type:'invest',date,accountId,amount:newAmount,name,units,buyPrice:buyPriceToSave,holdingId:hid,sourceKey});
     }
   }
   saveState();closeModal('modal-inv-hold');rebuildAll();
@@ -1727,6 +1823,7 @@ function renderInvestments(){
   const bucketReturnPct=v=>v.invested>0?(v.profit/v.invested)*100:0;
   document.getElementById('inv-stat-tiles').innerHTML=[
     {label:'Available Cash',val:fmt(bal.totInvCash),color:'#1d4ed8',sub:'Transferred, not yet invested'},
+    {label:'Invested Value',val:fmt(totInvested),color:'#1c1917',sub:`${holdings.length} holding(s)`,breakdown:[['Stocks (Equity)',fmt(invBuckets.Stock.invested)],['Mutual Funds',fmt(invBuckets.MF.invested)]]},
     {label:'Current Value',val:fmt(totCurrent),color:'#1c1917',sub:`${holdings.length} holding(s)`,breakdown:[['Stocks (Equity)',fmt(invBuckets.Stock.current)],['Mutual Funds',fmt(invBuckets.MF.current)]]},
     {label:'Total Gain / Loss',val:fmt(totGain),color:gc,sub:totGain>=0?'Unrealized profit':'Unrealized loss',breakdown:[['Stocks (Equity)',`${invBuckets.Stock.profit>=0?'+':''}${fmt(invBuckets.Stock.profit)}`],['Mutual Funds',`${invBuckets.MF.profit>=0?'+':''}${fmt(invBuckets.MF.profit)}`]]},
     {label:'Overall Return',val:`${totGainPct>=0?'+':''}${totGainPct.toFixed(2)}%`,color:gc,sub:'Since purchase',breakdown:[['Stocks (Equity)',`${bucketReturnPct(invBuckets.Stock)>=0?'+':''}${bucketReturnPct(invBuckets.Stock).toFixed(2)}%`],['Mutual Funds',`${bucketReturnPct(invBuckets.MF)>=0?'+':''}${bucketReturnPct(invBuckets.MF).toFixed(2)}%`]]},
@@ -2118,7 +2215,7 @@ function buildRow(t,canDel){
     amtStr='+'+fmt(t.amount);amtCol='#166534';
   }else if(t.type==='invest'){
     iconBg='#ede9fe';iconTxt='IV';mainLabel='Invested — '+esc(t.name||'Holding');
-    subLabel=trLabel('inv:'+t.accountId)+(t.units?` &middot; ${t.units} units @ ${fmt(t.buyPrice)}`:'');
+    subLabel=trLabel('inv:'+t.accountId)+(t.sourceKey?` &middot; paid from ${trLabel(t.sourceKey)}`:'')+(t.units?` &middot; ${t.units} units @ ${fmt(t.buyPrice)}`:'');
     amtStr=fmt(t.amount);amtCol='#7c3aed';canDel=false;
   }else{
     iconBg='#eff6ff';iconTxt='TR';mainLabel='Transfer';

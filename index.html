@@ -270,11 +270,12 @@ html.dark{filter:invert(1) hue-rotate(180deg)}
             <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:9px">
               <div><div class="slabel" style="margin-bottom:4px">Credit To</div>
                 <select id="i-actype" class="pl" onchange="fillIncInst()">
-                  <option value="bank">Bank Account</option><option value="cash">Cash</option>
+                  <option value="bank">Bank Account</option><option value="cash">Cash</option><option value="cc">Credit Card</option>
                 </select>
               </div>
               <div><div class="slabel" style="margin-bottom:4px">Instrument</div><select id="i-inst" class="pl"></select></div>
             </div>
+            <div id="i-cc-hint" class="info-box hidden" style="margin-bottom:9px;background:#f0fdf4;color:#166534">This reduces the card's outstanding due instead of adding to a bank/cash balance.</div>
             <div style="margin-bottom:9px"><div class="slabel" style="margin-bottom:5px">Source / Category</div><div id="i-chips" style="display:flex;flex-wrap:wrap;gap:5px"></div></div>
             <div style="margin-bottom:11px"><div class="slabel" style="margin-bottom:4px">Description (optional)</div>
               <div class="fw"><input id="i-desc" class="fi" type="text" placeholder="e.g. Monthly salary"/></div>
@@ -361,6 +362,19 @@ html.dark{filter:invert(1) hue-rotate(180deg)}
             <span style="font-weight:600;font-size:.88rem">Transaction Log</span>
             <span class="slabel" id="log-month-label"></span>
           </div>
+          <!-- Category & Date Filter -->
+          <div style="display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-bottom:11px;padding:10px;background:#faf9f7;border-radius:9px;border:1px solid #f0eeec">
+            <select id="txn-filter-cat" class="pl" style="width:auto;padding:6px 9px;font-size:.78rem" onchange="applyTxnFilter()">
+              <option value="">All Categories</option>
+            </select>
+            <div class="date-trigger" style="width:auto;padding:6px 9px;font-size:.78rem" onclick="openDatePicker('txn-filter-from')"><span id="txn-filter-from-disp">From</span></div>
+            <input id="txn-filter-from" type="hidden"/>
+            <span style="font-size:.75rem;color:#a8a29e">to</span>
+            <div class="date-trigger" style="width:auto;padding:6px 9px;font-size:.78rem" onclick="openDatePicker('txn-filter-to')"><span id="txn-filter-to-disp">To</span></div>
+            <input id="txn-filter-to" type="hidden"/>
+            <button class="btn-g" style="padding:6px 11px;font-size:.78rem" onclick="clearTxnFilter()">Clear Filter</button>
+          </div>
+          <div id="txn-filter-summary" class="hidden" style="font-size:.75rem;color:#57534e;margin-bottom:9px"></div>
           <div id="txn-list"></div>
         </div>
         <!-- Quick Charts -->
@@ -945,6 +959,7 @@ function normalizeState(){
 
 /* UI state */
 let txnType='expense',selExpCat=null,selIncCat=null,viewMK=null,viewFY=null,viewMode='month',activeTab='log',activeView='dashboard';
+let txnFilter={category:'',from:'',to:''};
 let invSummaryMode='cash';
 let CH={};  // chart instances keyed by id
 let cumulativeCatSelection=[];
@@ -1075,6 +1090,7 @@ function confirmDatePicker(){
   if(_dateTargetId){
     setDateVal(_dateTargetId,iso);
     if(_dateTargetId==='rng-from'||_dateTargetId==='rng-to')applyCustomRange();
+    if(_dateTargetId==='txn-filter-from'||_dateTargetId==='txn-filter-to')applyTxnFilter();
   }
   closeModal('modal-datewheel');
 }
@@ -1116,6 +1132,7 @@ function computeBal(){
     }else if(t.type==='income'){
       if(t.destType==='bank'&&bk[t.destId]!==undefined)bk[t.destId]+=a;
       else if(t.destType==='cash')ca+=a;
+      else if(t.destType==='cc'&&cd[t.destId]!==undefined)cd[t.destId]-=a;
     }else if(t.type==='transfer'){
       const mv=(key,sign)=>{
         if(!key)return;
@@ -2082,8 +2099,10 @@ function fillExpInst(){
 function fillIncInst(){
   const t=document.getElementById('i-actype').value,s=document.getElementById('i-inst');
   s.innerHTML='';
-  if(t==='bank'){if(!state.banks.length){s.innerHTML='<option>No banks added</option>';return;}state.banks.forEach(b=>s.innerHTML+=`<option value="${b.id}">${esc(b.name)}</option>`);}
+  if(t==='bank'){if(!state.banks.length)s.innerHTML='<option>No banks added</option>';else state.banks.forEach(b=>s.innerHTML+=`<option value="${b.id}">${esc(b.name)}</option>`);}
+  else if(t==='cc'){if(!state.cards.length)s.innerHTML='<option>No cards added</option>';else state.cards.forEach(c=>s.innerHTML+=`<option value="${c.id}">${esc(c.name)}</option>`);}
   else s.innerHTML='<option value="cash">Cash</option>';
+  document.getElementById('i-cc-hint')?.classList.toggle('hidden',t!=='cc');
 }
 function fillTransferOpts(){
   let html='';
@@ -2118,7 +2137,7 @@ function saveCategory(){
   const ctx=document.getElementById('cat-ctx').value,name=document.getElementById('inp-cat').value.trim();
   if(!name){toast('Enter a name');return;}
   if(state.categories[ctx].map(c=>c.toLowerCase()).includes(name.toLowerCase())){toast('Already exists');return;}
-  state.categories[ctx].push(name);saveState();renderChips(ctx);closeModal('modal-cat');toast('Category added');
+  state.categories[ctx].push(name);saveState();renderChips(ctx);fillTxnFilterCatOpts();closeModal('modal-cat');toast('Category added');
 }
 
 /* ── Txn toggle ───────────────────────────────────────────── */
@@ -2208,9 +2227,10 @@ function submitIncome(){
   if(!amt||amt<=0){toast('Enter a valid amount');return;}
   if(!date){toast('Select a date');return;}
   if(!selIncCat){toast('Select a source category');return;}
+  if((dt==='bank'||dt==='cc')&&!di){toast('No account selected');return;}
   state.transactions.push({id:uid(),date,type:'income',amount:amt,destType:dt,destId:dt==='cash'?'cash':di,category:selIncCat,desc});
   saveState();document.getElementById('i-amt').value='';document.getElementById('i-desc').value='';
-  rebuildAll();toast('Income recorded');
+  rebuildAll();toast(dt==='cc'?'Income recorded — card due reduced':'Income recorded');
 }
 function submitTransfer(){
   const amt=Number(document.getElementById('t-amt').value),date=document.getElementById('t-date').value;
@@ -2301,10 +2321,75 @@ function txnsForFY(fy){const{from,to}=fyRange(fy);return state.transactions.filt
 function txnsInRange(from,to){return state.transactions.filter(t=>t.date>=from&&t.date<=to);}
 function curViewTxns(){return viewMode==='fy'?txnsForFY(viewFY):txnsForMK(viewMK);}
 
+/* Category + date-range filter for the transaction log */
+function fillTxnFilterCatOpts(){
+  const sel=document.getElementById('txn-filter-cat');
+  if(!sel)return;
+  const prev=sel.value;
+  let html='<option value="">All Categories</option>';
+  if(state.categories.expense.length)html+='<optgroup label="Expense">'+state.categories.expense.map(c=>`<option value="exp:${esc(c)}">${esc(c)}</option>`).join('')+'</optgroup>';
+  if(state.categories.income.length)html+='<optgroup label="Income">'+state.categories.income.map(c=>`<option value="inc:${esc(c)}">${esc(c)}</option>`).join('')+'</optgroup>';
+  sel.innerHTML=html;
+  if(prev&&Array.from(sel.options).some(o=>o.value===prev))sel.value=prev;
+}
+function isTxnFilterActive(){return!!(txnFilter.category||txnFilter.from||txnFilter.to);}
+function txnMatchesFilter(t){
+  const{category,from,to}=txnFilter;
+  if(category){
+    const idx=category.indexOf(':'),kind=category.slice(0,idx),name=category.slice(idx+1);
+    if(kind==='exp'){if(t.type!=='expense'||t.category!==name)return false;}
+    else if(kind==='inc'){if(t.type!=='income'||t.category!==name)return false;}
+  }
+  if(from&&t.date<from)return false;
+  if(to&&t.date>to)return false;
+  return true;
+}
+function applyTxnFilter(){
+  txnFilter={
+    category:document.getElementById('txn-filter-cat').value,
+    from:document.getElementById('txn-filter-from').value,
+    to:document.getElementById('txn-filter-to').value,
+  };
+  renderTxnLog();
+}
+function clearTxnFilter(){
+  document.getElementById('txn-filter-cat').value='';
+  setDateVal('txn-filter-from','');
+  document.getElementById('txn-filter-from-disp').textContent='From';
+  setDateVal('txn-filter-to','');
+  document.getElementById('txn-filter-to-disp').textContent='To';
+  txnFilter={category:'',from:'',to:''};
+  renderTxnLog();
+}
+
 function renderTxnLog(){
   const list=document.getElementById('txn-list');
-  const txns=curViewTxns().slice().sort((a,b)=>b.date.localeCompare(a.date)||b.id.localeCompare(a.id));
-  if(!txns.length){list.innerHTML=`<div style="text-align:center;padding:26px 0;font-size:.83rem;color:#a8a29e">No transactions this ${viewMode==='fy'?'financial year':'month'}.</div>`;return;}
+  const filterActive=isTxnFilterActive();
+  const summaryEl=document.getElementById('txn-filter-summary');
+  const label=document.getElementById('log-month-label');
+  let txns;
+  if(filterActive){
+    txns=state.transactions.filter(txnMatchesFilter).slice().sort((a,b)=>b.date.localeCompare(a.date)||b.id.localeCompare(a.id));
+    const catSel=document.getElementById('txn-filter-cat');
+    const catText=txnFilter.category?catSel.options[catSel.selectedIndex].textContent:'All Categories';
+    const rangeText=(txnFilter.from||txnFilter.to)?`${txnFilter.from?fmtDate(txnFilter.from):'…'} – ${txnFilter.to?fmtDate(txnFilter.to):'…'}`:'All time';
+    label.textContent=`Filtered: ${catText} · ${rangeText}`;
+    const expSum=txns.filter(t=>t.type==='expense').reduce((s,t)=>s+Number(t.amount),0);
+    const incSum=txns.filter(t=>t.type==='income').reduce((s,t)=>s+Number(t.amount),0);
+    const parts=[];
+    if(expSum)parts.push(`Expenses: ${fmt(expSum)}`);
+    if(incSum)parts.push(`Income: ${fmt(incSum)}`);
+    summaryEl.textContent=`${txns.length} transaction(s) found`+(parts.length?' · '+parts.join(' · '):'');
+    summaryEl.classList.remove('hidden');
+  }else{
+    txns=curViewTxns().slice().sort((a,b)=>b.date.localeCompare(a.date)||b.id.localeCompare(a.id));
+    label.textContent=viewMode==='fy'?fyLabel(viewFY):mkLabel(viewMK);
+    summaryEl.classList.add('hidden');
+  }
+  if(!txns.length){
+    list.innerHTML=`<div style="text-align:center;padding:26px 0;font-size:.83rem;color:#a8a29e">No transactions ${filterActive?'match this filter':`this ${viewMode==='fy'?'financial year':'month'}`}.</div>`;
+    return;
+  }
   const grouped={};txns.forEach(t=>{if(!grouped[t.date])grouped[t.date]=[];grouped[t.date].push(t);});
   const dates=Object.keys(grouped).sort().reverse();
   list.innerHTML='';
@@ -2926,7 +3011,7 @@ function renderNetWorthChart(){
     state.transactions.filter(t=>t.date<=endDate).forEach(t=>{
       const a=Number(t.amount)||0;
       if(t.type==='expense'){if(t.acType==='bank'&&bk[t.acId]!==undefined)bk[t.acId]-=a;else if(t.acType==='cash')ca-=a;else if(t.acType==='cc'&&cd[t.acId]!==undefined)cd[t.acId]+=a;}
-      else if(t.type==='income'){if(t.destType==='bank'&&bk[t.destId]!==undefined)bk[t.destId]+=a;else if(t.destType==='cash')ca+=a;}
+      else if(t.type==='income'){if(t.destType==='bank'&&bk[t.destId]!==undefined)bk[t.destId]+=a;else if(t.destType==='cash')ca+=a;else if(t.destType==='cc'&&cd[t.destId]!==undefined)cd[t.destId]-=a;}
       else if(t.type==='transfer'){
         const mv=(key,sign)=>{if(!key)return;if(key==='cash'){ca+=sign*a;return;}const[k,id]=key.split(':');if(k==='bank'&&bk[id]!==undefined)bk[id]+=sign*a;else if(k==='cc'&&cd[id]!==undefined)cd[id]-=sign*a;};
         mv(t.fromKey,-1);mv(t.toKey,+1);
@@ -3008,6 +3093,7 @@ function rebuildAll(){
   renderBudget();
   renderCumulativeCategoryWidget();
   renderWeekly();
+  fillTxnFilterCatOpts();
   renderTxnLog();
   fillExpInst();fillIncInst();fillTransferOpts();
   renderChips('expense');renderChips('income');

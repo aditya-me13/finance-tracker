@@ -205,6 +205,12 @@ html.dark{filter:invert(1) hue-rotate(180deg)}
     <div id="sb-cards"><div style="font-size:.74rem;color:#c4bfba;padding:3px 8px">No cards yet</div></div>
   </div>
 
+  <!-- Splitwise / Roommate Settlement -->
+  <div class="sb-sec" id="sb-splitwise-sec" style="display:none">
+    <div class="sb-head"><span class="slabel">Splitwise Balance</span></div>
+    <div id="sb-splitwise-body"></div>
+  </div>
+
   <!-- Quick Calculator -->
   <div class="sb-sec">
     <div class="sb-head"><span class="slabel">Quick Calculator</span>
@@ -236,14 +242,38 @@ html.dark{filter:invert(1) hue-rotate(180deg)}
           <!-- EXPENSE -->
           <div id="form-expense">
             <div style="display:grid;grid-template-columns:1fr 136px;gap:8px;margin-bottom:9px">
-              <div style="min-width:0"><div class="slabel" style="margin-bottom:4px">Amount (INR)</div>
-                <div class="fw"><div class="fp">₹</div><input id="e-amt" class="fi" type="number" min="0" step="0.01" placeholder="0.00"/></div>
+              <div style="min-width:0"><div class="slabel" style="margin-bottom:4px" id="e-amt-label">Amount (INR)</div>
+                <div class="fw"><div class="fp">₹</div><input id="e-amt" class="fi" type="number" min="0" step="0.01" placeholder="0.00" oninput="onExpAmtInput()"/></div>
               </div>
               <div style="min-width:0"><div class="slabel" style="margin-bottom:4px">Date</div>
                 <div class="date-trigger" onclick="openDatePicker('e-date')"><span id="e-date-disp">Select date</span><svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg></div>
                 <input id="e-date" type="hidden"/></div>
             </div>
-            <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:9px">
+            <!-- Roommate Split -->
+            <div style="margin-bottom:9px">
+              <label style="display:flex;align-items:center;gap:7px;cursor:pointer;font-size:.8rem;color:#44403c">
+                <input type="checkbox" id="e-split-toggle" onchange="toggleSplitPanel()" style="accent-color:#1c1917"/>
+                Split with roommates
+              </label>
+              <div id="e-split-panel" class="hidden" style="margin-top:8px;padding:10px;background:#faf9f7;border:1px solid #f0eeec;border-radius:9px">
+                <div class="tg" style="margin-bottom:9px">
+                  <button type="button" class="tp active" id="e-split-fronted-btn" onclick="setSplitMode('fronted')">I paid the bill</button>
+                  <button type="button" class="tp" id="e-split-owed-btn" onclick="setSplitMode('owed')">Someone else paid</button>
+                </div>
+                <div style="display:grid;grid-template-columns:1fr 90px;gap:8px;align-items:end">
+                  <div><div class="slabel" style="margin-bottom:4px">My Share (₹)</div>
+                    <div class="fw"><div class="fp">₹</div><input id="e-my-share" class="fi" type="number" min="0" step="0.01" placeholder="0.00"/></div>
+                  </div>
+                  <div><div class="slabel" style="margin-bottom:4px">÷ People</div>
+                    <div class="fw"><input id="e-split-people" class="fi" type="number" min="2" step="1" placeholder="4" style="text-align:center"/></div>
+                  </div>
+                </div>
+                <button type="button" onclick="calcEqualShare()" style="font-size:.71rem;color:#1d4ed8;background:none;border:none;cursor:pointer;margin-top:6px;padding:0;font-family:'DM Sans',sans-serif">Split equally →</button>
+                <p id="e-split-fronted-note" style="font-size:.71rem;color:#a8a29e;margin-top:6px;line-height:1.4">The full <b>Total Bill Amount</b> still leaves your account below — only "My Share" counts toward your category spend &amp; budgets.</p>
+                <p id="e-split-owed-note" class="hidden" style="font-size:.71rem;color:#a8a29e;margin-top:6px;line-height:1.4">Enter the <b>Total Bill Amount</b> someone else paid above, and your <b>My Share</b> below. Nothing is deducted from any account — settle it later via "Settle Up".</p>
+              </div>
+            </div>
+            <div id="e-acc-row" style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:9px">
               <div><div class="slabel" style="margin-bottom:4px">Account Type</div>
                 <select id="e-actype" class="pl" onchange="fillExpInst()">
                   <option value="bank">Bank Account</option><option value="cc">Credit Card</option><option value="cash">Cash</option>
@@ -501,6 +531,7 @@ html.dark{filter:invert(1) hue-rotate(180deg)}
             <label style="display:flex;align-items:center;gap:4px;font-size:.77rem;cursor:pointer"><input type="checkbox" id="hf-bank" checked onchange="renderHistChart()"> <span style="color:#3b82f6">Bank/UPI</span></label>
             <label style="display:flex;align-items:center;gap:4px;font-size:.77rem;cursor:pointer"><input type="checkbox" id="hf-cash" checked onchange="renderHistChart()"> <span style="color:#22c55e">Cash</span></label>
             <label style="display:flex;align-items:center;gap:4px;font-size:.77rem;cursor:pointer"><input type="checkbox" id="hf-cc" checked onchange="renderHistChart()"> <span style="color:#f59e0b">Credit Card</span></label>
+            <label style="display:flex;align-items:center;gap:4px;font-size:.77rem;cursor:pointer"><input type="checkbox" id="hf-shared" checked onchange="renderHistChart()"> <span style="color:#7c3aed">Roommate Split</span></label>
           </div>
         </div>
         <div style="height:220px;position:relative">
@@ -641,6 +672,14 @@ html.dark{filter:invert(1) hue-rotate(180deg)}
             <div class="fw"><input id="ac-reminddays" class="fi" type="number" min="1" max="30" placeholder="e.g. 5"/></div></div>
         </div>
         <p style="font-size:.71rem;color:#a8a29e;margin-top:4px">We'll highlight upcoming due dates in the sidebar.</p>
+      </div>
+      <!-- Net Worth inclusion (bank accounts only) -->
+      <div id="ac-nw-wrap" class="hidden">
+        <label style="display:flex;align-items:flex-start;gap:8px;cursor:pointer">
+          <input type="checkbox" id="ac-include-nw" checked style="accent-color:#1c1917;margin-top:2px"/>
+          <span style="font-size:.8rem;color:#44403c">Include this account in Net Worth &amp; Liquid Cash totals</span>
+        </label>
+        <p style="font-size:.71rem;color:#a8a29e;margin-top:4px;margin-left:22px">Turn off for reconciliation/"dumping" accounts you don't want counted in your headline totals. The account still tracks its own balance.</p>
       </div>
     </div>
     <div style="display:flex;gap:8px;margin-top:16px">
@@ -845,6 +884,29 @@ html.dark{filter:invert(1) hue-rotate(180deg)}
   </div>
 </div>
 
+<!-- MODAL: Settle Splitwise -->
+<div id="modal-settle" class="mo hidden" onclick="if(event.target.id==='modal-settle')closeModal('modal-settle')">
+  <div class="mb">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+      <h3 style="font-weight:600;font-size:.93rem">Settle Up</h3>
+      <button class="btn-i" onclick="closeModal('modal-settle')"><svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg></button>
+    </div>
+    <div id="settle-summary" style="margin-bottom:14px;padding:12px;background:#faf9f7;border-radius:9px;border:1px solid #f0eeec"></div>
+    <div style="display:flex;flex-direction:column;gap:11px">
+      <div><div class="slabel" style="margin-bottom:4px">Settlement Date</div>
+        <div class="date-trigger" onclick="openDatePicker('settle-date')"><span id="settle-date-disp">Select date</span><svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg></div>
+        <input id="settle-date" type="hidden"/></div>
+      <div><div class="slabel" style="margin-bottom:4px">Settle Via</div>
+        <select id="settle-acc" class="pl"></select></div>
+      <p id="settle-hint" class="info-box">This will record the net amount as an income/expense in the selected account and mark all outstanding split entries as settled.</p>
+    </div>
+    <div style="display:flex;gap:8px;margin-top:16px">
+      <button class="btn-g" style="flex:1" onclick="closeModal('modal-settle')">Cancel</button>
+      <button class="btn-p" style="flex:1;background:#166534" onclick="confirmSettle()">Confirm Settlement</button>
+    </div>
+  </div>
+</div>
+
 <!-- MODAL: Date Wheel Picker -->
 <div id="modal-datewheel" class="mo hidden" onclick="if(event.target.id==='modal-datewheel')closeModal('modal-datewheel')">
   <div class="mb" style="max-width:280px">
@@ -955,6 +1017,10 @@ function normalizeState(){
   if(!state.investments)state.investments={accounts:[],holdings:[]};
   if(!state.investments.accounts)state.investments.accounts=[];
   if(!state.investments.holdings)state.investments.holdings=[];
+  state.transactions.forEach(t=>{
+    if(t.type==='expense'&&(t.myShare===undefined||t.myShare===null||t.myShare===''))t.myShare=Number(t.amount)||0;
+  });
+  state.banks.forEach(b=>{if(b.includeInNetWorth===undefined)b.includeInNetWorth=true;});
 }
 
 /* UI state */
@@ -984,6 +1050,11 @@ const fyRange=fy=>({from:`${fy}-04-01`,to:`${Number(fy)+1}-03-31`});
 const fmt=n=>'₹'+Number(n).toLocaleString('en-IN',{minimumFractionDigits:2,maximumFractionDigits:2});
 const esc=s=>String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 const dateToStr=d=>`${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
+/* Shared-expense helpers:
+   realAmount  = money that actually left a real bank/cash/CC account (for balances & cash flow)
+   shareAmount = your true personal cost regardless of who paid (for category charts & budgets) */
+const realAmount=t=>t.type==='expense'?(t.acType==='shared'?0:Number(t.amount)||0):Number(t.amount)||0;
+const shareAmount=t=>t.type==='expense'?Number(t.myShare!==undefined&&t.myShare!==null&&t.myShare!==''?t.myShare:t.amount)||0:Number(t.amount)||0;
 
 /* ── Toast ────────────────────────────────────────────────── */
 let _tt;
@@ -1159,13 +1230,14 @@ function computeBal(){
       }
     }
   }
-  const totBank=Object.values(bk).reduce((s,v)=>s+v,0);
+  const totBankAll=Object.values(bk).reduce((s,v)=>s+v,0);
+  const totBank=state.banks.filter(b=>b.includeInNetWorth!==false).reduce((s,b)=>s+(bk[b.id]||0),0);
   const totCC=Object.values(cd).reduce((s,v)=>s+v,0);
   const totInvCash=Object.values(iv).reduce((s,v)=>s+v,0);
   const totHoldingsValue=state.investments.holdings.reduce((s,h)=>s+(Number(h.units)||0)*(Number(h.nav)||0),0);
   const liquid=totBank+ca-totCC;
   const investWorth=totInvCash+totHoldingsValue;
-  return{bk,ca,cd,iv,totBank,totCC,totInvCash,totHoldingsValue,liquid,investWorth,netWorth:liquid+investWorth};
+  return{bk,ca,cd,iv,totBank,totBankAll,totCC,totInvCash,totHoldingsValue,liquid,investWorth,netWorth:liquid+investWorth};
 }
 
 /* ── CC Due Date logic ────────────────────────────────────── */
@@ -1184,6 +1256,13 @@ function getDueDateStatus(card){
   else if(diffDays<=remind){status='soon';label=`Due in ${diffDays}d`;}
   else{status='ok';label=`Due ${due.toLocaleDateString('en-IN',{day:'numeric',month:'short'})}`;}
   return{status,label,due,diffDays};
+}
+
+/* ── Splitwise / Roommate Settlement ──────────────────────── */
+function computeSplitwiseBalance(){
+  const owed=state.transactions.filter(t=>t.type==='expense'&&t.acType==='shared'&&!t.settled).reduce((s,t)=>s+(Number(t.myShare!==undefined?t.myShare:t.amount)||0),0);
+  const fronted=state.transactions.filter(t=>t.type==='expense'&&t.shared&&t.acType!=='shared'&&!t.settled).reduce((s,t)=>s+Math.max(0,(Number(t.amount)||0)-(Number(t.myShare)||0)),0);
+  return{owed,fronted,net:fronted-owed};
 }
 
 /* ── Sidebar ──────────────────────────────────────────────── */
@@ -1231,10 +1310,11 @@ function renderSidebar(){
 
   const sbB=document.getElementById('sb-banks');
   sbB.innerHTML=!state.banks.length?'<div style="font-size:.74rem;color:#c4bfba;padding:3px 8px">No accounts yet</div>':
-    state.banks.map((b,i)=>{const v=bal.bk[b.id]||0;return`<div class="sb-item" style="align-items:center;gap:6px">
+    state.banks.map((b,i)=>{const v=bal.bk[b.id]||0;const excluded=b.includeInNetWorth===false;return`<div class="sb-item" style="align-items:center;gap:6px">
       <span class="sb-dot" style="background:${BDOTS[i%BDOTS.length]};margin-top:0;flex-shrink:0"></span>
-      <span class="sb-name" style="flex:1" title="${esc(b.name)}">${esc(b.name)}</span>
-      <span class="sb-amt${v<0?' neg':''}">${fmt(v)}</span>
+      <span class="sb-name" style="flex:${excluded?'0 1 auto':'1'}" title="${esc(b.name)}">${esc(b.name)}</span>
+      ${excluded?'<span class="badge-sm" style="background:#f4f3f0;color:#a8a29e;flex-shrink:0" title="Not counted in Net Worth or Liquid Cash">Excluded</span>':''}
+      <span class="sb-amt${v<0?' neg':''}" style="${excluded?'flex:1;text-align:right':''}">${fmt(v)}</span>
       <button class="btn-i" onclick="openEditModal('bank','${b.id}')" title="Edit" style="padding:2px;flex-shrink:0">
         <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
       </button>
@@ -1275,6 +1355,72 @@ function renderSidebar(){
         </div>`:''}
       </div>`;
     }).join('');
+  renderSplitwiseWidget();
+}
+
+function renderSplitwiseWidget(){
+  const sec=document.getElementById('sb-splitwise-sec'),body=document.getElementById('sb-splitwise-body');
+  if(!sec||!body)return;
+  const{owed,fronted,net}=computeSplitwiseBalance();
+  if(owed<=0.004&&fronted<=0.004){sec.style.display='none';return;}
+  sec.style.display='block';
+  const netLabel=net>0.004?`You're owed ${fmt(net)}`:net<-0.004?`You owe ${fmt(-net)}`:'All settled up';
+  const netColor=net>0.004?'#166534':net<-0.004?'#ef4444':'#78716c';
+  body.innerHTML=`
+    <div style="padding:3px 8px 2px">
+      <div class="num" style="font-size:.92rem;font-weight:600;color:${netColor}">${netLabel}</div>
+      <div style="font-size:.67rem;color:#a8a29e;margin-top:2px">Fronted: ${fmt(fronted)} &middot; Owed: ${fmt(owed)}</div>
+      <button class="btn-g" style="width:100%;margin-top:8px;padding:6px 0;font-size:.76rem" onclick="openSettleModal()">Settle Up</button>
+    </div>`;
+}
+
+function fillSettleAccOpts(){
+  let html='<option value="cash">Cash</option>';
+  state.banks.forEach(b=>html+=`<option value="bank:${b.id}">${esc(b.name)} (Bank)</option>`);
+  document.getElementById('settle-acc').innerHTML=html;
+}
+
+function openSettleModal(){
+  const{owed,fronted,net}=computeSplitwiseBalance();
+  if(owed<=0.004&&fronted<=0.004){toast("Nothing to settle — you're all square");return;}
+  const netColor=net>=0?'#166534':'#ef4444';
+  document.getElementById('settle-summary').innerHTML=`
+    <div style="display:flex;justify-content:space-between;font-size:.8rem;margin-bottom:5px"><span>You fronted for others</span><span class="num" style="color:#166534">+${fmt(fronted)}</span></div>
+    <div style="display:flex;justify-content:space-between;font-size:.8rem;margin-bottom:8px"><span>You owe others</span><span class="num" style="color:#ef4444">&minus;${fmt(owed)}</span></div>
+    <div style="height:1px;background:#e7e5e4;margin-bottom:8px"></div>
+    <div style="display:flex;justify-content:space-between;font-weight:600;font-size:.9rem"><span>Net</span><span class="num" style="color:${netColor}">${net>=0?'+':'-'}${fmt(Math.abs(net))}</span></div>
+    <p style="font-size:.72rem;color:#a8a29e;margin-top:6px">${net>0.004?"You're owed money overall — this will record it as income.":net<-0.004?'You owe money overall — this will record it as an expense.':"You're exactly settled — no money needs to move."}</p>`;
+  setDateVal('settle-date',today());
+  fillSettleAccOpts();
+  document.getElementById('settle-hint').textContent=Math.abs(net)>0.004
+    ?'This will record the net amount as an income/expense in the selected account and mark all outstanding split entries as settled.'
+    :'This will just mark all outstanding split entries as settled — no money needs to move.';
+  openModal('modal-settle');
+}
+
+function confirmSettle(){
+  const{owed,fronted,net}=computeSplitwiseBalance();
+  if(owed<=0.004&&fronted<=0.004){toast('Nothing to settle');closeModal('modal-settle');return;}
+  const date=document.getElementById('settle-date').value;
+  if(!date){toast('Select a settlement date');return;}
+  const accKey=document.getElementById('settle-acc').value;
+  const isCash=accKey==='cash';
+  const bankId=isCash?null:accKey.split(':')[1];
+
+  if(Math.abs(net)>0.004){
+    if(!state.categories.expense.includes('Settlement'))state.categories.expense.push('Settlement');
+    if(!state.categories.income.includes('Settlement'))state.categories.income.push('Settlement');
+    if(net>0){
+      state.transactions.push({id:uid(),date,type:'income',amount:Math.abs(net),destType:isCash?'cash':'bank',destId:isCash?'cash':bankId,category:'Settlement',desc:'Splitwise settlement'});
+    }else{
+      state.transactions.push({id:uid(),date,type:'expense',amount:Math.abs(net),myShare:Math.abs(net),acType:isCash?'cash':'bank',acId:isCash?'cash':bankId,category:'Settlement',desc:'Splitwise settlement'});
+    }
+  }
+  state.transactions.forEach(t=>{
+    if(t.type==='expense'&&t.shared&&!t.settled)t.settled=true;
+  });
+  saveState();closeModal('modal-settle');rebuildAll();
+  toast(Math.abs(net)>0.004?`Settled — ${net>0?'income':'expense'} of ${fmt(Math.abs(net))} recorded`:'All settled — no money moved');
 }
 
 /* ── Account Modal ────────────────────────────────────────── */
@@ -1287,6 +1433,7 @@ function _configModal(type, isEdit){
   document.getElementById('ac-name').placeholder=isBank?'e.g. HDFC Savings':isCC?'e.g. ICICI Amazon Pay':'';
   document.getElementById('ac-bal-wrap').classList.toggle('hidden', isCC||isCash);
   ['ac-lim-wrap','ac-due-wrap','ac-duedate-wrap'].forEach(id=>document.getElementById(id).classList.toggle('hidden',!isCC));
+  document.getElementById('ac-nw-wrap').classList.toggle('hidden',!isBank);
   if(isCash){
     document.getElementById('ac-bal-wrap').classList.remove('hidden');
     document.getElementById('ac-bal-lbl').textContent='Cash Balance (INR)';
@@ -1303,6 +1450,7 @@ function _configModal(type, isEdit){
 function openAddModal(type){
   _editAcType=null; _editAcId=null;
   ['ac-name','ac-bal','ac-lim','ac-due','ac-dueday','ac-reminddays'].forEach(id=>document.getElementById(id).value='');
+  document.getElementById('ac-include-nw').checked=true;
   _configModal(type, false);
   openModal('modal-ac');
 }
@@ -1310,12 +1458,14 @@ function openAddModal(type){
 function openEditModal(type, id){
   _editAcType=type; _editAcId=id;
   ['ac-name','ac-bal','ac-lim','ac-due','ac-dueday','ac-reminddays'].forEach(el=>document.getElementById(el).value='');
+  document.getElementById('ac-include-nw').checked=true;
   _configModal(type, true);
   if(type==='bank'){
     const b=state.banks.find(x=>x.id===id);
     if(!b)return;
     document.getElementById('ac-name').value=b.name;
     document.getElementById('ac-bal').value=b.startBalance||'';
+    document.getElementById('ac-include-nw').checked=b.includeInNetWorth!==false;
   } else if(type==='cc'){
     const c=state.cards.find(x=>x.id===id);
     if(!c)return;
@@ -1338,11 +1488,12 @@ function saveAccount(){
 
   if(type==='bank'){
     const bal=Number(document.getElementById('ac-bal').value)||0;
+    const includeInNetWorth=document.getElementById('ac-include-nw').checked;
     if(isEdit){
       const b=state.banks.find(x=>x.id===_editAcId);
-      if(b){b.name=name;b.startBalance=bal;}
+      if(b){b.name=name;b.startBalance=bal;b.includeInNetWorth=includeInNetWorth;}
     } else {
-      state.banks.push({id:uid(),name,startBalance:bal});
+      state.banks.push({id:uid(),name,startBalance:bal,includeInNetWorth});
     }
   } else if(type==='cc'){
     const obj={name,limit:Number(document.getElementById('ac-lim').value)||0,startDue:Number(document.getElementById('ac-due').value)||0,dueDay:Number(document.getElementById('ac-dueday').value)||0,remindDays:Number(document.getElementById('ac-reminddays').value)||5};
@@ -2153,7 +2304,7 @@ function setTxn(type){
 function calculateCumulativeTotal(selectedCats){
   return curViewTxns()
     .filter(t=>t.type==='expense'&&selectedCats.includes(t.category))
-    .reduce((sum,t)=>sum+Number(t.amount),0);
+    .reduce((sum,t)=>sum+shareAmount(t),0);
 }
 
 function renderCumulativeCategoryWidget(){
@@ -2208,17 +2359,78 @@ function quickTransferIn(accountId){
 }
 
 /* ── Submit ───────────────────────────────────────────────── */
+/* ── Roommate Split (shared expenses) ─────────────────────── */
+let expSplitMode='fronted';
+function toggleSplitPanel(){
+  const on=document.getElementById('e-split-toggle').checked;
+  document.getElementById('e-split-panel').classList.toggle('hidden',!on);
+  document.getElementById('e-amt-label').textContent=on?'Total Bill Amount (₹)':'Amount (INR)';
+  if(on){
+    setSplitMode(expSplitMode);
+    const shareInp=document.getElementById('e-my-share');
+    if(!shareInp.value)shareInp.value=document.getElementById('e-amt').value||'';
+  }else{
+    document.getElementById('e-acc-row').classList.remove('hidden');
+  }
+}
+function setSplitMode(mode){
+  expSplitMode=mode;
+  document.getElementById('e-split-fronted-btn').classList.toggle('active',mode==='fronted');
+  document.getElementById('e-split-owed-btn').classList.toggle('active',mode==='owed');
+  document.getElementById('e-split-fronted-note').classList.toggle('hidden',mode!=='fronted');
+  document.getElementById('e-split-owed-note').classList.toggle('hidden',mode!=='owed');
+  document.getElementById('e-acc-row').classList.toggle('hidden',mode==='owed');
+}
+function onExpAmtInput(){
+  if(!document.getElementById('e-split-toggle').checked)return;
+  const shareInp=document.getElementById('e-my-share');
+  // keep "My Share" in sync with the total until the user edits it manually
+  if(shareInp.dataset.touched)return;
+  shareInp.value=document.getElementById('e-amt').value||'';
+}
+function calcEqualShare(){
+  const amt=Number(document.getElementById('e-amt').value)||0;
+  const n=Number(document.getElementById('e-split-people').value)||4;
+  if(amt<=0||n<=0){toast('Enter the total bill amount and number of people first');return;}
+  const shareInp=document.getElementById('e-my-share');
+  shareInp.value=(amt/n).toFixed(2);
+  shareInp.dataset.touched='1';
+}
+function resetSplitPanel(){
+  document.getElementById('e-split-toggle').checked=false;
+  const shareInp=document.getElementById('e-my-share');
+  shareInp.value='';delete shareInp.dataset.touched;
+  document.getElementById('e-split-people').value='';
+  expSplitMode='fronted';
+  toggleSplitPanel();
+}
+
 function submitExpense(){
   const amt=Number(document.getElementById('e-amt').value),date=document.getElementById('e-date').value;
-  const at=document.getElementById('e-actype').value,ai=document.getElementById('e-inst').value;
   const desc=document.getElementById('e-desc').value.trim();
+  const isSplit=document.getElementById('e-split-toggle').checked;
   if(!amt||amt<=0){toast('Enter a valid amount');return;}
   if(!date){toast('Select a date');return;}
   if(!selExpCat){toast('Select a category');return;}
-  if((at==='bank'||at==='cc')&&!ai){toast('No account selected');return;}
-  state.transactions.push({id:uid(),date,type:'expense',amount:amt,acType:at,acId:at==='cash'?'cash':ai,category:selExpCat,desc});
-  saveState();document.getElementById('e-amt').value='';document.getElementById('e-desc').value='';
-  rebuildAll();toast('Expense logged');
+
+  let myShare=amt;
+  if(isSplit){
+    myShare=Number(document.getElementById('e-my-share').value);
+    if(!(myShare>0)){toast('Enter your share amount');return;}
+    if(myShare>amt){toast('Your share cannot exceed the total bill amount');return;}
+  }
+
+  if(isSplit&&expSplitMode==='owed'){
+    state.transactions.push({id:uid(),date,type:'expense',amount:amt,acType:'shared',acId:null,category:selExpCat,desc,myShare,shared:true,sharedMode:'owed',settled:false});
+  }else{
+    const at=document.getElementById('e-actype').value,ai=document.getElementById('e-inst').value;
+    if((at==='bank'||at==='cc')&&!ai){toast('No account selected');return;}
+    state.transactions.push({id:uid(),date,type:'expense',amount:amt,acType:at,acId:at==='cash'?'cash':ai,category:selExpCat,desc,myShare,shared:isSplit,sharedMode:isSplit?'fronted':undefined,settled:isSplit?false:undefined});
+  }
+  saveState();
+  document.getElementById('e-amt').value='';document.getElementById('e-desc').value='';
+  resetSplitPanel();
+  rebuildAll();toast(isSplit?'Shared expense logged':'Expense logged');
 }
 function submitIncome(){
   const amt=Number(document.getElementById('i-amt').value),date=document.getElementById('i-date').value;
@@ -2413,8 +2625,18 @@ function buildRow(t,canDel){
   if(t.type==='expense'){
     const ci=state.categories.expense.indexOf(t.category),col=cpal(ci>=0?ci:0);
     iconBg=col.bg;iconTxt=t.category.slice(0,2).toUpperCase();mainLabel=esc(t.category);
-    subLabel=acLabel(t.acType,t.acId)+(t.desc?' &middot; '+esc(t.desc):'');
-    amtStr='&minus;'+fmt(t.amount);amtCol='#ef4444';
+    let splitNote='';
+    let displayAmt=t.amount;
+    const settledNote=t.shared?(t.settled?` <span style="color:#a8a29e">(settled)</span>`:''):'';
+    if(t.acType==='shared'){
+      const totalNote=Number(t.amount)&&Number(t.amount)!==Number(t.myShare)?` &middot; total bill ${fmt(t.amount)}`:'';
+      splitNote=` &middot; <span style="color:#7c3aed;font-weight:600">Owed via Splitwise</span>${totalNote}${settledNote}`;
+      displayAmt=t.myShare;
+    }else if(t.shared&&Number(t.myShare)<Number(t.amount)){
+      splitNote=` &middot; <span style="color:#7c3aed;font-weight:600">your share ${fmt(t.myShare)}</span>${settledNote}`;
+    }
+    subLabel=acLabel(t.acType,t.acId)+splitNote+(t.desc?' &middot; '+esc(t.desc):'');
+    amtStr='&minus;'+fmt(displayAmt);amtCol='#ef4444';
   }else if(t.type==='income'){
     iconBg='#f0fdf4';iconTxt='IN';mainLabel=esc(t.category);
     subLabel=acLabel(t.destType,t.destId)+(t.desc?' &middot; '+esc(t.desc):'');
@@ -2449,6 +2671,7 @@ function acLabel(type,id){
   if(type==='cash')return'Cash';
   if(type==='bank'){const b=state.banks.find(x=>x.id===id);return b?esc(b.name):'Bank';}
   if(type==='cc'){const c=state.cards.find(x=>x.id===id);return c?esc(c.name):'Card';}
+  if(type==='shared')return'Roommate Split';
   return'';
 }
 function trLabel(key){
@@ -2470,7 +2693,7 @@ function fmtDate(s){
 /* ── Budget ───────────────────────────────────────────────── */
 function renderBudget(){
   const mk=curMK(),exps=txnsForMK(mk).filter(t=>t.type==='expense');
-  const spent=exps.reduce((s,t)=>s+Number(t.amount),0);
+  const spent=exps.reduce((s,t)=>s+shareAmount(t),0);
   const bud=Number(state.monthlyBudget)||0,pct=bud>0?Math.min((spent/bud)*100,100):0;
   const warn=bud>0&&spent>=bud*.8,over=bud>0&&spent>=bud;
   document.getElementById('b-spent').textContent=fmt(spent);
@@ -2487,7 +2710,7 @@ function renderBudget(){
   catList.innerHTML='';
   budCats.forEach(cat=>{
     const catBud=state.categoryBudgets[cat]||0;
-    const catSpent=exps.filter(e=>e.category===cat).reduce((s,e)=>s+Number(e.amount),0);
+    const catSpent=exps.filter(e=>e.category===cat).reduce((s,e)=>s+shareAmount(e),0);
     const cpct=catBud>0?Math.min((catSpent/catBud)*100,100):0;
     const cw=catBud>0&&catSpent>=catBud*.8,co=catBud>0&&catSpent>=catBud;
     const ci=state.categories.expense.indexOf(cat),col=cpal(ci>=0?ci:0);
@@ -2540,7 +2763,7 @@ function renderWeekly(){
   const rows=Array.from({length:7},(_,i)=>{
     const dd=new Date(mon);dd.setDate(mon.getDate()+i);
     const key=dateToStr(dd);
-    const total=state.transactions.filter(t=>t.type==='expense'&&t.date===key).reduce((s,t)=>s+Number(t.amount),0);
+    const total=state.transactions.filter(t=>t.type==='expense'&&t.date===key).reduce((s,t)=>s+shareAmount(t),0);
     return{label:['Mon','Tue','Wed','Thu','Fri','Sat','Sun'][i],date:dd,total};
   });
   const maxV=Math.max(...rows.map(r=>r.total),1),now=new Date();now.setHours(0,0,0,0);
@@ -2693,7 +2916,7 @@ const baseOpts=(extra={})=>({responsive:true,maintainAspectRatio:false,plugins:{
 function renderBarChart(mk,exps){
   const[y,m]=mk.split('-').map(Number),days=new Date(y,m,0).getDate();
   const data=Array(days).fill(0);
-  exps.forEach(e=>{const d=parseInt(e.date.split('-')[2],10);if(d>=1&&d<=days)data[d-1]+=Number(e.amount);});
+  exps.forEach(e=>{const d=parseInt(e.date.split('-')[2],10);if(d>=1&&d<=days)data[d-1]+=shareAmount(e);});
   document.getElementById('bar-label').textContent=mkLabel(mk);
   destroyChart('bar');
   CH.bar=new Chart(document.getElementById('chart-bar').getContext('2d'),{
@@ -2711,7 +2934,7 @@ function renderBarChartFY(fy,exps){
   exps.forEach(e=>{
     const[ey,em]=e.date.split('-').map(Number);
     const idx=em>=4?em-4:em+8;
-    data[idx]+=Number(e.amount);
+    data[idx]+=shareAmount(e);
   });
   document.getElementById('bar-label').textContent=fyLabel(fy);
   const labels=['Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec','Jan','Feb','Mar'];
@@ -2741,15 +2964,16 @@ function buildDonut(key,canvasId,legId,labels,data,bgs,fgs,emptyMsg){
 function renderQuickCharts(){
   const exps=curViewTxns().filter(t=>t.type==='expense');
   if(viewMode==='fy')renderBarChartFY(viewFY,exps);else renderBarChart(viewMK,exps);
-  const et={};exps.forEach(e=>{et[e.category]=(et[e.category]||0)+Number(e.amount);});
+  const et={};exps.forEach(e=>{et[e.category]=(et[e.category]||0)+shareAmount(e);});
   const el=Object.keys(et),ed=el.map(l=>et[l]);
   buildDonut('qDonut','chart-donut','donut-leg',el,ed,
     el.map((_,i)=>{const idx=state.categories.expense.indexOf(_);return cpal(idx>=0?idx:i).bg;}),
     el.map((_,i)=>{const idx=state.categories.expense.indexOf(_);return cpal(idx>=0?idx:i).fg;}),'No expenses');
-  const bkT=exps.filter(e=>e.acType==='bank').reduce((s,e)=>s+Number(e.amount),0);
-  const caT=exps.filter(e=>e.acType==='cash').reduce((s,e)=>s+Number(e.amount),0);
-  const ccT=exps.filter(e=>e.acType==='cc').reduce((s,e)=>s+Number(e.amount),0);
-  const me=[['Bank',bkT,'#dbeafe','#3b82f6'],['Cash',caT,'#dcfce7','#22c55e'],['Credit Card',ccT,'#fef3c7','#f59e0b']].filter(e=>e[1]>0);
+  const bkT=exps.filter(e=>e.acType==='bank').reduce((s,e)=>s+shareAmount(e),0);
+  const caT=exps.filter(e=>e.acType==='cash').reduce((s,e)=>s+shareAmount(e),0);
+  const ccT=exps.filter(e=>e.acType==='cc').reduce((s,e)=>s+shareAmount(e),0);
+  const shT=exps.filter(e=>e.acType==='shared').reduce((s,e)=>s+shareAmount(e),0);
+  const me=[['Bank',bkT,'#dbeafe','#3b82f6'],['Cash',caT,'#dcfce7','#22c55e'],['Credit Card',ccT,'#fef3c7','#f59e0b'],['Roommate Split',shT,'#ede9fe','#7c3aed']].filter(e=>e[1]>0);
   const ml=document.getElementById('mode-leg');
   if(!me.length){ml.innerHTML='<span style="font-size:.77rem;color:#c4bfba">No data</span>';}
   else{const tot=me.reduce((s,e)=>s+e[1],0);ml.innerHTML=me.map(([l,v,,fg])=>`<div style="display:flex;align-items:center;gap:5px"><span style="width:8px;height:8px;border-radius:2px;background:${fg};flex-shrink:0"></span><span style="font-size:.75rem;color:#57534e;flex:1">${l}</span><span class="num" style="font-size:.7rem;color:#a8a29e">${((v/tot)*100).toFixed(0)}%</span></div>`).join('');}
@@ -2809,11 +3033,14 @@ function renderAnalytics(){
   const allTxns=txnsInRange(from,to);
   const exps=allTxns.filter(t=>t.type==='expense');
   const incs=allTxns.filter(t=>t.type==='income');
-  const totalSpent=exps.reduce((s,t)=>s+Number(t.amount),0);
+  const totalSpent=exps.reduce((s,t)=>s+realAmount(t),0);
   const totalInc=incs.reduce((s,t)=>s+Number(t.amount),0);
   const surplus=totalInc-totalSpent;
+  const trueSpent=exps.reduce((s,t)=>s+shareAmount(t),0);
+  const frontedForOthers=exps.filter(t=>t.shared&&t.acType!=='shared').reduce((s,t)=>s+Math.max(0,(Number(t.amount)||0)-shareAmount(t)),0);
+  const owedToOthers=exps.filter(t=>t.acType==='shared').reduce((s,t)=>s+shareAmount(t),0);
 
-  renderStatTiles(totalSpent,totalInc,surplus,exps,incs);
+  renderStatTiles(totalSpent,totalInc,surplus,exps,incs,trueSpent,frontedForOthers,owedToOthers);
   renderBvaChart(exps,from,to);
   renderAnExpDonut(exps);
   renderAnIncDonut(incs);
@@ -2825,7 +3052,7 @@ function renderAnalytics(){
   renderSavingsRate(totalSpent,totalInc);
 }
 
-function renderStatTiles(totalSpent,totalInc,surplus,exps,incs){
+function renderStatTiles(totalSpent,totalInc,surplus,exps,incs,trueSpent,frontedForOthers,owedToOthers){
   const avgDay=(()=>{
     if(!exps.length)return 0;
     const{from,to}=getRangeDates();
@@ -2834,10 +3061,13 @@ function renderStatTiles(totalSpent,totalInc,surplus,exps,incs){
   })();
   const bal=computeBal();
   const tiles=[
-    {label:'Total Spent',val:fmt(totalSpent),color:'#ef4444',sub:`${exps.length} transactions`},
+    {label:'Actual Bank Spend',val:fmt(totalSpent),color:'#ef4444',sub:`${exps.length} transactions · real money out`},
     {label:'Total Income',val:fmt(totalInc),color:'#166534',sub:`${incs.length} transactions`},
     {label:'Net Surplus',val:fmt(surplus),color:surplus>=0?'#166534':'#ef4444',sub:surplus>=0?'Savings':'Deficit'},
     {label:'Avg Daily Spend',val:fmt(avgDay),color:'#57534e',sub:'Over the period'},
+    {label:'True Personal Spend',val:fmt(trueSpent),color:'#7c3aed',sub:'Your share, incl. owed to roommates'},
+    {label:'Fronted for Roommates',val:fmt(frontedForOthers),color:'#1d4ed8',sub:'Paid by you, not yet settled'},
+    {label:'Owed via Splitwise',val:fmt(owedToOthers),color:'#d97706',sub:'Their spend — still your share'},
   ];
   document.getElementById('an-stat-tiles').innerHTML=tiles.map(({label,val,color,sub})=>`
     <div class="stat-tile">
@@ -2856,7 +3086,7 @@ function renderBvaChart(exps){
   empty.classList.add('hidden');
   wrap.style.height=Math.max(allCats.length*48+70,220)+'px';
   const budData=allCats.map(cat=>state.categoryBudgets[cat]||0);
-  const actData=allCats.map(cat=>exps.filter(e=>e.category===cat).reduce((s,e)=>s+Number(e.amount),0));
+  const actData=allCats.map(cat=>exps.filter(e=>e.category===cat).reduce((s,e)=>s+shareAmount(e),0));
   destroyChart('bva');
   CH.bva=new Chart(document.getElementById('an-bva').getContext('2d'),{
     type:'bar',
@@ -2875,7 +3105,7 @@ function renderBvaChart(exps){
 }
 
 function renderAnExpDonut(exps){
-  const t={};exps.forEach(e=>{t[e.category]=(t[e.category]||0)+Number(e.amount);});
+  const t={};exps.forEach(e=>{t[e.category]=(t[e.category]||0)+shareAmount(e);});
   const labels=Object.keys(t),data=labels.map(l=>t[l]);
   const bgs=labels.map((_,i)=>{const idx=state.categories.expense.indexOf(_);return cpal(idx>=0?idx:i).bg;});
   const fgs=labels.map((_,i)=>{const idx=state.categories.expense.indexOf(_);return cpal(idx>=0?idx:i).fg;});
@@ -2930,12 +3160,14 @@ function renderHistChart(){
   const showBank=document.getElementById('hf-bank').checked;
   const showCash=document.getElementById('hf-cash').checked;
   const showCC=document.getElementById('hf-cc').checked;
+  const showShared=document.getElementById('hf-shared')?.checked;
   const mkExps=mk=>state.transactions.filter(t=>t.type==='expense'&&mkOf(t.date)===mk);
   const shortLbl=k=>{const[y,m]=k.split('-');return new Date(+y,+m-1,1).toLocaleDateString('en-IN',{month:'short',year:'2-digit'});};
   const ds=[];
-  if(showBank)ds.push({label:'Bank/UPI',data:months.map(mk=>mkExps(mk).filter(e=>e.acType==='bank').reduce((s,t)=>s+Number(t.amount),0)),backgroundColor:'rgba(59,130,246,.75)',borderColor:'#3b82f6',borderWidth:2,borderRadius:4,stack:'s'});
-  if(showCash)ds.push({label:'Cash',data:months.map(mk=>mkExps(mk).filter(e=>e.acType==='cash').reduce((s,t)=>s+Number(t.amount),0)),backgroundColor:'rgba(34,197,94,.75)',borderColor:'#22c55e',borderWidth:2,borderRadius:4,stack:'s'});
-  if(showCC)  ds.push({label:'CC',data:months.map(mk=>mkExps(mk).filter(e=>e.acType==='cc').reduce((s,t)=>s+Number(t.amount),0)),backgroundColor:'rgba(245,158,11,.75)',borderColor:'#f59e0b',borderWidth:2,borderRadius:4,stack:'s'});
+  if(showBank)ds.push({label:'Bank/UPI',data:months.map(mk=>mkExps(mk).filter(e=>e.acType==='bank').reduce((s,t)=>s+shareAmount(t),0)),backgroundColor:'rgba(59,130,246,.75)',borderColor:'#3b82f6',borderWidth:2,borderRadius:4,stack:'s'});
+  if(showCash)ds.push({label:'Cash',data:months.map(mk=>mkExps(mk).filter(e=>e.acType==='cash').reduce((s,t)=>s+shareAmount(t),0)),backgroundColor:'rgba(34,197,94,.75)',borderColor:'#22c55e',borderWidth:2,borderRadius:4,stack:'s'});
+  if(showCC)  ds.push({label:'CC',data:months.map(mk=>mkExps(mk).filter(e=>e.acType==='cc').reduce((s,t)=>s+shareAmount(t),0)),backgroundColor:'rgba(245,158,11,.75)',borderColor:'#f59e0b',borderWidth:2,borderRadius:4,stack:'s'});
+  if(showShared)ds.push({label:'Roommate Split',data:months.map(mk=>mkExps(mk).filter(e=>e.acType==='shared').reduce((s,t)=>s+shareAmount(t),0)),backgroundColor:'rgba(124,58,237,.75)',borderColor:'#7c3aed',borderWidth:2,borderRadius:4,stack:'s'});
   destroyChart('hist');
   CH.hist=new Chart(document.getElementById('an-hist').getContext('2d'),{
     type:'bar',data:{labels:months.map(shortLbl),datasets:ds},
@@ -2952,7 +3184,7 @@ function renderTrendChart(exps,from,to){
   if(!exps.length){empty.classList.remove('hidden');destroyChart('trend');return;}
   empty.classList.add('hidden');
   const byDate={};
-  exps.forEach(e=>{byDate[e.date]=(byDate[e.date]||0)+Number(e.amount);});
+  exps.forEach(e=>{byDate[e.date]=(byDate[e.date]||0)+shareAmount(e);});
   const dates=[],data=[];
   const cur=new Date(from+'T00:00:00'),end=new Date(to+'T00:00:00');
   while(cur<=end){const k=dateToStr(cur);dates.push(k);data.push(byDate[k]||0);cur.setDate(cur.getDate()+1);}
@@ -2974,7 +3206,7 @@ function renderTrendChart(exps,from,to){
 }
 
 function renderTopCategories(exps){
-  const totals={};exps.forEach(e=>{totals[e.category]=(totals[e.category]||0)+Number(e.amount);});
+  const totals={};exps.forEach(e=>{totals[e.category]=(totals[e.category]||0)+shareAmount(e);});
   const sorted=Object.entries(totals).sort((a,b)=>b[1]-a[1]).slice(0,6);
   const maxV=sorted[0]?.[1]||1;
   const wrap=document.getElementById('an-top-cats');
@@ -3023,7 +3255,7 @@ function renderNetWorthChart(){
         if(t.destKey==='cash')ca+=a;else if(t.destKey){const[k,id]=t.destKey.split(':');if(k==='bank'&&bk[id]!==undefined)bk[id]+=a;}
       }
     });
-    return Object.values(bk).reduce((s,v)=>s+v,0)+ca-Object.values(cd).reduce((s,v)=>s+v,0);
+    return state.banks.filter(b=>b.includeInNetWorth!==false).reduce((s,b)=>s+(bk[b.id]||0),0)+ca-Object.values(cd).reduce((s,v)=>s+v,0);
   });
   const shortLbl=k=>{const[y,m]=k.split('-');return new Date(+y,+m-1,1).toLocaleDateString('en-IN',{month:'short',year:'2-digit'});};
   const colors=nwData.map(v=>v>=0?'rgba(34,197,94,.7)':'rgba(239,68,68,.7)');

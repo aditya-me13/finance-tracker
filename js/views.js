@@ -86,9 +86,16 @@ function fillTxnFilterCatOpts(){
   sel.innerHTML=html;
   if(prev&&Array.from(sel.options).some(o=>o.value===prev))sel.value=prev;
 }
-function isTxnFilterActive(){return!!(txnFilter.category||txnFilter.from||txnFilter.to);}
+function fillTxnFilterTagOpts(){
+  const sel=document.getElementById('txn-filter-tag');
+  if(!sel)return;
+  const prev=sel.value;
+  sel.innerHTML='<option value="">All Tags</option>'+state.tags.map(t=>`<option value="${esc(t)}">${esc(t)}</option>`).join('');
+  if(prev&&Array.from(sel.options).some(o=>o.value===prev))sel.value=prev;
+}
+function isTxnFilterActive(){return!!(txnFilter.category||txnFilter.from||txnFilter.to||txnFilter.tag||txnFilter.search);}
 function txnMatchesFilter(t){
-  const{category,from,to}=txnFilter;
+  const{category,from,to,tag,search}=txnFilter;
   if(category){
     const idx=category.indexOf(':'),kind=category.slice(0,idx),name=category.slice(idx+1);
     if(kind==='exp'){if(t.type!=='expense'||t.category!==name)return false;}
@@ -96,6 +103,12 @@ function txnMatchesFilter(t){
   }
   if(from&&t.date<from)return false;
   if(to&&t.date>to)return false;
+  if(tag&&!(t.tags||[]).includes(tag))return false;
+  if(search){
+    const q=search.toLowerCase();
+    const haystack=[t.category,t.desc,String(t.amount),...(t.tags||[])].filter(Boolean).join(' ').toLowerCase();
+    if(!haystack.includes(q))return false;
+  }
   return true;
 }
 function applyTxnFilter(){
@@ -103,7 +116,10 @@ function applyTxnFilter(){
     category:document.getElementById('txn-filter-cat').value,
     from:document.getElementById('txn-filter-from').value,
     to:document.getElementById('txn-filter-to').value,
+    tag:document.getElementById('txn-filter-tag')?document.getElementById('txn-filter-tag').value:'',
+    search:document.getElementById('txn-filter-search')?document.getElementById('txn-filter-search').value.trim():'',
   };
+  bulkSelectedIds.clear();
   renderTxnLog();
 }
 function clearTxnFilter(){
@@ -112,7 +128,10 @@ function clearTxnFilter(){
   document.getElementById('txn-filter-from-disp').textContent='From';
   setDateVal('txn-filter-to','');
   document.getElementById('txn-filter-to-disp').textContent='To';
-  txnFilter={category:'',from:'',to:''};
+  if(document.getElementById('txn-filter-tag'))document.getElementById('txn-filter-tag').value='';
+  if(document.getElementById('txn-filter-search'))document.getElementById('txn-filter-search').value='';
+  txnFilter={category:'',from:'',to:'',tag:'',search:''};
+  bulkSelectedIds.clear();
   renderTxnLog();
 }
 
@@ -127,19 +146,24 @@ function renderTxnLog(){
     const catSel=document.getElementById('txn-filter-cat');
     const catText=txnFilter.category?catSel.options[catSel.selectedIndex].textContent:'All Categories';
     const rangeText=(txnFilter.from||txnFilter.to)?`${txnFilter.from?fmtDate(txnFilter.from):'…'} – ${txnFilter.to?fmtDate(txnFilter.to):'…'}`:'All time';
-    label.textContent=`Filtered: ${catText} · ${rangeText}`;
+    const tagText=txnFilter.tag?` · #${txnFilter.tag}`:'';
+    const searchText=txnFilter.search?` · "${txnFilter.search}"`:'';
+    label.textContent=`Filtered: ${catText} · ${rangeText}${tagText}${searchText}`;
     const expSum=txns.filter(t=>t.type==='expense').reduce((s,t)=>s+Number(t.amount),0);
     const incSum=txns.filter(t=>t.type==='income').reduce((s,t)=>s+Number(t.amount),0);
     const parts=[];
     if(expSum)parts.push(`Expenses: ${fmt(expSum)}`);
     if(incSum)parts.push(`Income: ${fmt(incSum)}`);
-    summaryEl.textContent=`${txns.length} transaction(s) found`+(parts.length?' · '+parts.join(' · '):'');
+    document.getElementById('txn-filter-summary-text').textContent=`${txns.length} transaction(s) found`+(parts.length?' · '+parts.join(' · '):'');
     summaryEl.classList.remove('hidden');
   }else{
     txns=curViewTxns().slice().sort((a,b)=>b.date.localeCompare(a.date)||b.id.localeCompare(a.id));
     label.textContent=viewMode==='fy'?fyLabel(viewFY):mkLabel(viewMK);
     summaryEl.classList.add('hidden');
+    bulkSelectedIds.clear();
   }
+  updateBulkBar();
+  syncSelectAllCheckbox();
   if(!txns.length){
     list.innerHTML=`<div style="text-align:center;padding:26px 0;font-size:.83rem;color:#a8a29e">No transactions ${filterActive?'match this filter':`this ${viewMode==='fy'?'financial year':'month'}`}.</div>`;
     return;
@@ -157,11 +181,11 @@ function renderTxnLog(){
       ${dayExps?`<span class="num" style="font-size:.7rem;color:#a8a29e">${fmt(dayExps)}</span>`:''}
     </div>`;
     list.appendChild(hdr);
-    grouped[date].forEach(t=>list.appendChild(buildRow(t,true)));
+    grouped[date].forEach(t=>list.appendChild(buildRow(t,true,filterActive)));
   });
 }
 
-function buildRow(t,canDel){
+function buildRow(t,canDel,selectable){
   const row=document.createElement('div');row.className='txnrow';
   let iconBg,iconTxt,mainLabel,subLabel,amtStr,amtCol;
   if(t.type==='expense'){
@@ -196,10 +220,14 @@ function buildRow(t,canDel){
     subLabel=trLabel(t.fromKey)+' &rarr; '+trLabel(t.toKey)+(t.note?' &middot; '+esc(t.note):'');
     amtStr=fmt(t.amount);amtCol='#1d4ed8';
   }
+  const bulkCheckbox=(selectable&&(t.type==='expense'||t.type==='income'))
+    ?`<input type="checkbox" ${bulkSelectedIds.has(t.id)?'checked':''} onchange="toggleBulkSelect('${t.id}',this.checked)" style="accent-color:#1c1917;cursor:pointer;flex-shrink:0" title="Select for bulk actions"/>`
+    :'';
   row.innerHTML=`
+    ${bulkCheckbox}
     <div class="txnico" style="background:${iconBg};color:#57534e">${iconTxt}</div>
     <div style="flex:1;min-width:0">
-      <div style="font-size:.82rem;color:#292524;font-weight:500">${mainLabel}</div>
+      <div style="font-size:.82rem;color:#292524;font-weight:500">${mainLabel}${tagPillsHtml(t.tags)}</div>
       <div style="font-size:.72rem;color:#a8a29e;margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${subLabel}</div>
     </div>
     <span class="num" style="font-size:.83rem;font-weight:500;color:${amtCol};flex-shrink:0">${amtStr}</span>

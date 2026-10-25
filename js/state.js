@@ -39,15 +39,20 @@ const DEF_EXP=['Food','Travel','Shopping','Bills','Entertainment','Investment'];
 const DEF_INC=['Salary','Freelance','Refund','Interest','Gift','Other'];
 
 /* ── Local cache (instant load / offline fallback) + cloud sync ── */
-const loadLocalCache=()=>{try{const r=localStorage.getItem('ft_v4');if(r)return JSON.parse(r);}catch(e){}return null;};
+/* Cache is namespaced per user so several accounts can share one browser */
+const cacheKey=()=>currentUid?'ft_v4_'+currentUid:null;
+const loadLocalCache=()=>{try{const k=cacheKey();if(!k)return null;const r=localStorage.getItem(k);if(r)return JSON.parse(r);}catch(e){}return null;};
 let _saveTimer=null;
+function pushToCloud(){
+  return db.collection('users').doc(currentUid).set({data:JSON.stringify(state),updatedAt:Date.now()});
+}
 function saveState(){
-  try{localStorage.setItem('ft_v4',JSON.stringify(state));}catch(e){}
   if(!currentUid)return;
+  try{localStorage.setItem(cacheKey(),JSON.stringify(state));}catch(e){}
   clearTimeout(_saveTimer);
   _saveTimer=setTimeout(()=>{
-    db.collection('users').doc(currentUid).set({data:JSON.stringify(state),updatedAt:Date.now()})
-      .catch(()=>toast('Cloud sync failed — saved locally, will retry next change'));
+    _saveTimer=null;
+    pushToCloud().catch(()=>toast('Cloud sync failed — saved locally, will retry next change'));
   },700);
 }
 async function loadStateFromCloud(){
@@ -67,7 +72,7 @@ async function loadStateFromCloud(){
   normalizeState();
 }
 
-let state={banks:[],cards:[],cash:{startBalance:0},categories:{expense:[...DEF_EXP],income:[...DEF_INC]},monthlyBudget:0,categoryBudgets:{},transactions:[],investments:{accounts:[],holdings:[]}};
+let state={banks:[],cards:[],cash:{startBalance:0},categories:{expense:[...DEF_EXP],income:[...DEF_INC]},monthlyBudget:0,categoryBudgets:{},transactions:[],investments:{accounts:[],holdings:[]},tags:[],loans:[],recurring:[]};
 function normalizeState(){
   if(!state.banks)state.banks=[];
   if(!state.cards)state.cards=[];
@@ -80,15 +85,22 @@ function normalizeState(){
   if(!state.investments)state.investments={accounts:[],holdings:[]};
   if(!state.investments.accounts)state.investments.accounts=[];
   if(!state.investments.holdings)state.investments.holdings=[];
+  if(!state.tags)state.tags=[];
+  if(!state.loans)state.loans=[];
+  if(!state.recurring)state.recurring=[];
   state.transactions.forEach(t=>{
     if(t.type==='expense'&&(t.myShare===undefined||t.myShare===null||t.myShare===''))t.myShare=Number(t.amount)||0;
+    if(!t.tags)t.tags=[];
   });
   state.banks.forEach(b=>{if(b.includeInNetWorth===undefined)b.includeInNetWorth=true;});
 }
 
 /* UI state */
 let txnType='expense',selExpCat=null,selIncCat=null,viewMK=null,viewFY=null,viewMode='month',activeTab='log',activeView='dashboard';
-let txnFilter={category:'',from:'',to:''};
+let txnFilter={category:'',from:'',to:'',tag:'',search:''};
+let bulkSelectedIds=new Set();
+let bulkTagMode='add';
+let selExpTags=[],selIncTags=[];
 let invSummaryMode='cash';
 let CH={};  // chart instances keyed by id
 let cumulativeCatSelection=[];

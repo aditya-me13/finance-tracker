@@ -8,7 +8,7 @@ function doSignIn(){
   const pass=document.getElementById('auth-pass').value;
   if(!email||!pass){showAuthErr('Enter email and password');return;}
   document.getElementById('auth-err').style.display='none';
-  auth.signInWithEmailAndPassword(email,pass).catch(e=>showAuthErr(e.message));
+  _signedInThisLoad=true;authReady.then(()=>auth.signInWithEmailAndPassword(email,pass)).catch(e=>{_signedInThisLoad=false;showAuthErr(e.message);});
 }
 function doSignUp(){
   const email=document.getElementById('auth-email').value.trim();
@@ -16,9 +16,24 @@ function doSignUp(){
   if(!email||!pass){showAuthErr('Enter email and password');return;}
   if(pass.length<6){showAuthErr('Password must be at least 6 characters');return;}
   document.getElementById('auth-err').style.display='none';
-  auth.createUserWithEmailAndPassword(email,pass).catch(e=>showAuthErr(e.message));
+  _signedInThisLoad=true;authReady.then(()=>auth.createUserWithEmailAndPassword(email,pass)).catch(e=>{_signedInThisLoad=false;showAuthErr(e.message);});
+}
+/* No auto-login: auth lives in memory only, so every reload asks for credentials */
+const authReady=auth.setPersistence(firebase.auth.Auth.Persistence.NONE).catch(()=>{});
+let _signedInThisLoad=false;
+async function doSignOut(){
+  try{
+    if(_saveTimer&&currentUid){clearTimeout(_saveTimer);_saveTimer=null;await pushToCloud();}
+  }catch(e){}
+  try{await auth.signOut();}catch(e){}
+  location.reload();
 }
 auth.onAuthStateChanged(async user=>{
+  if(user&&!_signedInThisLoad){
+    /* leftover session from earlier persistence mode: drop it */
+    try{await auth.signOut();}catch(e){}
+    return;
+  }
   if(user){
     currentUid=user.uid;
     document.getElementById('auth-gate').classList.add('hidden');
@@ -108,12 +123,18 @@ function confirmDelete(id){
   if(t.type==='expense')desc=`${t.category} — ${fmt(t.amount)} on ${fmtDate(t.date)}`;
   else if(t.type==='income')desc=`${t.category} income — ${fmt(t.amount)} on ${fmtDate(t.date)}`;
   else desc=`Transfer of ${fmt(t.amount)} on ${fmtDate(t.date)}`;
-  document.getElementById('confirm-body').textContent=`Delete "${desc}"? This cannot be undone.`;
+  document.getElementById('confirm-body').textContent=`Delete "${desc}"? You can undo this right after.`;
   document.getElementById('confirm-ok-btn').onclick=()=>{
     if(_pendingDeleteId){
+      const removed=state.transactions.find(x=>x.id===_pendingDeleteId);
       state.transactions=state.transactions.filter(x=>x.id!==_pendingDeleteId);
       _pendingDeleteId=null;
-      saveState();rebuildAll();toast('Transaction deleted');
+      saveState();rebuildAll();
+      if(removed)showUndoToast('Transaction deleted',()=>{
+        state.transactions.push(removed);
+        saveState();rebuildAll();
+        toast('Restored');
+      });
     }
     closeModal('modal-confirm');
   };

@@ -146,12 +146,21 @@ function confirmDeleteInvAccount(id){
   const a=state.investments.accounts.find(x=>x.id===id);
   const name=a?a.name:'account';
   const holdCount=state.investments.holdings.filter(h=>h.accountId===id).length;
-  document.getElementById('confirm-body').textContent=`Delete "${name}"? This will also delete ${holdCount} holding(s) and their linked transactions. This cannot be undone.`;
+  document.getElementById('confirm-body').textContent=`Delete "${name}"? This will also delete ${holdCount} holding(s) and their linked transactions. You can undo this right after.`;
   document.getElementById('confirm-ok-btn').onclick=()=>{
+    const removedAccount=a;
+    const removedHoldings=state.investments.holdings.filter(h=>h.accountId===id);
+    const removedTxns=state.transactions.filter(t=>t.type==='invest'&&t.accountId===id);
     state.investments.accounts=state.investments.accounts.filter(x=>x.id!==id);
     state.investments.holdings=state.investments.holdings.filter(h=>h.accountId!==id);
     state.transactions=state.transactions.filter(t=>!(t.type==='invest'&&t.accountId===id));
-    saveState();rebuildAll();toast('Investment account deleted');
+    saveState();rebuildAll();
+    if(removedAccount)showUndoToast('Investment account deleted',()=>{
+      state.investments.accounts.push(removedAccount);
+      state.investments.holdings.push(...removedHoldings);
+      state.transactions.push(...removedTxns);
+      saveState();rebuildAll();toast('Restored');
+    });
     closeModal('modal-confirm');
   };
   openModal('modal-confirm');
@@ -403,14 +412,21 @@ async function saveInvHolding(){
 
 function confirmDeleteInvHolding(id){
   const h=state.investments.holdings.find(x=>x.id===id);
-  document.getElementById('confirm-body').textContent=`Delete "${h?h.name:'holding'}"? The invested amount will be returned to the account's available cash. This cannot be undone.`;
+  document.getElementById('confirm-body').textContent=`Delete "${h?h.name:'holding'}"? The invested amount will be returned to the account's available cash. You can undo this right after.`;
   document.getElementById('confirm-ok-btn').onclick=()=>{
+    let removedTxns=[];
     if(h){
       const ids=h.seriesTxnIds?.length?h.seriesTxnIds:[h.txnId];
+      removedTxns=state.transactions.filter(x=>ids.includes(x.id));
       state.transactions=state.transactions.filter(x=>!ids.includes(x.id));
     }
     state.investments.holdings=state.investments.holdings.filter(x=>x.id!==id);
-    saveState();rebuildAll();toast('Holding deleted');
+    saveState();rebuildAll();
+    if(h)showUndoToast('Holding deleted',()=>{
+      state.investments.holdings.push(h);
+      state.transactions.push(...removedTxns);
+      saveState();rebuildAll();toast('Restored');
+    });
     closeModal('modal-confirm');
   };
   openModal('modal-confirm');

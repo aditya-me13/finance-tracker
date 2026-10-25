@@ -20,10 +20,24 @@ const shareAmount=t=>t.type==='expense'?Number(t.myShare!==undefined&&t.myShare!
 
 /* ── Toast ────────────────────────────────────────────────── */
 let _tt;
-function toast(msg,ms=2400){
+function toast(msg,ms=2400,action=null){
   const el=document.getElementById('toast');document.getElementById('toast-msg').textContent=msg;
+  const actionBtn=document.getElementById('toast-action');
+  if(action&&actionBtn){
+    actionBtn.textContent=action.label;
+    actionBtn.classList.remove('hidden');
+    actionBtn.onclick=()=>{action.onClick();el.classList.add('hiding');setTimeout(()=>el.classList.add('hidden'),200);clearTimeout(_tt);};
+  }else if(actionBtn){
+    actionBtn.classList.add('hidden');
+    actionBtn.onclick=null;
+  }
   el.classList.remove('hidden','hiding');clearTimeout(_tt);
   _tt=setTimeout(()=>{el.classList.add('hiding');setTimeout(()=>el.classList.add('hidden'),200);},ms);
+}
+/* Generic "Deleted. Undo?" pattern — the item is already removed & saved;
+   restoreFn puts it back if the user clicks Undo within the toast window. */
+function showUndoToast(msg,restoreFn){
+  toast(msg,5000,{label:'Undo',onClick:restoreFn});
 }
 const openModal=id=>document.getElementById(id).classList.remove('hidden');
 const closeModal=id=>document.getElementById(id).classList.add('hidden');

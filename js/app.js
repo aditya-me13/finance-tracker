@@ -16,7 +16,7 @@ function importData(ev){
       if(!imp.cash)imp.cash={startBalance:imp.config?.cashBase||0};
       if(!imp.categoryBudgets)imp.categoryBudgets={};
       if(!imp.investments)imp.investments={accounts:[],holdings:[]};
-      state=imp;saveState();rebuildAll();toast('Data imported');
+      state=imp;normalizeState();saveState();rebuildAll();toast('Data imported');
     }catch{toast('Import failed: invalid file');}
   });
   ev.target.value='';
@@ -30,9 +30,11 @@ function rebuildAll(){
   renderCumulativeCategoryWidget();
   renderWeekly();
   fillTxnFilterCatOpts();
+  fillTxnFilterTagOpts();
   renderTxnLog();
   fillExpInst();fillIncInst();fillTransferOpts();
   renderChips('expense');renderChips('income');
+  renderTagChips('expense');renderTagChips('income');
   if(activeTab==='charts')renderQuickCharts();
   if(activeView==='analytics')renderAnalytics();
   if(activeView==='invest')renderInvestments();
@@ -62,6 +64,14 @@ function boot(){
   const mq=window.matchMedia('(max-width:860px)');
   const setGrid=()=>{document.getElementById('dash-grid').style.gridTemplateColumns=mq.matches?'1fr':'360px 1fr';};
   mq.addEventListener('change',setGrid);setGrid();
+  generateDueRecurring();
   rebuildAll();
   updateRangeDisplay();
+}
+
+/* ── PWA: register service worker (safe no-op if unsupported) ── */
+if('serviceWorker' in navigator){
+  window.addEventListener('load',()=>{
+    navigator.serviceWorker.register('sw.js').catch(()=>{});
+  });
 }

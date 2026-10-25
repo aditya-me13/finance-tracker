@@ -168,6 +168,7 @@ function submitExpense(){
   const amt=Number(document.getElementById('e-amt').value),date=document.getElementById('e-date').value;
   const desc=document.getElementById('e-desc').value.trim();
   const isSplit=document.getElementById('e-split-toggle').checked;
+  const isRecur=document.getElementById('e-recur-toggle').checked;
   if(!amt||amt<=0){toast('Enter a valid amount');return;}
   if(!date){toast('Select a date');return;}
   if(!selExpCat){toast('Select a category');return;}
@@ -179,28 +180,45 @@ function submitExpense(){
     if(myShare>amt){toast('Your share cannot exceed the total bill amount');return;}
   }
 
+  const tags=selExpTags.slice();
+  let acType,acId;
   if(isSplit&&expSplitMode==='owed'){
-    state.transactions.push({id:uid(),date,type:'expense',amount:amt,acType:'shared',acId:null,category:selExpCat,desc,myShare,shared:true,sharedMode:'owed',settled:false});
+    acType='shared';acId=null;
+    state.transactions.push({id:uid(),date,type:'expense',amount:amt,acType,acId,category:selExpCat,desc,myShare,shared:true,sharedMode:'owed',settled:false,tags});
   }else{
-    const at=document.getElementById('e-actype').value,ai=document.getElementById('e-inst').value;
-    if((at==='bank'||at==='cc')&&!ai){toast('No account selected');return;}
-    state.transactions.push({id:uid(),date,type:'expense',amount:amt,acType:at,acId:at==='cash'?'cash':ai,category:selExpCat,desc,myShare,shared:isSplit,sharedMode:isSplit?'fronted':undefined,settled:isSplit?false:undefined});
+    acType=document.getElementById('e-actype').value;
+    const ai=document.getElementById('e-inst').value;
+    if((acType==='bank'||acType==='cc')&&!ai){toast('No account selected');return;}
+    acId=acType==='cash'?'cash':ai;
+    state.transactions.push({id:uid(),date,type:'expense',amount:amt,acType,acId,category:selExpCat,desc,myShare,shared:isSplit,sharedMode:isSplit?'fronted':undefined,settled:isSplit?false:undefined,tags});
+  }
+  if(isRecur){
+    const freq=document.getElementById('e-recur-freq').value;
+    createRecurringFromEntry({type:'expense',amount:amt,acType,acId,category:selExpCat,desc,myShare,tags,frequency:freq,anchorDate:date});
   }
   saveState();
   document.getElementById('e-amt').value='';document.getElementById('e-desc').value='';
-  resetSplitPanel();
+  resetSplitPanel();resetRecurToggle('expense');resetTagInputs();
   rebuildAll();toast(isSplit?'Shared expense logged':'Expense logged');
 }
 function submitIncome(){
   const amt=Number(document.getElementById('i-amt').value),date=document.getElementById('i-date').value;
   const dt=document.getElementById('i-actype').value,di=document.getElementById('i-inst').value;
   const desc=document.getElementById('i-desc').value.trim();
+  const isRecur=document.getElementById('i-recur-toggle').checked;
   if(!amt||amt<=0){toast('Enter a valid amount');return;}
   if(!date){toast('Select a date');return;}
   if(!selIncCat){toast('Select a source category');return;}
   if((dt==='bank'||dt==='cc')&&!di){toast('No account selected');return;}
-  state.transactions.push({id:uid(),date,type:'income',amount:amt,destType:dt,destId:dt==='cash'?'cash':di,category:selIncCat,desc});
+  const destId=dt==='cash'?'cash':di;
+  const tags=selIncTags.slice();
+  state.transactions.push({id:uid(),date,type:'income',amount:amt,destType:dt,destId,category:selIncCat,desc,tags});
+  if(isRecur){
+    const freq=document.getElementById('i-recur-freq').value;
+    createRecurringFromEntry({type:'income',amount:amt,destType:dt,destId,category:selIncCat,desc,tags,frequency:freq,anchorDate:date});
+  }
   saveState();document.getElementById('i-amt').value='';document.getElementById('i-desc').value='';
+  resetRecurToggle('income');resetTagInputs();
   rebuildAll();toast(dt==='cc'?'Income recorded — card due reduced':'Income recorded');
 }
 function submitTransfer(){

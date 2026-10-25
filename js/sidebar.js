@@ -1,4 +1,45 @@
 /* ── Sidebar ──────────────────────────────────────────────── */
+function renderDueThisMonthWidget(bal){
+  const sec=document.getElementById('sb-duewidget-sec'),body=document.getElementById('sb-duewidget-body');
+  if(!sec||!body)return;
+  const items=[];
+  state.cards.forEach(c=>{
+    const ds=getDueDateStatus(c);
+    if(ds&&(ds.status==='urgent'||ds.status==='soon'||ds.status==='overdue'))
+      items.push({kind:'Credit Card',name:c.name,label:ds.label,status:ds.status,amount:bal.cd[c.id]||0,due:ds.due});
+  });
+  state.loans.forEach(l=>{
+    const ds=getDueDateStatus(l);
+    if(ds&&(ds.status==='urgent'||ds.status==='soon'||ds.status==='overdue'))
+      items.push({kind:'Loan EMI',name:l.name,label:ds.label,status:ds.status,amount:l.emiAmount,due:ds.due});
+  });
+  (state.recurring||[]).forEach(r=>{
+    if(!r.active)return;
+    const nextDueStr=nextRecurDate(r,r.lastGeneratedDate||r.startDate);
+    const nextDue=new Date(nextDueStr+'T00:00:00');
+    const diffDays=Math.ceil((nextDue-new Date())/(1000*60*60*24));
+    if(diffDays<=5){
+      const status=diffDays<0?'overdue':diffDays===0?'urgent':'soon';
+      const amt=r.type==='expense'?(r.myShare!==undefined?r.myShare:r.amount):r.amount;
+      items.push({kind:'Recurring',name:r.name,label:`Auto-logs ${fmtDate(nextDueStr)}`,status,amount:amt,due:nextDue});
+    }
+  });
+  if(!items.length){sec.style.display='none';return;}
+  sec.style.display='block';
+  items.sort((a,b)=>a.due-b.due);
+  body.innerHTML=items.map(it=>`
+    <div class="reminder-banner ${it.status==='overdue'||it.status==='urgent'?'urgent':'soon'}" style="margin:0 4px 6px;border-radius:9px">
+      <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" style="flex-shrink:0;margin-top:1px"><path stroke-linecap="round" stroke-linejoin="round" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6 6 0 10-12 0v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/></svg>
+      <div style="flex:1;min-width:0">
+        <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
+          <span style="font-weight:600;font-size:.78rem">${esc(it.name)}</span>
+          <span class="badge-sm" style="background:rgba(0,0,0,.06);color:inherit">${it.kind}</span>
+        </div>
+        <div style="font-size:.71rem;opacity:.85">${it.label}${it.amount?` &middot; ${fmt(it.amount)}`:''}</div>
+      </div>
+    </div>`).join('');
+}
+
 function renderSidebar(){
   const bal=computeBal();
   const liquid=document.getElementById('sb-liquid-focus');
@@ -17,29 +58,7 @@ function renderSidebar(){
     inv.style.color='#f4f3f0';
   }
 
-  const remSec=document.getElementById('sb-reminders');
-  const alerts=[];
-  state.cards.forEach(c=>{
-    const ds=getDueDateStatus(c);
-    if(ds&&(ds.status==='urgent'||ds.status==='soon'||ds.status==='overdue')){
-      const due=bal.cd[c.id]||0;
-      alerts.push({name:c.name,ds,due});
-    }
-  });
-  if(alerts.length){
-    remSec.style.display='block';
-    remSec.innerHTML=`<div class="sb-head"><span class="slabel" style="color:#ef4444">Due Reminders</span></div>`+
-      alerts.map(({name,ds,due})=>`
-        <div class="reminder-banner ${ds.status==='overdue'||ds.status==='urgent'?'urgent':'soon'}" style="margin:0 4px 6px;border-radius:9px">
-          <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" style="flex-shrink:0;margin-top:1px"><path stroke-linecap="round" stroke-linejoin="round" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6 6 0 10-12 0v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/></svg>
-          <div>
-            <div style="font-weight:600;font-size:.78rem">${esc(name)}</div>
-            <div style="font-size:.71rem;opacity:.8">${ds.label} · Due: ${fmt(due)}</div>
-          </div>
-        </div>`).join('');
-  }else{
-    remSec.style.display='none';
-  }
+  renderDueThisMonthWidget(bal);
 
   const sbB=document.getElementById('sb-banks');
   sbB.innerHTML=!state.banks.length?'<div style="font-size:.74rem;color:#c4bfba;padding:3px 8px">No accounts yet</div>':
@@ -89,6 +108,8 @@ function renderSidebar(){
       </div>`;
     }).join('');
   renderSplitwiseWidget();
+  renderLoansWidget();
+  renderRecurringWidget();
 }
 
 function renderSplitwiseWidget(){
@@ -252,9 +273,14 @@ function confirmDeleteAccount(type, id){
   else if(type==='cc'){const c=state.cards.find(x=>x.id===id);name=c?c.name:'card';}
   document.getElementById('confirm-body').textContent=`Delete "${name}"? Its transactions will remain but balances will be recalculated without this account.`;
   document.getElementById('confirm-ok-btn').onclick=()=>{
-    if(type==='bank')state.banks=state.banks.filter(x=>x.id!==id);
-    else if(type==='cc')state.cards=state.cards.filter(x=>x.id!==id);
-    saveState();rebuildAll();toast('Account deleted');
+    let removed=null;
+    if(type==='bank'){removed=state.banks.find(x=>x.id===id);state.banks=state.banks.filter(x=>x.id!==id);}
+    else if(type==='cc'){removed=state.cards.find(x=>x.id===id);state.cards=state.cards.filter(x=>x.id!==id);}
+    saveState();rebuildAll();
+    if(removed)showUndoToast('Account deleted',()=>{
+      if(type==='bank')state.banks.push(removed);else state.cards.push(removed);
+      saveState();rebuildAll();toast('Restored');
+    });
     closeModal('modal-confirm');
   };
   openModal('modal-confirm');

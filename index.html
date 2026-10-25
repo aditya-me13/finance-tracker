@@ -8,6 +8,13 @@
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet"/>
 <link rel="stylesheet" href="styles.css"/>
+<link rel="manifest" href="manifest.json"/>
+<meta name="theme-color" content="#1c1917"/>
+<link rel="icon" href="icons/icon-192.png"/>
+<link rel="apple-touch-icon" href="icons/icon-192.png"/>
+<meta name="apple-mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+<meta name="apple-mobile-web-app-title" content="Finance"/>
 </head>
 <body>
 <div class="shell" style="display:none">
@@ -33,6 +40,7 @@
       Import <input type="file" accept=".json" class="hidden" onchange="importData(event)"/>
     </label>
     <button onclick="exportData()" style="font-size:.78rem;font-weight:500;background:#1c1917;color:#fff;border:none;padding:5px 11px;border-radius:7px;cursor:pointer;font-family:'DM Sans',sans-serif">Export</button>
+    <button onclick="doSignOut()" title="Log out" style="font-size:.78rem;font-weight:500;background:transparent;color:inherit;border:1px solid #d6d3d1;padding:5px 11px;border-radius:7px;cursor:pointer;font-family:'DM Sans',sans-serif">Logout</button>
   </div>
 </header>
 
@@ -55,7 +63,7 @@
   </div>
 
   <!-- CC Reminders -->
-  <div id="sb-reminders" class="sb-sec" style="display:none"></div>
+  <!-- CC Reminders are now part of the unified "Due This Month" widget below -->
 
   <div class="sb-sec">
     <div class="sb-head"><span class="slabel">Bank Accounts</span>
@@ -78,6 +86,26 @@
   <div class="sb-sec" id="sb-splitwise-sec" style="display:none">
     <div class="sb-head"><span class="slabel">Splitwise Balance</span></div>
     <div id="sb-splitwise-body"></div>
+  </div>
+
+  <!-- Due This Month (unified: CC + Loans + Recurring) -->
+  <div class="sb-sec" id="sb-duewidget-sec" style="display:none">
+    <div class="sb-head"><span class="slabel" style="color:#ef4444">Due This Month</span></div>
+    <div id="sb-duewidget-body"></div>
+  </div>
+
+  <!-- Loans / EMIs -->
+  <div class="sb-sec">
+    <div class="sb-head"><span class="slabel">Loans / EMIs</span>
+      <button class="sb-add" onclick="openLoanModal()"><svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.5"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/></svg></button>
+    </div>
+    <div id="sb-loans"><div style="font-size:.74rem;color:#c4bfba;padding:3px 8px">No loans yet</div></div>
+  </div>
+
+  <!-- Recurring Transactions -->
+  <div class="sb-sec" id="sb-recurring-sec" style="display:none">
+    <div class="sb-head"><span class="slabel">Recurring</span></div>
+    <div id="sb-recurring-body"></div>
   </div>
 
   <!-- Quick Calculator -->
@@ -151,6 +179,27 @@
               <div><div class="slabel" style="margin-bottom:4px">Instrument</div><select id="e-inst" class="pl"></select></div>
             </div>
             <div style="margin-bottom:9px"><div class="slabel" style="margin-bottom:5px">Category</div><div id="e-chips" style="display:flex;flex-wrap:wrap;gap:5px"></div></div>
+            <div style="margin-bottom:9px">
+              <div class="slabel" style="margin-bottom:5px">Tags (optional)</div>
+              <div id="e-tag-chips" style="display:flex;flex-wrap:wrap;gap:5px;margin-bottom:6px"></div>
+              <div class="fw"><input id="e-tag-input" class="fi" type="text" placeholder="Type a tag and press Enter, e.g. Goa Trip" onkeydown="if(event.key==='Enter'){event.preventDefault();addTagFromInput('expense');}"/></div>
+              <div id="e-tag-suggest" style="display:flex;flex-wrap:wrap;gap:5px;margin-top:6px"></div>
+            </div>
+            <div style="margin-bottom:9px">
+              <label style="display:flex;align-items:center;gap:7px;cursor:pointer;font-size:.8rem;color:#44403c">
+                <input type="checkbox" id="e-recur-toggle" onchange="toggleRecurPanel('expense')" style="accent-color:#1c1917"/>
+                Repeat this automatically
+              </label>
+              <div id="e-recur-panel" class="hidden" style="margin-top:8px;padding:10px;background:#faf9f7;border:1px solid #f0eeec;border-radius:9px">
+                <div class="slabel" style="margin-bottom:4px">Frequency</div>
+                <select id="e-recur-freq" class="pl">
+                  <option value="monthly">Monthly (same day each month)</option>
+                  <option value="weekly">Weekly (same weekday)</option>
+                  <option value="daily">Daily</option>
+                </select>
+                <p style="font-size:.71rem;color:#a8a29e;margin-top:6px;line-height:1.4">This entry is logged now; future occurrences will be auto-logged from the Recurring list.</p>
+              </div>
+            </div>
             <div style="margin-bottom:11px"><div class="slabel" style="margin-bottom:4px">Description (optional)</div>
               <div class="fw"><input id="e-desc" class="fi" type="text" placeholder="e.g. Lunch at cafe"/></div>
             </div>
@@ -176,6 +225,27 @@
             </div>
             <div id="i-cc-hint" class="info-box hidden" style="margin-bottom:9px;background:#f0fdf4;color:#166534">This reduces the card's outstanding due instead of adding to a bank/cash balance.</div>
             <div style="margin-bottom:9px"><div class="slabel" style="margin-bottom:5px">Source / Category</div><div id="i-chips" style="display:flex;flex-wrap:wrap;gap:5px"></div></div>
+            <div style="margin-bottom:9px">
+              <div class="slabel" style="margin-bottom:5px">Tags (optional)</div>
+              <div id="i-tag-chips" style="display:flex;flex-wrap:wrap;gap:5px;margin-bottom:6px"></div>
+              <div class="fw"><input id="i-tag-input" class="fi" type="text" placeholder="Type a tag and press Enter" onkeydown="if(event.key==='Enter'){event.preventDefault();addTagFromInput('income');}"/></div>
+              <div id="i-tag-suggest" style="display:flex;flex-wrap:wrap;gap:5px;margin-top:6px"></div>
+            </div>
+            <div style="margin-bottom:9px">
+              <label style="display:flex;align-items:center;gap:7px;cursor:pointer;font-size:.8rem;color:#44403c">
+                <input type="checkbox" id="i-recur-toggle" onchange="toggleRecurPanel('income')" style="accent-color:#1c1917"/>
+                Repeat this automatically
+              </label>
+              <div id="i-recur-panel" class="hidden" style="margin-top:8px;padding:10px;background:#faf9f7;border:1px solid #f0eeec;border-radius:9px">
+                <div class="slabel" style="margin-bottom:4px">Frequency</div>
+                <select id="i-recur-freq" class="pl">
+                  <option value="monthly">Monthly (same day each month)</option>
+                  <option value="weekly">Weekly (same weekday)</option>
+                  <option value="daily">Daily</option>
+                </select>
+                <p style="font-size:.71rem;color:#a8a29e;margin-top:6px;line-height:1.4">This entry is logged now; future occurrences will be auto-logged from the Recurring list.</p>
+              </div>
+            </div>
             <div style="margin-bottom:11px"><div class="slabel" style="margin-bottom:4px">Description (optional)</div>
               <div class="fw"><input id="i-desc" class="fi" type="text" placeholder="e.g. Monthly salary"/></div>
             </div>
@@ -261,19 +331,40 @@
             <span style="font-weight:600;font-size:.88rem">Transaction Log</span>
             <span class="slabel" id="log-month-label"></span>
           </div>
-          <!-- Category & Date Filter -->
-          <div style="display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-bottom:11px;padding:10px;background:#faf9f7;border-radius:9px;border:1px solid #f0eeec">
-            <select id="txn-filter-cat" class="pl" style="width:auto;padding:6px 9px;font-size:.78rem" onchange="applyTxnFilter()">
-              <option value="">All Categories</option>
-            </select>
-            <div class="date-trigger" style="width:auto;padding:6px 9px;font-size:.78rem" onclick="openDatePicker('txn-filter-from')"><span id="txn-filter-from-disp">From</span></div>
-            <input id="txn-filter-from" type="hidden"/>
-            <span style="font-size:.75rem;color:#a8a29e">to</span>
-            <div class="date-trigger" style="width:auto;padding:6px 9px;font-size:.78rem" onclick="openDatePicker('txn-filter-to')"><span id="txn-filter-to-disp">To</span></div>
-            <input id="txn-filter-to" type="hidden"/>
-            <button class="btn-g" style="padding:6px 11px;font-size:.78rem" onclick="clearTxnFilter()">Clear Filter</button>
+          <!-- Search + Category & Date Filter -->
+          <div style="margin-bottom:11px">
+            <div class="fw" style="margin-bottom:8px">
+              <div class="fp"><svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-4.35-4.35M17 11a6 6 0 11-12 0 6 6 0 0112 0z"/></svg></div>
+              <input id="txn-filter-search" class="fi" type="text" placeholder="Search description, category, amount, or tag…" oninput="applyTxnFilter()"/>
+            </div>
+            <div style="display:flex;flex-wrap:wrap;gap:6px;align-items:center;padding:10px;background:#faf9f7;border-radius:9px;border:1px solid #f0eeec">
+              <select id="txn-filter-cat" class="pl" style="width:auto;padding:6px 9px;font-size:.78rem" onchange="applyTxnFilter()">
+                <option value="">All Categories</option>
+              </select>
+              <select id="txn-filter-tag" class="pl" style="width:auto;padding:6px 9px;font-size:.78rem" onchange="applyTxnFilter()">
+                <option value="">All Tags</option>
+              </select>
+              <div class="date-trigger" style="width:auto;padding:6px 9px;font-size:.78rem" onclick="openDatePicker('txn-filter-from')"><span id="txn-filter-from-disp">From</span></div>
+              <input id="txn-filter-from" type="hidden"/>
+              <span style="font-size:.75rem;color:#a8a29e">to</span>
+              <div class="date-trigger" style="width:auto;padding:6px 9px;font-size:.78rem" onclick="openDatePicker('txn-filter-to')"><span id="txn-filter-to-disp">To</span></div>
+              <input id="txn-filter-to" type="hidden"/>
+              <button class="btn-g" style="padding:6px 11px;font-size:.78rem" onclick="clearTxnFilter()">Clear Filter</button>
+            </div>
           </div>
-          <div id="txn-filter-summary" class="hidden" style="font-size:.75rem;color:#57534e;margin-bottom:9px"></div>
+          <div id="txn-filter-summary" class="hidden" style="font-size:.75rem;color:#57534e;margin-bottom:9px;display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+            <label style="display:flex;align-items:center;gap:5px;cursor:pointer;font-weight:500">
+              <input type="checkbox" id="txn-select-all" onchange="toggleSelectAllFiltered()" style="accent-color:#1c1917"/> Select all
+            </label>
+            <span id="txn-filter-summary-text"></span>
+          </div>
+          <div id="txn-bulk-bar" class="hidden" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:9px;padding:9px 12px;background:#eff6ff;border:1px solid #bfdbfe;border-radius:9px">
+            <span id="txn-bulk-count" style="font-size:.8rem;font-weight:600;color:#1d4ed8"></span>
+            <button class="btn-g" style="padding:5px 10px;font-size:.76rem;background:#fff" onclick="openBulkRecatModal()">Recategorize</button>
+            <button class="btn-g" style="padding:5px 10px;font-size:.76rem;background:#fff" onclick="openBulkTagModal()">Tag</button>
+            <button class="btn-danger" style="padding:5px 10px;font-size:.76rem" onclick="bulkDeleteSelected()">Delete Selected</button>
+            <button style="margin-left:auto;font-size:.76rem;color:#1d4ed8;background:none;border:none;cursor:pointer;font-weight:500" onclick="clearBulkSelection()">Clear Selection</button>
+          </div>
           <div id="txn-list"></div>
         </div>
         <!-- Quick Charts -->
@@ -776,6 +867,124 @@
   </div>
 </div>
 
+<!-- MODAL: Manage Recurring -->
+<div id="modal-recurring" class="mo hidden" onclick="if(event.target.id==='modal-recurring')closeModal('modal-recurring')">
+  <div class="mb wide">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+      <h3 style="font-weight:600;font-size:.93rem">Manage Recurring</h3>
+      <button class="btn-i" onclick="closeModal('modal-recurring')"><svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg></button>
+    </div>
+    <p style="font-size:.74rem;color:#a8a29e;margin-bottom:10px">New rules are created from the Expense/Income form via "Repeat this automatically".</p>
+    <div id="recurring-list" style="display:flex;flex-direction:column;gap:2px;max-height:400px;overflow-y:auto"></div>
+    <div style="display:flex;gap:8px;margin-top:16px">
+      <button class="btn-g" style="flex:1" onclick="closeModal('modal-recurring')">Close</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: Add/Edit Loan -->
+<div id="modal-loan" class="mo hidden" onclick="if(event.target.id==='modal-loan')closeModal('modal-loan')">
+  <div class="mb">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+      <h3 style="font-weight:600;font-size:.93rem" id="modal-loan-title">Add Loan / EMI</h3>
+      <button class="btn-i" onclick="closeModal('modal-loan')"><svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg></button>
+    </div>
+    <input type="hidden" id="loan-id"/>
+    <div style="display:flex;flex-direction:column;gap:11px">
+      <div><div class="slabel" style="margin-bottom:4px">Loan Name</div>
+        <div class="fw"><input id="loan-name" class="fi" type="text" placeholder="e.g. Car Loan, Education Loan"/></div></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+        <div><div class="slabel" style="margin-bottom:4px">Original Principal (₹)</div>
+          <div class="fw"><div class="fp">₹</div><input id="loan-principal" class="fi" type="number" min="0" step="0.01" placeholder="0.00"/></div></div>
+        <div><div class="slabel" style="margin-bottom:4px">Outstanding (₹)</div>
+          <div class="fw"><div class="fp">₹</div><input id="loan-outstanding" class="fi" type="number" min="0" step="0.01" placeholder="0.00"/></div></div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+        <div><div class="slabel" style="margin-bottom:4px">EMI Amount (₹)</div>
+          <div class="fw"><div class="fp">₹</div><input id="loan-emi" class="fi" type="number" min="0" step="0.01" placeholder="0.00"/></div></div>
+        <div><div class="slabel" style="margin-bottom:4px">Tenure Left (months)</div>
+          <div class="fw"><input id="loan-tenure" class="fi" type="number" min="0" step="1" placeholder="e.g. 24"/></div></div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+        <div><div class="slabel" style="margin-bottom:4px">EMI Due Day (1–31)</div>
+          <div class="fw"><input id="loan-dueday" class="fi" type="number" min="1" max="31" placeholder="e.g. 5"/></div></div>
+        <div><div class="slabel" style="margin-bottom:4px">Remind (days before)</div>
+          <div class="fw"><input id="loan-reminddays" class="fi" type="number" min="1" max="30" placeholder="e.g. 5"/></div></div>
+      </div>
+    </div>
+    <div style="display:flex;gap:8px;margin-top:16px">
+      <button class="btn-g" style="flex:1" onclick="closeModal('modal-loan')">Cancel</button>
+      <button class="btn-p" style="flex:1" id="loan-save-btn" onclick="saveLoan()">Add</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: Record EMI Payment -->
+<div id="modal-emi-pay" class="mo hidden" onclick="if(event.target.id==='modal-emi-pay')closeModal('modal-emi-pay')">
+  <div class="mb">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+      <h3 style="font-weight:600;font-size:.93rem">Record EMI Payment</h3>
+      <button class="btn-i" onclick="closeModal('modal-emi-pay')"><svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg></button>
+    </div>
+    <input type="hidden" id="emi-loan-id"/>
+    <div style="display:flex;flex-direction:column;gap:11px">
+      <div id="emi-pay-info" style="font-size:.8rem;color:#57534e"></div>
+      <div><div class="slabel" style="margin-bottom:4px">Amount (₹)</div>
+        <div class="fw"><div class="fp">₹</div><input id="emi-pay-amount" class="fi" type="number" min="0" step="0.01" placeholder="0.00"/></div></div>
+      <div><div class="slabel" style="margin-bottom:4px">Payment Date</div>
+        <div class="date-trigger" onclick="openDatePicker('emi-pay-date')"><span id="emi-pay-date-disp">Select date</span><svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg></div>
+        <input id="emi-pay-date" type="hidden"/></div>
+      <div><div class="slabel" style="margin-bottom:4px">Pay From</div>
+        <select id="emi-pay-acc" class="pl"></select></div>
+      <p style="font-size:.71rem;color:#a8a29e;line-height:1.4">Logs an expense from the selected account and reduces the loan's outstanding balance by this amount.</p>
+    </div>
+    <div style="display:flex;gap:8px;margin-top:16px">
+      <button class="btn-g" style="flex:1" onclick="closeModal('modal-emi-pay')">Cancel</button>
+      <button class="btn-p" style="flex:1" onclick="confirmEmiPayment()">Record Payment</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: Bulk Recategorize -->
+<div id="modal-bulk-recat" class="mo hidden" onclick="if(event.target.id==='modal-bulk-recat')closeModal('modal-bulk-recat')">
+  <div class="mb" style="max-width:360px">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+      <h3 style="font-weight:600;font-size:.93rem">Bulk Recategorize</h3>
+      <button class="btn-i" onclick="closeModal('modal-bulk-recat')"><svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg></button>
+    </div>
+    <div id="bulk-recat-body"></div>
+    <div style="display:flex;gap:8px;margin-top:16px">
+      <button class="btn-g" style="flex:1" onclick="closeModal('modal-bulk-recat')">Cancel</button>
+      <button class="btn-p" style="flex:1" id="bulk-recat-confirm-btn" onclick="confirmBulkRecat()">Apply</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: Bulk Tag -->
+<div id="modal-bulk-tag" class="mo hidden" onclick="if(event.target.id==='modal-bulk-tag')closeModal('modal-bulk-tag')">
+  <div class="mb" style="max-width:360px">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+      <h3 style="font-weight:600;font-size:.93rem">Bulk Tag</h3>
+      <button class="btn-i" onclick="closeModal('modal-bulk-tag')"><svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg></button>
+    </div>
+    <div class="tg" style="margin-bottom:11px">
+      <button type="button" class="tp active" id="bulk-tag-add-btn" onclick="setBulkTagMode('add')">Add Tag</button>
+      <button type="button" class="tp" id="bulk-tag-remove-btn" onclick="setBulkTagMode('remove')">Remove Tag</button>
+    </div>
+    <div id="bulk-tag-add-fields">
+      <div class="fw"><input id="bulk-tag-input" class="fi" type="text" placeholder="Type a tag, e.g. Goa Trip"/></div>
+      <div id="bulk-tag-suggest" style="display:flex;flex-wrap:wrap;gap:5px;margin-top:8px"></div>
+    </div>
+    <div id="bulk-tag-remove-fields" class="hidden">
+      <select id="bulk-tag-remove-select" class="pl"></select>
+    </div>
+    <div style="display:flex;gap:8px;margin-top:16px">
+      <button class="btn-g" style="flex:1" onclick="closeModal('modal-bulk-tag')">Cancel</button>
+      <button class="btn-p" style="flex:1" onclick="confirmBulkTag()">Apply</button>
+    </div>
+  </div>
+</div>
+
 <!-- MODAL: Date Wheel Picker -->
 <div id="modal-datewheel" class="mo hidden" onclick="if(event.target.id==='modal-datewheel')closeModal('modal-datewheel')">
   <div class="mb" style="max-width:280px">
@@ -795,7 +1004,10 @@
 
 <!-- Toast -->
 <div id="toast" class="hidden">
-  <div style="background:#1c1917;color:#fff;font-size:.82rem;font-weight:500;padding:9px 17px;border-radius:9px;box-shadow:0 4px 20px rgba(0,0,0,.18)" id="toast-msg"></div>
+  <div style="background:#1c1917;color:#fff;font-size:.82rem;font-weight:500;padding:9px 12px 9px 17px;border-radius:9px;box-shadow:0 4px 20px rgba(0,0,0,.18);display:flex;align-items:center;gap:14px">
+    <span id="toast-msg"></span>
+    <button id="toast-action" class="hidden" style="background:none;border:none;color:#93c5fd;font-weight:700;cursor:pointer;font-size:.82rem;font-family:'DM Sans',sans-serif;padding:0;white-space:nowrap"></button>
+  </div>
 </div>
 
 <!-- Firebase SDK (compat build — no bundler needed) -->
@@ -808,12 +1020,17 @@
 <script src="js/ui-common.js"></script>
 <script src="js/balances.js"></script>
 <script src="js/sidebar.js"></script>
+<script src="js/loans.js"></script>
 <script src="js/investments.js"></script>
+<script src="js/tags.js"></script>
+<script src="js/recurring.js"></script>
 <script src="js/transactions.js"></script>
 <script src="js/views.js"></script>
+<script src="js/bulk-actions.js"></script>
 <script src="js/budget.js"></script>
 <script src="js/calculator.js"></script>
 <script src="js/charts-analytics.js"></script>
 <script src="js/app.js"></script>
+<script src="js/shortcuts.js"></script>
 </body>
 </html>

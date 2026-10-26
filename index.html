@@ -157,7 +157,7 @@
                   <button type="button" class="tp active" id="e-split-fronted-btn" onclick="setSplitMode('fronted')">I paid the bill</button>
                   <button type="button" class="tp" id="e-split-owed-btn" onclick="setSplitMode('owed')">Someone else paid</button>
                 </div>
-                <div class="split-fields">
+                <div style="display:grid;grid-template-columns:1fr 90px;gap:8px;align-items:end">
                   <div><div class="slabel" style="margin-bottom:4px">My Share (₹)</div>
                     <div class="fw"><div class="fp">₹</div><input id="e-my-share" class="fi" type="number" min="0" step="0.01" placeholder="0.00"/></div>
                   </div>
@@ -730,9 +730,17 @@
         <input type="hidden" id="inv-hold-schemecode"/>
         <p id="inv-hold-mfpicked" style="font-size:.71rem;color:#166534;margin-top:4px"></p>
       </div>
+      <div id="inv-hold-entry-mode-wrap">
+        <div class="slabel" style="margin-bottom:4px">Enter Holding By</div>
+        <select id="inv-hold-entry-mode" class="pl" onchange="toggleHoldEntryMode()">
+          <option value="units">Units / Quantity</option>
+          <option value="amount">Amount invested (₹) — units calculated from price/NAV</option>
+        </select>
+      </div>
       <div style="display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:8px">
         <div style="min-width:0"><div class="slabel" id="inv-hold-units-label" style="margin-bottom:4px">Units / Quantity</div>
-          <div class="fw"><input id="inv-hold-units" class="fi" type="number" min="0" step="0.001" placeholder="0"/></div></div>
+          <div class="fw"><input id="inv-hold-units" class="fi" type="number" min="0" step="0.001" placeholder="0" oninput="updateHoldUnitsPreview()"/></div>
+          <p id="inv-hold-units-preview" style="font-size:.71rem;color:#166534;margin-top:4px"></p></div>
         <div style="min-width:0"><div class="slabel" id="inv-hold-buy-label" style="margin-bottom:4px">Avg. Buy Price (₹/unit)</div>
           <div id="inv-hold-buy-mode-wrap" style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;width:100%;margin-bottom:6px">
             <select id="inv-hold-buy-mode" class="pl" style="padding:6px 8px;font-size:.78rem;flex:1;min-width:150px" onchange="toggleHoldPriceMode()">
@@ -742,7 +750,7 @@
             <button id="inv-hold-buy-fetch-btn" type="button" class="btn-g" style="white-space:nowrap;flex:0 0 auto" onclick="fetchHoldPurchasePrice()">Fetch</button>
           </div>
           <p id="inv-hold-buy-hint" style="font-size:.71rem;color:#a8a29e;margin:0 0 6px"></p>
-          <div class="fw"><div class="fp">₹</div><input id="inv-hold-buy" class="fi" type="number" min="0" step="0.01" placeholder="0.00"/></div></div>
+          <div class="fw"><div class="fp">₹</div><input id="inv-hold-buy" class="fi" type="number" min="0" step="0.01" placeholder="0.00" oninput="updateHoldUnitsPreview()"/></div></div>
       </div>
       <div><div class="slabel" style="margin-bottom:4px">Current NAV / Price (₹/unit)</div>
         <div class="fw"><div class="fp">₹</div><input id="inv-hold-nav" class="fi" type="number" min="0" step="0.01" placeholder="0.00"/></div>
@@ -863,6 +871,40 @@
     <div style="display:flex;gap:8px;margin-top:16px">
       <button class="btn-g" style="flex:1" onclick="closeModal('modal-settle')">Cancel</button>
       <button class="btn-p" style="flex:1;background:#166534" onclick="confirmSettle()">Confirm Settlement</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: Record split settlement payment -->
+<div id="modal-splitpay" class="mo hidden" onclick="if(event.target.id==='modal-splitpay')closeModal('modal-splitpay')">
+  <div class="mb">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+      <h3 style="font-weight:600;font-size:.93rem">Record Split Payment</h3>
+      <button class="btn-i" onclick="closeModal('modal-splitpay')"><svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg></button>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:11px">
+      <div style="display:flex;gap:6px">
+        <button class="ttb ae" id="sp-dir-paid" style="flex:1" onclick="setSplitPayDir('paid')">I paid roommates</button>
+        <button class="ttb" id="sp-dir-received" style="flex:1" onclick="setSplitPayDir('received')">Roommates paid me</button>
+      </div>
+      <div><div class="slabel" style="margin-bottom:4px">Amount received / paid</div>
+        <input id="sp-amt" type="number" step="0.01" min="0" class="pl" placeholder="0.00" oninput="onSplitAmtInput()"/>
+        <div style="font-size:.7rem;color:#a8a29e;margin-top:3px">Auto-spreads oldest first — or set amounts per entry below.</div></div>
+      <div><div class="slabel" style="margin-bottom:2px">Settle against</div>
+        <div id="sp-entries" style="max-height:200px;overflow-y:auto"></div>
+        <div id="sp-summary" style="font-size:.74rem;color:#57534e;margin-top:6px"></div></div>
+      <div><div class="slabel" style="margin-bottom:4px">Date</div>
+        <div class="date-trigger" onclick="openDatePicker('sp-date')"><span id="sp-date-disp">Select date</span><svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg></div>
+        <input id="sp-date" type="hidden"/></div>
+      <div><div class="slabel" style="margin-bottom:4px" id="sp-acc-label">Paid From</div>
+        <select id="sp-acc" class="pl"></select></div>
+      <div><div class="slabel" style="margin-bottom:4px">Note (optional)</div>
+        <input id="sp-note" type="text" class="pl" placeholder="e.g. UPI to Rahul"/></div>
+      <p class="info-box">Moves real money in the selected account and adjusts your Splitwise balance. Only the amounts you allocate are settled; anything left carries forward. It isn't counted as spending or income in analytics.</p>
+    </div>
+    <div style="display:flex;gap:8px;margin-top:16px">
+      <button class="btn-g" style="flex:1" onclick="closeModal('modal-splitpay')">Cancel</button>
+      <button class="btn-p" style="flex:1;background:#166534" onclick="confirmSplitPay()">Record Payment</button>
     </div>
   </div>
 </div>

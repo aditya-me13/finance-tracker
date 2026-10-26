@@ -46,8 +46,6 @@ input:focus,select:focus{border-color:#a8a29e!important;box-shadow:0 0 0 3px rgb
 .fw:focus-within{border-color:#a8a29e;box-shadow:0 0 0 3px rgba(168,162,158,.12)}
 .fp{padding:0 10px;background:#faf9f7;border-right:1.5px solid #e7e5e4;color:#a8a29e;font-size:.8rem;display:flex;align-items:center;font-weight:500;flex-shrink:0}
 .fi{flex:1;padding:9px 11px;border:none;background:transparent;color:#1c1917}
-.split-fields{display:grid;grid-template-columns:minmax(0,1fr) 136px;gap:8px;align-items:end}
-.split-fields>div{min-width:0}
 select.pl{width:100%;border:1.5px solid #e7e5e4;border-radius:9px;padding:9px 11px;background:#fff;color:#1c1917;appearance:none;cursor:pointer;transition:border-color .15s}
 .tt{display:flex;border-radius:9px;overflow:hidden;border:1.5px solid #e7e5e4;margin-bottom:13px}
 .ttb{flex:1;padding:7px 4px;font-size:.79rem;font-weight:500;cursor:pointer;border:none;background:#fff;color:#a8a29e;transition:all .15s;font-family:'DM Sans',sans-serif;text-align:center}

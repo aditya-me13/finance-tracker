@@ -149,8 +149,8 @@ function renderTxnLog(){
     const tagText=txnFilter.tag?` · #${txnFilter.tag}`:'';
     const searchText=txnFilter.search?` · "${txnFilter.search}"`:'';
     label.textContent=`Filtered: ${catText} · ${rangeText}${tagText}${searchText}`;
-    const expSum=txns.filter(t=>t.type==='expense').reduce((s,t)=>s+Number(t.amount),0);
-    const incSum=txns.filter(t=>t.type==='income').reduce((s,t)=>s+Number(t.amount),0);
+    const expSum=txns.filter(t=>t.type==='expense'&&!t.splitSettle).reduce((s,t)=>s+Number(t.amount),0);
+    const incSum=txns.filter(t=>t.type==='income'&&!t.splitSettle).reduce((s,t)=>s+Number(t.amount),0);
     const parts=[];
     if(expSum)parts.push(`Expenses: ${fmt(expSum)}`);
     if(incSum)parts.push(`Income: ${fmt(incSum)}`);
@@ -172,8 +172,8 @@ function renderTxnLog(){
   const dates=Object.keys(grouped).sort().reverse();
   list.innerHTML='';
   dates.forEach(date=>{
-    const dayExps=grouped[date].filter(t=>t.type==='expense').reduce((s,t)=>s+Number(t.amount),0);
-    const dayInc=grouped[date].filter(t=>t.type==='income').reduce((s,t)=>s+Number(t.amount),0);
+    const dayExps=grouped[date].filter(t=>t.type==='expense'&&!t.splitSettle).reduce((s,t)=>s+Number(t.amount),0);
+    const dayInc=grouped[date].filter(t=>t.type==='income'&&!t.splitSettle).reduce((s,t)=>s+Number(t.amount),0);
     const hdr=document.createElement('div');
     hdr.style.cssText='display:flex;align-items:center;justify-content:space-between;padding:5px 11px 3px';
     hdr.innerHTML=`<span class="slabel">${fmtDate(date)}</span><div style="display:flex;gap:8px">
@@ -201,11 +201,16 @@ function buildRow(t,canDel,selectable){
     }else if(t.shared&&Number(t.myShare)<Number(t.amount)){
       splitNote=` &middot; <span style="color:#7c3aed;font-weight:600">your share ${fmt(t.myShare)}</span>${settledNote}`;
     }
+    if(t.shared&&!t.settled){
+      const al=(typeof buildSplitAllocMap==='function'?buildSplitAllocMap()[t.id]:0)||0;
+      if(al>0.004)splitNote+=` <span style="color:#166534">(${fmt(al)} settled)</span>`;
+    }
+    if(t.splitSettle)splitNote=` &middot; <span style="color:#7c3aed;font-weight:600">Split settlement — you paid</span>${t.settled?' <span style="color:#a8a29e">(settled)</span>':''}`;
     subLabel=acLabel(t.acType,t.acId)+splitNote+(t.desc?' &middot; '+esc(t.desc):'');
     amtStr='&minus;'+fmt(displayAmt);amtCol='#ef4444';
   }else if(t.type==='income'){
     iconBg='#f0fdf4';iconTxt='IN';mainLabel=esc(t.category);
-    subLabel=acLabel(t.destType,t.destId)+(t.desc?' &middot; '+esc(t.desc):'');
+    subLabel=acLabel(t.destType,t.destId)+(t.splitSettle?` &middot; <span style="color:#7c3aed;font-weight:600">Split settlement — received</span>${t.settled?' <span style="color:#a8a29e">(settled)</span>':''}`:'')+(t.desc?' &middot; '+esc(t.desc):'');
     amtStr='+'+fmt(t.amount);amtCol='#166534';
   }else if(t.type==='invest'){
     iconBg='#ede9fe';iconTxt='IV';mainLabel='Invested — '+esc(t.name||'Holding');

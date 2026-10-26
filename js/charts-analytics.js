@@ -51,7 +51,7 @@ function buildDonut(key,canvasId,legId,labels,data,bgs,fgs,emptyMsg){
 }
 
 function renderQuickCharts(){
-  const exps=curViewTxns().filter(t=>t.type==='expense');
+  const exps=curViewTxns().filter(t=>t.type==='expense'&&!t.splitSettle);
   if(viewMode==='fy')renderBarChartFY(viewFY,exps);else renderBarChart(viewMK,exps);
   const et={};exps.forEach(e=>{et[e.category]=(et[e.category]||0)+shareAmount(e);});
   const el=Object.keys(et),ed=el.map(l=>et[l]);
@@ -120,8 +120,8 @@ function renderAnalytics(){
   updateRangeDisplay();
   const{from,to}=getRangeDates();
   const allTxns=txnsInRange(from,to);
-  const exps=allTxns.filter(t=>t.type==='expense');
-  const incs=allTxns.filter(t=>t.type==='income');
+  const exps=allTxns.filter(t=>t.type==='expense'&&!t.splitSettle);
+  const incs=allTxns.filter(t=>t.type==='income'&&!t.splitSettle);
   const totalSpent=exps.reduce((s,t)=>s+realAmount(t),0);
   const totalInc=incs.reduce((s,t)=>s+Number(t.amount),0);
   const surplus=totalInc-totalSpent;
@@ -216,8 +216,8 @@ function renderCashflowChart(from,to,surplus){
   const mkSet=new Set();
   state.transactions.filter(t=>t.date>=from&&t.date<=to).forEach(t=>mkSet.add(mkOf(t.date)));
   const months=Array.from(mkSet).sort();
-  const incData=months.map(mk=>txnsForMK(mk).filter(t=>t.type==='income').reduce((s,t)=>s+Number(t.amount),0));
-  const expData=months.map(mk=>txnsForMK(mk).filter(t=>t.type==='expense').reduce((s,t)=>s+Number(t.amount),0));
+  const incData=months.map(mk=>txnsForMK(mk).filter(t=>t.type==='income'&&!t.splitSettle).reduce((s,t)=>s+Number(t.amount),0));
+  const expData=months.map(mk=>txnsForMK(mk).filter(t=>t.type==='expense'&&!t.splitSettle).reduce((s,t)=>s+Number(t.amount),0));
   const empty=document.getElementById('an-cashflow-empty');
   const surEl=document.getElementById('cashflow-surplus');
   surEl.textContent=`Net: ${fmt(surplus)}`;surEl.style.color=surplus>=0?'#166534':'#ef4444';
@@ -250,7 +250,7 @@ function renderHistChart(){
   const showCash=document.getElementById('hf-cash').checked;
   const showCC=document.getElementById('hf-cc').checked;
   const showShared=document.getElementById('hf-shared')?.checked;
-  const mkExps=mk=>state.transactions.filter(t=>t.type==='expense'&&mkOf(t.date)===mk);
+  const mkExps=mk=>state.transactions.filter(t=>t.type==='expense'&&!t.splitSettle&&mkOf(t.date)===mk);
   const shortLbl=k=>{const[y,m]=k.split('-');return new Date(+y,+m-1,1).toLocaleDateString('en-IN',{month:'short',year:'2-digit'});};
   const ds=[];
   if(showBank)ds.push({label:'Bank/UPI',data:months.map(mk=>mkExps(mk).filter(e=>e.acType==='bank').reduce((s,t)=>s+shareAmount(t),0)),backgroundColor:'rgba(59,130,246,.75)',borderColor:'#3b82f6',borderWidth:2,borderRadius:4,stack:'s'});

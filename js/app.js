@@ -24,6 +24,7 @@ function importData(ev){
 
 /* ── Rebuild All ──────────────────────────────────────────── */
 function rebuildAll(){
+  resetSplitAllocMemo();
   buildMonthList();
   renderSidebar();
   renderBudget();

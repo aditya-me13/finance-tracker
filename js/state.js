@@ -47,6 +47,7 @@ function pushToCloud(){
   return db.collection('users').doc(currentUid).set({data:JSON.stringify(state),updatedAt:Date.now()});
 }
 function saveState(){
+  if(typeof resetSplitAllocMemo==='function')resetSplitAllocMemo();
   if(!currentUid)return;
   try{localStorage.setItem(cacheKey(),JSON.stringify(state));}catch(e){}
   clearTimeout(_saveTimer);

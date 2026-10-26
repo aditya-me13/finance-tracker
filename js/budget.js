@@ -1,6 +1,6 @@
 /* ── Budget ───────────────────────────────────────────────── */
 function renderBudget(){
-  const mk=curMK(),exps=txnsForMK(mk).filter(t=>t.type==='expense');
+  const mk=curMK(),exps=txnsForMK(mk).filter(t=>t.type==='expense'&&!t.splitSettle);
   const spent=exps.reduce((s,t)=>s+shareAmount(t),0);
   const bud=Number(state.monthlyBudget)||0,pct=bud>0?Math.min((spent/bud)*100,100):0;
   const warn=bud>0&&spent>=bud*.8,over=bud>0&&spent>=bud;

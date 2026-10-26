@@ -69,9 +69,39 @@ function getDueDateStatus(card){
 }
 
 /* ── Splitwise / Roommate Settlement ──────────────────────── */
-function computeSplitwiseBalance(){
-  const owed=state.transactions.filter(t=>t.type==='expense'&&t.acType==='shared'&&!t.settled).reduce((s,t)=>s+(Number(t.myShare!==undefined?t.myShare:t.amount)||0),0);
-  const fronted=state.transactions.filter(t=>t.type==='expense'&&t.shared&&t.acType!=='shared'&&!t.settled).reduce((s,t)=>s+Math.max(0,(Number(t.amount)||0)-(Number(t.myShare)||0)),0);
-  return{owed,fronted,net:fronted-owed};
+/* Payments recorded via "Record Payment" carry allocations [{id,amt}] against specific
+   split entries, so an entry can be partly settled and the remainder carries forward. */
+let _allocMemo=null;
+function resetSplitAllocMemo(){_allocMemo=null;}
+function buildSplitAllocMap(){
+  if(_allocMemo)return _allocMemo;
+  const m=_allocMemo={};
+  state.transactions.forEach(p=>{if(p.splitSettle&&Array.isArray(p.allocations))p.allocations.forEach(a=>{m[a.id]=(m[a.id]||0)+(Number(a.amt)||0);});});
+  return m;
 }
-
+const splitShareOf=t=>Number(t.myShare!==undefined&&t.myShare!==null&&t.myShare!==''?t.myShare:t.amount)||0;
+/* entries you owe others for (someone else paid) — outstanding portion */
+function splitOwedEntries(alloc){
+  alloc=alloc||buildSplitAllocMap();
+  return state.transactions.filter(t=>t.type==='expense'&&t.acType==='shared'&&!t.settled)
+    .map(t=>({t,total:splitShareOf(t),out:Math.max(0,splitShareOf(t)-(alloc[t.id]||0))})).filter(e=>e.out>0.004);
+}
+/* entries you fronted that others owe you — outstanding portion */
+function splitFrontedEntries(alloc){
+  alloc=alloc||buildSplitAllocMap();
+  return state.transactions.filter(t=>t.type==='expense'&&t.shared&&t.acType!=='shared'&&!t.settled)
+    .map(t=>{const tot=Math.max(0,(Number(t.amount)||0)-splitShareOf(t));return{t,total:tot,out:Math.max(0,tot-(alloc[t.id]||0))};}).filter(e=>e.out>0.004);
+}
+function computeSplitwiseBalance(){
+  const alloc=buildSplitAllocMap();
+  const owed=splitOwedEntries(alloc).reduce((s,e)=>s+e.out,0);
+  const fronted=splitFrontedEntries(alloc).reduce((s,e)=>s+e.out,0);
+  /* unallocated part of payments (e.g. paid more than outstanding) still moves the balance */
+  let paid=0,received=0;
+  state.transactions.filter(t=>t.splitSettle&&!t.settled).forEach(p=>{
+    const used=(p.allocations||[]).reduce((s,a)=>s+(Number(a.amt)||0),0);
+    const rest=Math.max(0,(Number(p.amount)||0)-used);
+    if(p.splitSettle==='paid')paid+=rest;else received+=rest;
+  });
+  return{owed,fronted,paid,received,net:fronted-owed+paid-received,pending:owed+fronted+paid+received};
+}

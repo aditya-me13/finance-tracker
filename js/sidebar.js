@@ -166,75 +166,36 @@ function renderSplitPaymentsList(){
       </div>`;}).join('')}
   </div>`;
 }
-let splitPayDir='paid',splitPayEntries=[];
+let splitPayDir='paid';
 function setSplitPayDir(d){
   splitPayDir=d;
   document.getElementById('sp-dir-paid').className='ttb'+(d==='paid'?' ae':'');
   document.getElementById('sp-dir-received').className='ttb'+(d==='received'?' ai':'');
   document.getElementById('sp-acc-label').textContent=d==='paid'?'Paid From':'Received Into';
-  /* "I paid" clears what I owe; "roommates paid me" clears what I fronted */
-  splitPayEntries=(d==='paid'?splitOwedEntries():splitFrontedEntries()).sort((a,b)=>a.t.date.localeCompare(b.t.date));
-  renderSplitPayEntries();
-  document.getElementById('sp-amt').value='';
   updateSplitPayTotal();
 }
-function renderSplitPayEntries(){
-  const box=document.getElementById('sp-entries');
-  if(!splitPayEntries.length){
-    box.innerHTML='<div style="font-size:.74rem;color:#a8a29e;padding:6px 2px">Nothing outstanding in this direction — the amount will be kept as a general credit against your balance.</div>';
-    return;
-  }
-  box.innerHTML=splitPayEntries.map((e,i)=>`<div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid #f5f4f2">
-    <div style="flex:1;min-width:0">
-      <div style="font-size:.76rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${fmtDate(e.t.date)} &middot; ${esc(e.t.category)}${e.t.desc?' &middot; '+esc(e.t.desc):''}</div>
-      <div style="font-size:.67rem;color:#a8a29e">Outstanding ${fmt(e.out)}${e.out<e.total-0.004?` of ${fmt(e.total)}`:''}</div>
-    </div>
-    <input id="sp-row-${i}" type="number" step="0.01" min="0" max="${e.out}" placeholder="0" class="pl" style="width:84px;padding:5px 7px;font-size:.78rem" oninput="onSplitRowInput()"/>
-    <button class="btn-i" style="font-size:.66rem;padding:2px 4px" onclick="document.getElementById('sp-row-${i}').value='${e.out.toFixed(2)}';onSplitRowInput()" title="Settle in full">Full</button>
-  </div>`).join('');
-}
-function readSplitRows(){
-  return splitPayEntries.map((e,i)=>{
-    let v=parseFloat(document.getElementById('sp-row-'+i)?.value)||0;
-    v=Math.max(0,Math.min(v,e.out));
-    return{id:e.t.id,amt:Math.round(v*100)/100};
-  });
-}
+const netLine=n=>n>0.004?`roommates owe you <b style="color:#166534">${fmt(n)}</b>`:n<-0.004?`you owe roommates <b style="color:#ef4444">${fmt(-n)}</b>`:'<b>all square</b>';
 function updateSplitPayTotal(){
-  const rows=readSplitRows(),sum=rows.reduce((s,r)=>s+r.amt,0);
-  const out=splitPayEntries.reduce((s,e)=>s+e.out,0);
+  const{net}=computeSplitwiseBalance();
   const amt=parseFloat(document.getElementById('sp-amt').value)||0;
-  const extra=amt-sum;
-  document.getElementById('sp-summary').innerHTML=splitPayEntries.length
-    ?`Settling <b>${fmt(sum)}</b> of ${fmt(out)} outstanding &middot; <b>${fmt(Math.max(0,out-sum))}</b> carries forward`+(extra>0.004?` &middot; <span style="color:#b45309">${fmt(extra)} extra kept as general credit</span>`:'')
-    :'';
-}
-/* typing a total auto-spreads it oldest-first across the entries */
-function onSplitAmtInput(){
-  let left=parseFloat(document.getElementById('sp-amt').value)||0;
-  splitPayEntries.forEach((e,i)=>{
-    const v=Math.min(left,e.out);left=Math.max(0,left-v);
-    document.getElementById('sp-row-'+i).value=v>0?(Math.round(v*100)/100):'';
-  });
-  updateSplitPayTotal();
-}
-/* editing individual entries sets the total to their sum */
-function onSplitRowInput(){
-  const sum=readSplitRows().reduce((s,r)=>s+r.amt,0);
-  document.getElementById('sp-amt').value=sum>0?(Math.round(sum*100)/100):'';
-  updateSplitPayTotal();
+  /* paying roommates moves net up; receiving from them moves it down */
+  const after=net+(splitPayDir==='paid'?amt:-amt);
+  document.getElementById('sp-summary').innerHTML=amt>0?`After this: ${netLine(after)}`:'';
 }
 function openSplitPayModal(){
   const{net}=computeSplitwiseBalance();
   setDateVal('sp-date',today());
   fillSettleAccOpts('sp-acc');
   document.getElementById('sp-note').value='';
+  document.getElementById('sp-net').innerHTML='Current net: '+netLine(net);
   setSplitPayDir(net>0.004?'received':'paid');
+  document.getElementById('sp-amt').value=Math.abs(net)>0.004?Math.abs(net).toFixed(2):'';
+  updateSplitPayTotal();
   openModal('modal-splitpay');
 }
 function confirmSplitPay(){
   const amt=parseFloat(document.getElementById('sp-amt').value);
-  if(!amt||amt<=0){toast('Enter an amount or fill in the entries');return;}
+  if(!amt||amt<=0){toast('Enter an amount');return;}
   const date=document.getElementById('sp-date').value;
   if(!date){toast('Select a date');return;}
   const accKey=document.getElementById('sp-acc').value;
@@ -242,18 +203,17 @@ function confirmSplitPay(){
   const bankId=isCash?null:accKey.split(':')[1];
   const note=document.getElementById('sp-note').value.trim();
   const desc='Split settlement'+(note?' — '+note:'');
-  const allocations=readSplitRows().filter(r=>r.amt>0.004);
   if(!state.categories.expense.includes('Settlement'))state.categories.expense.push('Settlement');
   if(!state.categories.income.includes('Settlement'))state.categories.income.push('Settlement');
   if(splitPayDir==='paid'){
     /* myShare 0: the cost was already counted when the owed entries were logged */
-    state.transactions.push({id:uid(),date,type:'expense',amount:amt,myShare:0,acType:isCash?'cash':'bank',acId:isCash?'cash':bankId,category:'Settlement',desc,splitSettle:'paid',settled:false,allocations});
+    state.transactions.push({id:uid(),date,type:'expense',amount:amt,myShare:0,acType:isCash?'cash':'bank',acId:isCash?'cash':bankId,category:'Settlement',desc,splitSettle:'paid',settled:false});
   }else{
-    state.transactions.push({id:uid(),date,type:'income',amount:amt,destType:isCash?'cash':'bank',destId:isCash?'cash':bankId,category:'Settlement',desc,splitSettle:'received',settled:false,allocations});
+    state.transactions.push({id:uid(),date,type:'income',amount:amt,destType:isCash?'cash':'bank',destId:isCash?'cash':bankId,category:'Settlement',desc,splitSettle:'received',settled:false});
   }
   saveState();closeModal('modal-splitpay');rebuildAll();
   const left=computeSplitwiseBalance();
-  toast(`Payment of ${fmt(amt)} recorded`+(left.pending>0.004?' — remainder carries forward':' — all settled'));
+  toast(`Payment of ${fmt(amt)} recorded`+(Math.abs(left.net)>0.004?'':' — all square'));
 }
 function deleteSplitPayment(id){
   const idx=state.transactions.findIndex(t=>t.id===id);if(idx<0)return;
@@ -416,4 +376,3 @@ function confirmDeleteAccount(type, id){
   };
   openModal('modal-confirm');
 }
-

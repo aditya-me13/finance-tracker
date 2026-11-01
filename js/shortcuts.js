@@ -10,7 +10,7 @@ function anyModalOpen(){
 function closeTopModal(){
   const openModals=document.querySelectorAll('.mo:not(.hidden):not(#auth-gate)');
   if(!openModals.length)return false;
-  openModals[openModals.length-1].classList.add('hidden');
+  closeModal(openModals[openModals.length-1].id);
   return true;
 }
 document.addEventListener('keydown',e=>{

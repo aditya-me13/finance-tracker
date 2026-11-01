@@ -4,6 +4,7 @@
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
 <title>Finance Tracker</title>
+<script>try{var m=localStorage.getItem('ft-theme')||(matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light');if(m==='dark')document.documentElement.classList.add('dark');}catch(e){}</script>
 <script src="https://cdn.tailwindcss.com"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet"/>
@@ -601,6 +602,7 @@
       <div id="auth-err" style="font-size:.76rem;color:#be123c;display:none"></div>
       <button class="btn-p" style="width:100%" id="auth-signin-btn" onclick="doSignIn()">Sign In</button>
       <button class="btn-g" style="width:100%" id="auth-signup-btn" onclick="doSignUp()">Create Account</button>
+      <button type="button" onclick="doResetPassword()" style="background:none;border:none;color:#1d4ed8;font-size:.74rem;cursor:pointer;font-family:'DM Sans',sans-serif">Forgot password?</button>
       <p style="font-size:.71rem;color:#a8a29e;text-align:center;margin-top:2px">Your data syncs privately to your own Firebase project.</p>
     </div>
   </div>
@@ -1106,7 +1108,7 @@
 </div>
 
 <!-- Toast -->
-<div id="toast" class="hidden">
+<div id="toast" class="hidden" role="status" aria-live="polite">
   <div style="background:#1c1917;color:#fff;font-size:.82rem;font-weight:500;padding:9px 12px 9px 17px;border-radius:9px;box-shadow:0 4px 20px rgba(0,0,0,.18);display:flex;align-items:center;gap:14px">
     <span id="toast-msg"></span>
     <button id="toast-action" class="hidden" style="background:none;border:none;color:#93c5fd;font-weight:700;cursor:pointer;font-size:.82rem;font-family:'DM Sans',sans-serif;padding:0;white-space:nowrap"></button>

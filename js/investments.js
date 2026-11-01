@@ -118,7 +118,7 @@ async function searchMF(){
   if(!q){wrap.innerHTML='';return;}
   wrap.innerHTML='<div style="font-size:.75rem;color:#a8a29e;padding:4px 2px">Searching…</div>';
   try{
-    const res=await fetch(`https://api.mfapi.in/mf/search?q=${encodeURIComponent(q)}`);
+    const res=await fetchT(`https://api.mfapi.in/mf/search?q=${encodeURIComponent(q)}`);
     const list=await res.json();
     if(!Array.isArray(list)||!list.length){wrap.innerHTML='<div style="font-size:.75rem;color:#a8a29e;padding:4px 2px">No matches</div>';return;}
     wrap.innerHTML=list.slice(0,8).map(f=>{
@@ -170,7 +170,7 @@ async function searchTicker(){
   msg('Searching…');
   try{
     if(!STOCK_PROXY_URL||STOCK_PROXY_URL.includes('PASTE-YOUR'))throw new Error('Stock price proxy not configured yet');
-    const res=await fetch(`${STOCK_PROXY_URL}?search=${encodeURIComponent(q)}&type=${type==='etf'?'etf':'stock'}`);
+    const res=await fetchT(`${STOCK_PROXY_URL}?search=${encodeURIComponent(q)}&type=${type==='etf'?'etf':'stock'}`);
     if(!res.ok)throw new Error('search failed');
     const j=await res.json();
     const list=(j.results||[]).slice(0,8);
@@ -630,16 +630,21 @@ function isoToDmy(iso){
   return `${d}-${m}-${y}`;
 }
 
+/* fetch with a timeout so a hung proxy can't freeze the UI */
+function fetchT(url,ms=10000){
+  const ctl=new AbortController(),timer=setTimeout(()=>ctl.abort(),ms);
+  return fetch(url,{signal:ctl.signal}).catch(e=>{throw e&&e.name==='AbortError'?new Error('Request timed out'):e;}).finally(()=>clearTimeout(timer));
+}
 async function fetchMFNav(schemeCode,date=''){
   if(!date){
-    const res=await fetch(`https://api.mfapi.in/mf/${encodeURIComponent(schemeCode)}`);
+    const res=await fetchT(`https://api.mfapi.in/mf/${encodeURIComponent(schemeCode)}`);
     if(!res.ok)throw new Error('MF history request failed');
     const j=await res.json();
     const nav=Number(j?.data?.[0]?.nav);
     if(!nav)throw new Error('No NAV returned');
     return nav;
   }
-  const res=await fetch(`https://api.mfapi.in/mf/${encodeURIComponent(schemeCode)}`);
+  const res=await fetchT(`https://api.mfapi.in/mf/${encodeURIComponent(schemeCode)}`);
   if(!res.ok)throw new Error('MF history request failed');
   const j=await res.json();
   const target=Date.parse(`${date}T00:00:00`);
@@ -651,7 +656,7 @@ async function fetchMFNav(schemeCode,date=''){
 }
 async function fetchStockPrice(symbol,date=''){
   if(!STOCK_PROXY_URL||STOCK_PROXY_URL.includes('PASTE-YOUR'))throw new Error('Stock price proxy not configured yet');
-  const res=await fetch(`${STOCK_PROXY_URL}?symbol=${encodeURIComponent(symbol)}${date?`&date=${encodeURIComponent(date)}`:''}`);
+  const res=await fetchT(`${STOCK_PROXY_URL}?symbol=${encodeURIComponent(symbol)}${date?`&date=${encodeURIComponent(date)}`:''}`);
   if(!res.ok)throw new Error(date?'No price returned for the selected date':'Price proxy request failed');
   const j=await res.json();
   const price=Number(j.price);
@@ -664,16 +669,21 @@ async function refreshAllPrices(){
   const btn=document.getElementById('refresh-prices-btn');
   if(btn){btn.disabled=true;btn.textContent='Refreshing…';}
   let ok=0,fail=0;
-  for(const h of holdings){
-    try{
-      let price=null;
-      if(h.type==='mf'&&h.schemeCode)price=await fetchMFNav(h.schemeCode);
-      else if(isExchangeTraded(h.type)&&h.symbol)price=await fetchStockPrice(h.symbol);
-      if(price){h.nav=price;ok++;}else fail++;
-    }catch(e){fail++;}
+  try{
+    // Resolve in small parallel batches instead of one request at a time
+    const lookup=async h=>{
+      try{
+        let price=null;
+        if(h.type==='mf'&&h.schemeCode)price=await fetchMFNav(h.schemeCode);
+        else if(isExchangeTraded(h.type)&&h.symbol)price=await fetchStockPrice(h.symbol);
+        if(price){h.nav=price;ok++;}else fail++;
+      }catch(e){fail++;}
+    };
+    for(let i=0;i<holdings.length;i+=4)await Promise.all(holdings.slice(i,i+4).map(lookup));
+    saveState();rebuildAll();
+  }finally{
+    if(btn){btn.disabled=false;btn.textContent='↻ Refresh Prices';}
   }
-  saveState();rebuildAll();
-  if(btn){btn.disabled=false;btn.textContent='↻ Refresh Prices';}
   toast(fail?`Updated ${ok} price(s), ${fail} failed (missing symbol/scheme or lookup error)`:`Updated ${ok} price(s)`,3200);
 }
 

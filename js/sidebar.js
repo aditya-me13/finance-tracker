@@ -367,7 +367,11 @@ function confirmDeleteAccount(type, id){
   let name='';
   if(type==='bank'){const b=state.banks.find(x=>x.id===id);name=b?b.name:'account';}
   else if(type==='cc'){const c=state.cards.find(x=>x.id===id);name=c?c.name:'card';}
-  document.getElementById('confirm-body').textContent=`Delete "${name}"? Its transactions will remain but balances will be recalculated without this account.`;
+  const key=type==='bank'?'bank:'+id:'cc:'+id;
+  const used=state.transactions.filter(t=>t.acId===id||t.destId===id||t.fromKey===key||t.toKey===key||t.sourceKey===key||t.destKey===key).length;
+  document.getElementById('confirm-body').textContent=used
+    ?`Delete "${name}"? ${used} transaction${used>1?'s':''} use this account. They stay in the log, but their amounts will no longer count in any balance. You can undo this right after.`
+    :`Delete "${name}"? You can undo this right after.`;
   document.getElementById('confirm-ok-btn').onclick=()=>{
     let removed=null;
     // Cards whose auto-debit pointed at a deleted bank are switched off (restored on undo)

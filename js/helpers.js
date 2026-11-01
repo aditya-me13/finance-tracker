@@ -40,6 +40,18 @@ function toast(msg,ms=2400,action=null){
 function showUndoToast(msg,restoreFn){
   toast(msg,5000,{label:'Undo',onClick:restoreFn});
 }
-const openModal=id=>document.getElementById(id).classList.remove('hidden');
-const closeModal=id=>document.getElementById(id).classList.add('hidden');
+let _modalReturnFocus=[];
+function openModal(id){
+  const el=document.getElementById(id);
+  el.setAttribute('role','dialog');el.setAttribute('aria-modal','true');
+  _modalReturnFocus.push({id,el:document.activeElement});
+  el.classList.remove('hidden');
+  const first=el.querySelector('input:not([type=hidden]),select,textarea,button.btn-p');
+  if(first&&first.focus)setTimeout(()=>first.focus(),30);
+}
+function closeModal(id){
+  document.getElementById(id).classList.add('hidden');
+  const i=_modalReturnFocus.map(m=>m.id).lastIndexOf(id);
+  if(i>=0){const[{el}]=_modalReturnFocus.splice(i,1);if(el&&el.focus&&document.contains(el))el.focus();}
+}
 

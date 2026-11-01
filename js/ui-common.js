@@ -1,4 +1,18 @@
 /* ── Auth ─────────────────────────────────────────────────── */
+const AUTH_ERRORS={
+  'auth/invalid-credential':'Incorrect email or password.','auth/wrong-password':'Incorrect email or password.','auth/user-not-found':'No account found for this email.',
+  'auth/invalid-email':'Enter a valid email address.','auth/email-already-in-use':'An account with this email already exists. Try signing in.',
+  'auth/weak-password':'Password must be at least 6 characters.','auth/too-many-requests':'Too many attempts. Wait a bit and try again.','auth/network-request-failed':'Network error. Check your connection.'
+};
+const authMsg=e=>AUTH_ERRORS[e&&e.code]||(e&&e.message)||'Something went wrong.';
+function doResetPassword(){
+  const email=document.getElementById('auth-email').value.trim();
+  if(!email){showAuthErr('Enter your email above, then click "Forgot password?"');return;}
+  auth.sendPasswordResetEmail(email).then(()=>{document.getElementById('auth-err').style.display='none';toast('Password reset email sent',3500);}).catch(e=>showAuthErr(authMsg(e)));
+}
+document.addEventListener('keydown',e=>{
+  if(e.key==='Enter'&&(e.target.id==='auth-email'||e.target.id==='auth-pass'))doSignIn();
+});
 function showAuthErr(msg){
   const el=document.getElementById('auth-err');
   el.textContent=msg;el.style.display='block';
@@ -8,7 +22,7 @@ function doSignIn(){
   const pass=document.getElementById('auth-pass').value;
   if(!email||!pass){showAuthErr('Enter email and password');return;}
   document.getElementById('auth-err').style.display='none';
-  _signedInThisLoad=true;authReady.then(()=>auth.signInWithEmailAndPassword(email,pass)).catch(e=>{_signedInThisLoad=false;showAuthErr(e.message);});
+  _signedInThisLoad=true;authReady.then(()=>auth.signInWithEmailAndPassword(email,pass)).catch(e=>{_signedInThisLoad=false;showAuthErr(authMsg(e));});
 }
 function doSignUp(){
   const email=document.getElementById('auth-email').value.trim();
@@ -16,14 +30,14 @@ function doSignUp(){
   if(!email||!pass){showAuthErr('Enter email and password');return;}
   if(pass.length<6){showAuthErr('Password must be at least 6 characters');return;}
   document.getElementById('auth-err').style.display='none';
-  _signedInThisLoad=true;authReady.then(()=>auth.createUserWithEmailAndPassword(email,pass)).catch(e=>{_signedInThisLoad=false;showAuthErr(e.message);});
+  _signedInThisLoad=true;authReady.then(()=>auth.createUserWithEmailAndPassword(email,pass)).catch(e=>{_signedInThisLoad=false;showAuthErr(authMsg(e));});
 }
 /* No auto-login: auth lives in memory only, so every reload asks for credentials */
 const authReady=auth.setPersistence(firebase.auth.Auth.Persistence.NONE).catch(()=>{});
 let _signedInThisLoad=false;
 async function doSignOut(){
   try{
-    if(_saveTimer&&currentUid){clearTimeout(_saveTimer);_saveTimer=null;await pushToCloud();}
+    if(_saveTimer&&currentUid&&_cloudReady){clearTimeout(_saveTimer);_saveTimer=null;await pushToCloud();}
   }catch(e){}
   try{await auth.signOut();}catch(e){}
   location.reload();

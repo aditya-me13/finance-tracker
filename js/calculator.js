@@ -113,8 +113,15 @@ function calcFallbackCopy(text,done){
     done();
   }catch(e){toast('Could not copy — select and copy manually');}
 }
+/* Keyboard input is active only while focus is inside #calc-box (set by clicking it) */
+function calcBoxFocus(){
+  const box=document.getElementById('calc-box');
+  if(box)box.focus();
+}
 function calcKeyDown(e){
+  if(e.ctrlKey||e.metaKey||e.altKey)return;
   const key=e.key;
+  if(/^[0-9+\-*/.()=]$|^(Enter|Backspace|Escape|Delete)$/.test(key))e.stopPropagation();
   if(/^[0-9]$/.test(key)){e.preventDefault();calcAppend(key);return;}
   if(key==='.'){e.preventDefault();calcAppend('.');return;}
   if(key==='+'){e.preventDefault();calcAppend('+');return;}

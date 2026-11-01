@@ -2,11 +2,11 @@
 body{font-family:'DM Sans',sans-serif;background:#f4f3f0;color:#1c1917;min-height:100vh}
 ::-webkit-scrollbar{width:5px;height:5px}::-webkit-scrollbar-thumb{background:#d6d3d1;border-radius:99px}
 .num{font-family:'DM Mono',monospace;letter-spacing:-.02em;white-space:nowrap}
-.shell{display:grid;grid-template-columns:248px 1fr;grid-template-rows:50px 1fr;min-height:100vh}
+.shell{display:grid;grid-template-columns:248px 1fr;grid-template-rows:50px 1fr;min-height:100vh;min-height:100dvh}
 .topbar{grid-column:1/-1;background:#fff;border-bottom:1px solid #ebe9e6;display:flex;align-items:center;justify-content:space-between;padding:0 18px;position:sticky;top:0;z-index:40}
 .sidebar{background:#fff;border-right:1px solid #ebe9e6;overflow-y:auto;padding:14px 0 24px;position:sticky;top:50px;height:calc(100vh - 50px)}
 .main{overflow-y:auto;padding:18px}
-@media(max-width:860px){.shell{grid-template-columns:1fr}.sidebar{position:static;height:auto;border-right:none;border-bottom:1px solid #ebe9e6}#dash-grid{grid-template-columns:1fr!important}}
+@media(max-width:860px){.shell{grid-template-columns:1fr}.sidebar{position:static;height:auto;border-right:none;border-top:1px solid #ebe9e6;order:2;scroll-margin-top:60px}.main{order:1;padding-bottom:84px}#dash-grid{grid-template-columns:1fr!important}.mob-summary{display:flex!important}#fab{display:flex!important}}
 @media(max-width:600px){
   .shell{grid-template-rows:auto 1fr}
   .topbar{flex-wrap:wrap;height:auto;min-height:50px;padding:9px 12px;row-gap:8px}
@@ -74,7 +74,9 @@ select.pl{width:100%;border:1.5px solid #e7e5e4;border-radius:9px;padding:9px 11
 .wbf{height:100%;border-radius:2px;background:#c4bfba;transition:width .3s}
 .wbf.today{background:#1c1917}
 .mo{position:fixed;inset:0;background:rgba(0,0,0,.35);backdrop-filter:blur(3px);z-index:50;display:flex;align-items:center;justify-content:center;padding:16px}
-.mb{background:#fff;border-radius:16px;padding:22px;width:100%;max-width:430px;box-shadow:0 12px 48px rgba(0,0,0,.16)}
+.mb{background:#fff;border-radius:16px;padding:22px;width:100%;max-width:430px;box-shadow:0 12px 48px rgba(0,0,0,.16);max-height:calc(100vh - 32px);max-height:calc(100dvh - 32px);overflow-y:auto}
+#modal-confirm{z-index:60}
+#modal-datewheel{z-index:70}
 .mb.wide{max-width:580px}
 .mb.narrow{max-width:360px}
 .bud-row{display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid #f4f3f0}
@@ -132,3 +134,71 @@ html.dark{filter:invert(1) hue-rotate(180deg)}
 .fi.no-spin{-moz-appearance:textfield;appearance:textfield}
 .fi.no-spin::-webkit-outer-spin-button,.fi.no-spin::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
 #calc-box:focus-within #calc-display{border-color:#a8a29e}
+
+/* Keyboard focus: visible ring for buttons, tabs and chips (inputs already get .fw:focus-within) */
+button:focus-visible,.nav-tab:focus-visible,.chip:focus-visible,.tp:focus-visible,.ttb:focus-visible,[tabindex]:focus-visible{outline:2px solid #1d4ed8;outline-offset:2px}
+
+/* ── Mobile: summary bar + quick-add button ───────────────── */
+.mob-summary{display:none;width:100%;align-items:center;justify-content:space-between;gap:10px;margin-bottom:12px;padding:10px 13px;background:#1c1917;color:#fff;border:none;border-radius:11px;font-family:'DM Sans',sans-serif;font-size:.78rem;cursor:pointer;text-align:left;flex-wrap:wrap}
+.mob-summary .ms-lbl{color:#a8a29e;font-size:.66rem;text-transform:uppercase;letter-spacing:.06em;margin-right:4px}
+.mob-summary .ms-go{color:#93c5fd;font-weight:600}
+#fab{display:none;position:fixed;right:16px;bottom:18px;width:52px;height:52px;border-radius:50%;background:#1c1917;color:#fff;border:none;align-items:center;justify-content:center;box-shadow:0 6px 20px rgba(0,0,0,.3);cursor:pointer;z-index:45;transition:transform .15s,box-shadow .15s}
+#fab:active{transform:scale(.92)}
+
+/* ── Interaction polish ───────────────────────────────────── */
+button,.date-trigger,.chip,.nav-tab,.sb-item,.card{-webkit-tap-highlight-color:transparent}
+/* Pressed state: every button gives tactile feedback */
+button:not(:disabled):active,.date-trigger:active,.chip:active,.tp:active,.ttb:active{transform:scale(.96)}
+button,.date-trigger,.chip,.tp,.ttb{transition:transform .12s ease,background-color .15s,border-color .15s,color .15s,box-shadow .15s,opacity .15s}
+button:disabled{opacity:.55;cursor:not-allowed}
+@media(hover:hover){
+  .btn-p:hover{box-shadow:0 4px 12px rgba(28,25,23,.22);transform:translateY(-1px)}
+  .btn-g:hover,.theme-btn:hover{border-color:#a8a29e}
+  .chip:hover{transform:scale(1.04);opacity:1}
+  .date-trigger:hover{box-shadow:0 0 0 3px rgba(168,162,158,.12)}
+  .nav-tab:not(.active):hover{background:rgba(255,255,255,.7);color:#1c1917}
+  .card{transition:box-shadow .2s}
+  .card:hover{box-shadow:0 2px 14px rgba(0,0,0,.05)}
+  .btn-i:hover{transform:scale(1.15)}
+  /* log row actions appear on hover/focus so rows stay clean; always visible on touch */
+  .txnrow .btn-i{opacity:.35}
+  .txnrow:hover .btn-i,.txnrow:focus-within .btn-i{opacity:1}
+}
+.txnrow{transition:background .12s,transform .2s ease}
+
+/* Modals and toast animate in */
+@keyframes fadeIn{from{opacity:0}to{opacity:1}}
+@keyframes popIn{from{opacity:0;transform:translateY(10px) scale(.97)}to{opacity:1;transform:none}}
+@keyframes slideUp{from{opacity:0;transform:translate(-50%,12px)}to{opacity:1;transform:translate(-50%,0)}}
+@keyframes viewIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+.mo:not(.hidden){animation:fadeIn .15s ease}
+.mo:not(.hidden) .mb,.mo:not(.hidden) .confirm-box{animation:popIn .2s cubic-bezier(.2,.8,.3,1)}
+#toast:not(.hidden):not(.hiding){animation:slideUp .2s ease}
+/* Page transition between Dashboard / Investments / Analytics */
+#view-dashboard:not(.hidden),#view-invest:not(.hidden),#view-analytics:not(.hidden){animation:viewIn .22s ease}
+
+/* Skeleton shimmer while cloud data loads */
+@keyframes shimmer{0%{background-position:-200px 0}100%{background-position:200px 0}}
+.shell.loading .num,.shell.loading .sb-name,.shell.loading .stat-grid>*,.shell.loading #txn-list>*{
+  color:transparent!important;border-radius:6px;pointer-events:none;
+  background:linear-gradient(90deg,#ebe9e6 25%,#f4f3f0 37%,#ebe9e6 63%);background-size:400px 100%;animation:shimmer 1.2s infinite linear}
+.shell.loading .worth-banner .num{background:linear-gradient(90deg,#292524 25%,#44403c 37%,#292524 63%);background-size:400px 100%}
+
+/* Tooltips: any element with data-tip (shows on hover and keyboard focus) */
+[data-tip]{position:relative}
+[data-tip]::after{content:attr(data-tip);position:absolute;left:50%;top:calc(100% + 6px);transform:translateX(-50%) translateY(-2px);background:#1c1917;color:#fff;font:500 .68rem 'DM Sans',sans-serif;padding:4px 8px;border-radius:6px;white-space:nowrap;pointer-events:none;opacity:0;transition:opacity .15s,transform .15s;z-index:200}
+@media(hover:hover){[data-tip]:hover::after{opacity:1;transform:translateX(-50%)}}
+[data-tip]:focus-visible::after{opacity:1;transform:translateX(-50%)}
+#fab[data-tip]::after{display:none}
+
+/* Smooth light/dark switch (class is added for ~400ms by toggleTheme) */
+html.theme-anim,html.theme-anim *{transition:background-color .3s,color .3s,border-color .3s,filter .3s!important}
+
+/* Wheel picker: visible keyboard focus */
+.wheel-col:focus-visible{outline:2px solid #1d4ed8;outline-offset:-2px;border-radius:8px}
+.wheel-item{transition:color .12s,font-size .12s}
+
+/* Respect users who ask for less motion */
+@media(prefers-reduced-motion:reduce){
+  *,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important;scroll-behavior:auto!important}
+}

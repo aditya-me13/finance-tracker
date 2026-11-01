@@ -1,4 +1,4 @@
-const CACHE_NAME='finance-tracker-v1';
+const CACHE_NAME='finance-tracker-v3';
 const APP_SHELL=[
   './',
   './index.html',
@@ -21,6 +21,7 @@ const APP_SHELL=[
   './js/loans.js',
   './js/bulk-actions.js',
   './js/shortcuts.js',
+  './js/swipe.js',
   './icons/icon-192.png',
   './icons/icon-512.png',
   './icons/icon-512-maskable.png',
@@ -31,7 +32,7 @@ self.addEventListener('install',e=>{
     caches.open(CACHE_NAME)
       .then(cache=>cache.addAll(APP_SHELL))
       .then(()=>self.skipWaiting())
-      .catch(()=>{}) // don't block install if one asset fails (e.g. offline first install)
+      .catch(err=>console.warn('SW precache failed',err)) // don't block install if one asset fails
   );
 });
 
@@ -57,7 +58,7 @@ self.addEventListener('fetch',e=>{
           caches.open(CACHE_NAME).then(cache=>cache.put(e.request,copy));
         }
         return resp;
-      }).catch(()=>cached);
+      }).catch(()=>cached||(e.request.mode==='navigate'?caches.match('./index.html'):Response.error()));
       return cached||network;
     })
   );

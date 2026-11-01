@@ -47,6 +47,9 @@ function renderSidebar(){
     liquid.textContent=fmt(bal.liquid);
     liquid.style.color=bal.liquid>=0?'#86efac':'#fca5a5';
   }
+  const msL=document.getElementById('ms-liquid'),msW=document.getElementById('ms-worth');
+  if(msL)msL.textContent=fmt(bal.liquid);
+  if(msW)msW.textContent=fmt(bal.netWorth);
   const nw=document.getElementById('sb-worth-secondary');
   if(nw){
     nw.textContent=fmt(bal.netWorth);
@@ -91,6 +94,7 @@ function renderSidebar(){
       const avail=lim>0?lim-due:null,pct=lim>0?Math.min((due/lim)*100,100):0;
       const cls=pct>80?'po':pct>50?'pw':'ps';
       const ds=getDueDateStatus(c);
+      const ad=c.autoDebit,ab=ad&&ad.enabled?state.banks.find(b=>b.id===ad.bankId):null;
       const badgeCls={ok:'due-ok',soon:'due-soon',urgent:'due-urgent',overdue:'due-overdue'}[ds?.status||'ok'];
       return`<div class="sb-item" style="flex-direction:column;align-items:flex-start;gap:5px">
         <div style="display:flex;align-items:center;gap:8px;width:100%">
@@ -100,7 +104,8 @@ function renderSidebar(){
           <button class="btn-i" onclick="openEditModal('cc','${c.id}')" title="Edit" style="padding:2px;flex-shrink:0"><svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg></button>
           <button class="btn-i" onclick="confirmDeleteAccount('cc','${c.id}')" title="Delete" style="padding:2px;flex-shrink:0" onmouseover="this.style.color='#ef4444'" onmouseout="this.style.color='#c4bfba'"><svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg></button>
         </div>
-        ${ds?`<div style="padding-left:15px"><span class="due-badge ${badgeCls}">${ds.label}</span></div>`:''}
+        ${ad&&ad.enabled&&ab?`<div style="padding-left:15px"><span class="due-badge due-ok">Auto-debit on ${ad.day}${ordSuffix(ad.day)} from ${esc(ab.name)}</span></div>`
+          :ds?`<div style="padding-left:15px"><span class="due-badge ${badgeCls}">${ds.label}</span></div>`:''}
         ${avail!==null?`<div style="padding-left:15px;width:100%">
           <div class="pt" style="height:3px"><div class="pf ${cls}" style="width:${pct}%"></div></div>
           <div style="font-size:.65rem;color:#c4bfba;margin-top:2px">${fmt(avail)} available</div>
@@ -221,9 +226,9 @@ function confirmSettle(){
     if(!state.categories.expense.includes('Settlement'))state.categories.expense.push('Settlement');
     if(!state.categories.income.includes('Settlement'))state.categories.income.push('Settlement');
     if(net>0){
-      state.transactions.push({id:uid(),date,type:'income',amount:Math.abs(net),destType:isCash?'cash':'bank',destId:isCash?'cash':bankId,category:'Settlement',desc:'Splitwise settlement'});
+      state.transactions.push({id:uid(),date,type:'income',amount:Math.abs(net),destType:isCash?'cash':'bank',destId:isCash?'cash':bankId,category:'Settlement',desc:'Splitwise settlement',splitSettle:'received',settled:true});
     }else{
-      state.transactions.push({id:uid(),date,type:'expense',amount:Math.abs(net),myShare:Math.abs(net),acType:isCash?'cash':'bank',acId:isCash?'cash':bankId,category:'Settlement',desc:'Splitwise settlement'});
+      state.transactions.push({id:uid(),date,type:'expense',amount:Math.abs(net),myShare:0,acType:isCash?'cash':'bank',acId:isCash?'cash':bankId,category:'Settlement',desc:'Splitwise settlement',splitSettle:'paid',settled:true});
     }
   }
   state.transactions.forEach(t=>{
@@ -257,10 +262,28 @@ function _configModal(type, isEdit){
   document.getElementById('ac-save-btn').textContent=isEdit?'Save Changes':'Add';
 }
 
+function toggleAutoDebitFields(){
+  const on=document.getElementById('ac-ad-on').checked;
+  document.getElementById('ac-ad-fields').classList.toggle('hidden',!on);
+  document.getElementById('ac-ad-fixed-wrap').classList.toggle('hidden',!on||document.getElementById('ac-ad-mode').value!=='fixed');
+}
+function _fillAutoDebitForm(ad){
+  const sel=document.getElementById('ac-ad-bank');
+  sel.innerHTML=state.banks.map(b=>`<option value="${b.id}">${esc(b.name)}</option>`).join('')||'<option value="">No banks added</option>';
+  ad=ad||{};
+  document.getElementById('ac-ad-on').checked=!!ad.enabled;
+  if(ad.bankId)sel.value=ad.bankId;
+  document.getElementById('ac-ad-day').value=ad.day||'';
+  document.getElementById('ac-ad-mode').value=ad.mode||'total';
+  document.getElementById('ac-ad-fixed').value=ad.fixedAmount||'';
+  toggleAutoDebitFields();
+}
+
 function openAddModal(type){
   _editAcType=null; _editAcId=null;
   ['ac-name','ac-bal','ac-lim','ac-due','ac-dueday','ac-reminddays'].forEach(id=>document.getElementById(id).value='');
   document.getElementById('ac-include-nw').checked=true;
+  _fillAutoDebitForm(null);
   _configModal(type, false);
   openModal('modal-ac');
 }
@@ -269,6 +292,7 @@ function openEditModal(type, id){
   _editAcType=type; _editAcId=id;
   ['ac-name','ac-bal','ac-lim','ac-due','ac-dueday','ac-reminddays'].forEach(el=>document.getElementById(el).value='');
   document.getElementById('ac-include-nw').checked=true;
+  _fillAutoDebitForm(null);
   _configModal(type, true);
   if(type==='bank'){
     const b=state.banks.find(x=>x.id===id);
@@ -284,6 +308,7 @@ function openEditModal(type, id){
     document.getElementById('ac-due').value=c.startDue||'';
     document.getElementById('ac-dueday').value=c.dueDay||'';
     document.getElementById('ac-reminddays').value=c.remindDays||'';
+    _fillAutoDebitForm(c.autoDebit);
   } else if(type==='cash'){
     document.getElementById('ac-bal').value=state.cash.startBalance||'';
   }
@@ -307,6 +332,24 @@ function saveAccount(){
     }
   } else if(type==='cc'){
     const obj={name,limit:Number(document.getElementById('ac-lim').value)||0,startDue:Number(document.getElementById('ac-due').value)||0,dueDay:Number(document.getElementById('ac-dueday').value)||0,remindDays:Number(document.getElementById('ac-reminddays').value)||5};
+    const prev=isEdit?state.cards.find(x=>x.id===_editAcId):null;
+    const prevAd=(prev&&prev.autoDebit)||{};
+    const adOn=document.getElementById('ac-ad-on').checked;
+    const adBank=document.getElementById('ac-ad-bank').value;
+    const adDay=Math.floor(Number(document.getElementById('ac-ad-day').value))||obj.dueDay;
+    const adMode=document.getElementById('ac-ad-mode').value==='fixed'?'fixed':'total';
+    const adFixed=Number(document.getElementById('ac-ad-fixed').value)||0;
+    if(adOn){
+      if(!state.banks.some(b=>b.id===adBank)){toast('Choose a bank account for auto-debit');return;}
+      if(adDay<1||adDay>31){toast('Enter an auto-debit day between 1 and 31');return;}
+      if(adMode==='fixed'&&adFixed<=0){toast('Enter a fixed auto-debit amount');return;}
+    }
+    // Only reset lastRunDate when the schedule actually changes, so editing the
+    // card name doesn't re-trigger a debit. A new schedule starts from today.
+    const sameSchedule=prevAd.enabled&&adOn&&prevAd.bankId===adBank&&prevAd.day===adDay;
+    const yesterday=new Date();yesterday.setDate(yesterday.getDate()-1);
+    obj.autoDebit={enabled:adOn,bankId:adOn?adBank:'',day:adOn?adDay:0,mode:adMode,fixedAmount:adFixed,
+      lastRunDate:sameSchedule?(prevAd.lastRunDate||dateToStr(yesterday)):dateToStr(yesterday)};
     if(isEdit){
       const ci=state.cards.findIndex(x=>x.id===_editAcId);
       if(ci>=0)state.cards[ci]={...state.cards[ci],...obj};
@@ -327,14 +370,25 @@ function confirmDeleteAccount(type, id){
   let name='';
   if(type==='bank'){const b=state.banks.find(x=>x.id===id);name=b?b.name:'account';}
   else if(type==='cc'){const c=state.cards.find(x=>x.id===id);name=c?c.name:'card';}
-  document.getElementById('confirm-body').textContent=`Delete "${name}"? Its transactions will remain but balances will be recalculated without this account.`;
+  const key=type==='bank'?'bank:'+id:'cc:'+id;
+  const used=state.transactions.filter(t=>t.acId===id||t.destId===id||t.fromKey===key||t.toKey===key||t.sourceKey===key||t.destKey===key).length;
+  document.getElementById('confirm-body').textContent=used
+    ?`Delete "${name}"? ${used} transaction${used>1?'s':''} use this account. They stay in the log, but their amounts will no longer count in any balance. You can undo this right after.`
+    :`Delete "${name}"? You can undo this right after.`;
   document.getElementById('confirm-ok-btn').onclick=()=>{
     let removed=null;
-    if(type==='bank'){removed=state.banks.find(x=>x.id===id);state.banks=state.banks.filter(x=>x.id!==id);}
+    // Cards whose auto-debit pointed at a deleted bank are switched off (restored on undo)
+    const disabledAd=[];
+    if(type==='bank'){
+      removed=state.banks.find(x=>x.id===id);state.banks=state.banks.filter(x=>x.id!==id);
+      state.cards.forEach(c=>{if(c.autoDebit&&c.autoDebit.enabled&&c.autoDebit.bankId===id){c.autoDebit.enabled=false;disabledAd.push(c);}});
+    }
     else if(type==='cc'){removed=state.cards.find(x=>x.id===id);state.cards=state.cards.filter(x=>x.id!==id);}
     saveState();rebuildAll();
-    if(removed)showUndoToast('Account deleted',()=>{
+    const adNote=disabledAd.length?` Auto-debit turned off for ${disabledAd.map(c=>c.name).join(', ')}.`:'';
+    if(removed)showUndoToast('Account deleted.'+adNote,()=>{
       if(type==='bank')state.banks.push(removed);else state.cards.push(removed);
+      disabledAd.forEach(c=>{c.autoDebit.enabled=true;});
       saveState();rebuildAll();toast('Restored');
     });
     closeModal('modal-confirm');

@@ -17,6 +17,7 @@ function createRecurringFromEntry(opts){
     amount:opts.amount,
     myShare:opts.myShare,
     acType:opts.acType,acId:opts.acId,
+    shared:!!opts.shared,sharedMode:opts.sharedMode,
     destType:opts.destType,destId:opts.destId,
     category:opts.category,
     desc:opts.desc,
@@ -50,7 +51,7 @@ function generateDueRecurring(){
     let guard=0;
     while(cursor<=todayStr&&guard<500){
       if(r.type==='expense'){
-        state.transactions.push({id:uid(),date:cursor,type:'expense',amount:r.amount,acType:r.acType,acId:r.acId,category:r.category,desc:r.desc||r.name,myShare:r.myShare!==undefined?r.myShare:r.amount,tags:(r.tags||[]).slice(),recurringId:r.id});
+        state.transactions.push({id:uid(),date:cursor,type:'expense',amount:r.amount,acType:r.acType,acId:r.acId,category:r.category,desc:r.desc||r.name,myShare:r.myShare!==undefined?r.myShare:r.amount,tags:(r.tags||[]).slice(),recurringId:r.id,...(r.shared?{shared:true,sharedMode:r.sharedMode,settled:false}:{})});
       }else{
         state.transactions.push({id:uid(),date:cursor,type:'income',amount:r.amount,destType:r.destType,destId:r.destId,category:r.category,desc:r.desc||r.name,tags:(r.tags||[]).slice(),recurringId:r.id});
       }
@@ -61,6 +62,49 @@ function generateDueRecurring(){
     }
   });
   if(count>0){saveState();toast(`${count} recurring transaction${count>1?'s':''} auto-logged`);}
+}
+
+/* ── Credit card auto-debit ───────────────────────────────── */
+/* Logs a bank -> card transfer on each configured debit day. Runs on app open and catches up
+   on every missed occurrence since lastRunDate (oldest first, so earlier debits reduce what
+   is owed for later ones). Nothing runs while the app is closed. */
+function nextAutoDebitDate(day,fromDateStr){
+  const d=new Date(fromDateStr+'T00:00:00');
+  let y=d.getFullYear(),m=d.getMonth();
+  let cand=dateToStr(new Date(y,m,Math.min(day,daysInMonth(y,m))));
+  if(cand<=fromDateStr){m++;cand=dateToStr(new Date(y,m,Math.min(day,daysInMonth(y,m))));}
+  return cand;
+}
+function generateDueAutoDebits(){
+  const todayStr=today();
+  let count=0,overdrawn=false,changed=false;
+  state.cards.forEach(c=>{
+    const ad=c.autoDebit;
+    if(!ad||!ad.enabled||!ad.day||!state.banks.some(b=>b.id===ad.bankId))return;
+    if(!ad.lastRunDate)ad.lastRunDate=todayStr;
+    let cursor=nextAutoDebitDate(ad.day,ad.lastRunDate);
+    let guard=0;
+    while(cursor<=todayStr&&guard<60){
+      const owed=cardDueAsOf(c.id,cursor);
+      const amount=ad.mode==='fixed'?Math.min(Number(ad.fixedAmount)||0,owed):owed;
+      const amt=Math.round(amount*100)/100;
+      if(amt>0){
+        state.transactions.push({id:uid(),date:cursor,type:'transfer',amount:amt,fromKey:'bank:'+ad.bankId,toKey:'cc:'+c.id,note:'Auto-debit: '+c.name,autoDebitCardId:c.id,tags:[]});
+        count++;
+      }
+      ad.lastRunDate=cursor;
+      changed=true;
+      cursor=nextAutoDebitDate(ad.day,cursor);
+      guard++;
+    }
+  });
+  if(!changed)return;
+  saveState(); // also persists lastRunDate when nothing was owed, so we don't rescan next time
+  if(count>0){
+    const bal=computeBal();
+    overdrawn=state.cards.some(c=>c.autoDebit&&c.autoDebit.enabled&&(bal.bk[c.autoDebit.bankId]||0)<0);
+    toast(`${count} card auto-debit${count>1?'s':''} logged${overdrawn?' – a bank balance is now negative':''}`);
+  }
 }
 
 /* ── Manage Recurring modal ───────────────────────────────── */
@@ -112,6 +156,12 @@ function toggleRecurringActive(id){
   const r=state.recurring.find(x=>x.id===id);
   if(!r)return;
   r.active=!r.active;
+  if(r.active){
+    // Skip occurrences that fell due while paused instead of back-filling them all on the next load
+    const t=today();let c=r.lastGeneratedDate||r.startDate,g=0;
+    for(let n=nextRecurDate(r,c);n<=t&&g<1000;n=nextRecurDate(r,n),g++)c=n;
+    r.lastGeneratedDate=c;
+  }
   saveState();openRecurringModal();renderRecurringWidget();
   toast(r.active?'Resumed':'Paused');
 }

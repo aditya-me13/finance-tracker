@@ -64,7 +64,7 @@ function saveBudgets(){
 /* ── Weekly ───────────────────────────────────────────────── */
 function renderWeekly(){
   const d=new Date(),dow=d.getDay(),toMon=dow===0?-6:1-dow;
-  const mon=new Date(d);mon.setDate(d.getDate()+toMon);
+  const mon=new Date(d);mon.setDate(d.getDate()+toMon);mon.setHours(0,0,0,0);
   document.getElementById('week-range').textContent=
     mon.toLocaleDateString('en-IN',{day:'numeric',month:'short'})+' – '+
     new Date(mon.getFullYear(),mon.getMonth(),mon.getDate()+6).toLocaleDateString('en-IN',{day:'numeric',month:'short'});

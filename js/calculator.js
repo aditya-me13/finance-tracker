@@ -82,10 +82,11 @@ function calcEvaluate(){
   if(!calcExpr)return;
   if(!/^[0-9+\-*/(). ]+$/.test(calcExpr)){calcClear();return;}
   try{
-    const result=Function('"use strict";return ('+calcExpr+')')();
+    const clean=calcExpr.replace(/(^|[^0-9.])0+(?=\d)/g,'$1'); // "05+1" is a syntax error in strict mode
+    const result=Function('"use strict";return ('+clean+')')();
     if(!Number.isFinite(result))throw new Error('Invalid result');
     const rounded=Math.round(result*1e8)/1e8;
-    calcExpr=String(rounded);
+    calcExpr=rounded.toLocaleString('en-US',{useGrouping:false,maximumFractionDigits:8}); // avoids 1e+21 which the input check rejects
     calcHasResult=true;
     calcUpdateDisplay();
   }catch(e){

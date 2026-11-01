@@ -4,6 +4,7 @@
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
 <title>Finance Tracker</title>
+<script>try{var m=localStorage.getItem('ft-theme')||(matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light');if(m==='dark')document.documentElement.classList.add('dark');}catch(e){}</script>
 <script src="https://cdn.tailwindcss.com"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet"/>
@@ -33,7 +34,7 @@
     <button class="nav-tab" id="nav-analytics" onclick="switchView('analytics')">Analytics</button>
   </div>
   <div style="display:flex;align-items:center;gap:5px">
-    <button id="theme-toggle" class="theme-btn" onclick="toggleTheme()" title="Toggle dark mode" aria-label="Toggle dark mode">
+    <button id="theme-toggle" class="theme-btn" onclick="toggleTheme()" title="Toggle dark mode" data-tip="Dark mode" aria-label="Toggle dark mode">
       <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path id="theme-icon" stroke-linecap="round" stroke-linejoin="round" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.36 6.36l-.7-.7M6.34 6.34l-.7-.7m12.02 0l-.7.7M6.34 17.66l-.7.7M16 12a4 4 0 11-8 0 4 4 0 018 0z"/></svg>
     </button>
     <label style="font-size:.78rem;font-weight:500;color:#78716c;padding:5px 9px;border-radius:7px;cursor:pointer;border:1.5px solid #e7e5e4">
@@ -45,7 +46,7 @@
 </header>
 
 <!-- SIDEBAR -->
-<aside class="sidebar">
+<aside class="sidebar" id="sidebar">
   <div class="worth-banner">
     <div class="slabel" style="color:#57534e;margin-bottom:5px">Liquid Cash Available</div>
     <div class="num" id="sb-liquid-focus" style="font-size:1.45rem;font-weight:600;color:#fff">₹0.00</div>
@@ -124,6 +125,13 @@
 <!-- MAIN -->
 <main class="main">
 
+  <!-- Mobile-only: keep the headline numbers on top now that the sidebar sits below the content -->
+  <button type="button" class="mob-summary" id="mob-summary" onclick="scrollToAccounts()" aria-label="Show accounts and net worth">
+    <span><span class="ms-lbl">Liquid</span> <b class="num" id="ms-liquid">₹0.00</b></span>
+    <span><span class="ms-lbl">Net worth</span> <b class="num" id="ms-worth">₹0.00</b></span>
+    <span class="ms-go">Accounts ↓</span>
+  </button>
+
   <!-- DASHBOARD -->
   <div id="view-dashboard">
     <div id="dash-grid" style="display:grid;grid-template-columns:360px 1fr;gap:15px;align-items:start">
@@ -159,7 +167,7 @@
                 </div>
                 <div style="display:grid;grid-template-columns:1fr 90px;gap:8px;align-items:end">
                   <div><div class="slabel" style="margin-bottom:4px">My Share (₹)</div>
-                    <div class="fw"><div class="fp">₹</div><input id="e-my-share" class="fi no-spin" type="number" min="0" step="0.01" placeholder="0.00"/></div>
+                    <div class="fw"><div class="fp">₹</div><input id="e-my-share" class="fi no-spin" oninput="this.dataset.touched='1'" type="number" min="0" step="0.01" placeholder="0.00"/></div>
                   </div>
                   <div><div class="slabel" style="margin-bottom:4px">÷ People</div>
                     <div class="fw"><input id="e-split-people" class="fi no-spin" type="number" min="2" step="1" placeholder="4" style="text-align:center"/></div>
@@ -601,6 +609,7 @@
       <div id="auth-err" style="font-size:.76rem;color:#be123c;display:none"></div>
       <button class="btn-p" style="width:100%" id="auth-signin-btn" onclick="doSignIn()">Sign In</button>
       <button class="btn-g" style="width:100%" id="auth-signup-btn" onclick="doSignUp()">Create Account</button>
+      <button type="button" onclick="doResetPassword()" style="background:none;border:none;color:#1d4ed8;font-size:.74rem;cursor:pointer;font-family:'DM Sans',sans-serif">Forgot password?</button>
       <p style="font-size:.71rem;color:#a8a29e;text-align:center;margin-top:2px">Your data syncs privately to your own Firebase project.</p>
     </div>
   </div>
@@ -632,6 +641,24 @@
             <div class="fw"><input id="ac-reminddays" class="fi" type="number" min="1" max="30" placeholder="e.g. 5"/></div></div>
         </div>
         <p style="font-size:.71rem;color:#a8a29e;margin-top:4px">We'll highlight upcoming due dates in the sidebar.</p>
+        <!-- Auto-debit -->
+        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;margin-top:12px">
+          <input type="checkbox" id="ac-ad-on" onchange="toggleAutoDebitFields()" style="accent-color:#1c1917"/>
+          <span style="font-size:.8rem;color:#44403c">Auto-debit this bill from a bank account</span>
+        </label>
+        <div id="ac-ad-fields" class="hidden" style="display:flex;flex-direction:column;gap:9px;margin-top:9px">
+          <div><div class="slabel" style="margin-bottom:4px">Pay from</div>
+            <div class="fw"><select id="ac-ad-bank" class="fi"></select></div></div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+            <div><div class="slabel" style="margin-bottom:4px">Debit on day (1–31)</div>
+              <div class="fw"><input id="ac-ad-day" class="fi" type="number" min="1" max="31" placeholder="e.g. 15"/></div></div>
+            <div><div class="slabel" style="margin-bottom:4px">Amount</div>
+              <div class="fw"><select id="ac-ad-mode" class="fi" onchange="toggleAutoDebitFields()"><option value="total">Full outstanding</option><option value="fixed">Fixed amount</option></select></div></div>
+          </div>
+          <div id="ac-ad-fixed-wrap" class="hidden"><div class="slabel" style="margin-bottom:4px">Fixed amount (INR)</div>
+            <div class="fw"><div class="fp">₹</div><input id="ac-ad-fixed" class="fi" type="number" min="0" step="0.01" placeholder="0.00"/></div></div>
+          <p style="font-size:.71rem;color:#a8a29e">Logged as a transfer from the bank to this card when you open the app on or after the debit day.</p>
+        </div>
       </div>
       <!-- Net Worth inclusion (bank accounts only) -->
       <div id="ac-nw-wrap" class="hidden">
@@ -1032,6 +1059,44 @@
   </div>
 </div>
 
+<!-- MODAL: Edit Transaction -->
+<div id="modal-txn-edit" class="mo hidden" onclick="if(event.target.id==='modal-txn-edit')closeModal('modal-txn-edit')">
+  <div class="mb">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+      <h3 style="font-weight:600;font-size:.93rem" id="et-title">Edit Transaction</h3>
+      <button class="btn-i" onclick="closeModal('modal-txn-edit')"><svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg></button>
+    </div>
+    <input type="hidden" id="et-id"/>
+    <div style="display:flex;flex-direction:column;gap:11px">
+      <div style="display:grid;grid-template-columns:1fr 136px;gap:8px">
+        <div style="min-width:0"><div class="slabel" style="margin-bottom:4px" id="et-amt-label">Amount (INR)</div>
+          <div class="fw"><div class="fp">₹</div><input id="et-amt" class="fi" type="number" min="0" step="0.01" placeholder="0.00"/></div></div>
+        <div style="min-width:0"><div class="slabel" style="margin-bottom:4px">Date</div>
+          <div class="date-trigger" onclick="openDatePicker('et-date')"><span id="et-date-disp">Select date</span></div>
+          <input id="et-date" type="hidden"/></div>
+      </div>
+      <div id="et-share-wrap" class="hidden"><div class="slabel" style="margin-bottom:4px">My Share (INR)</div>
+        <div class="fw"><div class="fp">₹</div><input id="et-share" class="fi" type="number" min="0" step="0.01" placeholder="0.00"/></div></div>
+      <div id="et-cat-wrap"><div class="slabel" style="margin-bottom:4px">Category</div><select id="et-cat" class="pl"></select></div>
+      <div id="et-acc-wrap" style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+        <div><div class="slabel" style="margin-bottom:4px">Account Type</div>
+          <select id="et-actype" class="pl" onchange="fillEditInst()"><option value="bank">Bank Account</option><option value="cc">Credit Card</option><option value="cash">Cash</option></select></div>
+        <div><div class="slabel" style="margin-bottom:4px">Instrument</div><select id="et-inst" class="pl"></select></div>
+      </div>
+      <div id="et-tr-wrap" class="hidden" style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+        <div><div class="slabel" style="margin-bottom:4px">From</div><select id="et-from" class="pl"></select></div>
+        <div><div class="slabel" style="margin-bottom:4px">To</div><select id="et-to" class="pl"></select></div>
+      </div>
+      <div><div class="slabel" style="margin-bottom:4px" id="et-desc-label">Description</div>
+        <div class="fw"><input id="et-desc" class="fi" type="text" placeholder="Optional"/></div></div>
+    </div>
+    <div style="display:flex;gap:8px;margin-top:16px">
+      <button class="btn-g" style="flex:1" onclick="closeModal('modal-txn-edit')">Cancel</button>
+      <button class="btn-p" style="flex:1" onclick="saveEditTxn()">Save Changes</button>
+    </div>
+  </div>
+</div>
+
 <!-- MODAL: Date Wheel Picker -->
 <div id="modal-datewheel" class="mo hidden" onclick="if(event.target.id==='modal-datewheel')closeModal('modal-datewheel')">
   <div class="mb" style="max-width:280px">
@@ -1039,18 +1104,23 @@
       <h3 style="font-weight:600;font-size:.93rem">Select Date</h3>
       <button class="btn-i" onclick="closeModal('modal-datewheel')"><svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg></button>
     </div>
-    <div class="wheel-wrap">
+    <div class="wheel-wrap" title="Arrow keys: change value · Left/Right: switch column · Enter: confirm">
       <div class="wheel-highlight"></div>
-      <div class="wheel-col" id="wheel-day" onscroll="onWheelScroll(this)"></div>
-      <div class="wheel-col" id="wheel-month" onscroll="onWheelScroll(this)"></div>
-      <div class="wheel-col" id="wheel-year" onscroll="onWheelScroll(this)"></div>
+      <div class="wheel-col" id="wheel-day" role="spinbutton" tabindex="0" aria-label="Day" onscroll="onWheelScroll(this)"></div>
+      <div class="wheel-col" id="wheel-month" role="spinbutton" tabindex="0" aria-label="Month" onscroll="onWheelScroll(this)"></div>
+      <div class="wheel-col" id="wheel-year" role="spinbutton" tabindex="0" aria-label="Year" onscroll="onWheelScroll(this)"></div>
     </div>
     <button class="btn-p" style="width:100%;margin-top:14px" onclick="confirmDatePicker()">Done</button>
   </div>
 </div>
 
+<!-- Mobile quick-add button -->
+<button type="button" id="fab" onclick="quickAdd()" aria-label="Add transaction" data-tip="Add transaction (N)">
+  <svg width="22" height="22" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.4"><path stroke-linecap="round" stroke-linejoin="round" d="M12 5v14M5 12h14"/></svg>
+</button>
+
 <!-- Toast -->
-<div id="toast" class="hidden">
+<div id="toast" class="hidden" role="status" aria-live="polite">
   <div style="background:#1c1917;color:#fff;font-size:.82rem;font-weight:500;padding:9px 12px 9px 17px;border-radius:9px;box-shadow:0 4px 20px rgba(0,0,0,.18);display:flex;align-items:center;gap:14px">
     <span id="toast-msg"></span>
     <button id="toast-action" class="hidden" style="background:none;border:none;color:#93c5fd;font-weight:700;cursor:pointer;font-size:.82rem;font-family:'DM Sans',sans-serif;padding:0;white-space:nowrap"></button>
@@ -1079,5 +1149,6 @@
 <script src="js/charts-analytics.js"></script>
 <script src="js/app.js"></script>
 <script src="js/shortcuts.js"></script>
+<script src="js/swipe.js"></script>
 </body>
 </html>

@@ -2,15 +2,15 @@
 function fillExpInst(){
   const t=document.getElementById('e-actype').value,s=document.getElementById('e-inst');
   s.innerHTML='';
-  if(t==='bank'){if(!state.banks.length){s.innerHTML='<option>No banks added</option>';return;}state.banks.forEach(b=>s.innerHTML+=`<option value="${b.id}">${esc(b.name)}</option>`);}
-  else if(t==='cc'){if(!state.cards.length){s.innerHTML='<option>No cards added</option>';return;}state.cards.forEach(c=>s.innerHTML+=`<option value="${c.id}">${esc(c.name)}</option>`);}
+  if(t==='bank'){if(!state.banks.length){s.innerHTML='<option value="">No banks added</option>';return;}state.banks.forEach(b=>s.innerHTML+=`<option value="${b.id}">${esc(b.name)}</option>`);}
+  else if(t==='cc'){if(!state.cards.length){s.innerHTML='<option value="">No cards added</option>';return;}state.cards.forEach(c=>s.innerHTML+=`<option value="${c.id}">${esc(c.name)}</option>`);}
   else s.innerHTML='<option value="cash">Cash</option>';
 }
 function fillIncInst(){
   const t=document.getElementById('i-actype').value,s=document.getElementById('i-inst');
   s.innerHTML='';
-  if(t==='bank'){if(!state.banks.length)s.innerHTML='<option>No banks added</option>';else state.banks.forEach(b=>s.innerHTML+=`<option value="${b.id}">${esc(b.name)}</option>`);}
-  else if(t==='cc'){if(!state.cards.length)s.innerHTML='<option>No cards added</option>';else state.cards.forEach(c=>s.innerHTML+=`<option value="${c.id}">${esc(c.name)}</option>`);}
+  if(t==='bank'){if(!state.banks.length)s.innerHTML='<option value="">No banks added</option>';else state.banks.forEach(b=>s.innerHTML+=`<option value="${b.id}">${esc(b.name)}</option>`);}
+  else if(t==='cc'){if(!state.cards.length)s.innerHTML='<option value="">No cards added</option>';else state.cards.forEach(c=>s.innerHTML+=`<option value="${c.id}">${esc(c.name)}</option>`);}
   else s.innerHTML='<option value="cash">Cash</option>';
   document.getElementById('i-cc-hint')?.classList.toggle('hidden',t!=='cc');
 }
@@ -23,6 +23,98 @@ function fillTransferOpts(){
   document.getElementById('t-from').innerHTML=html;
   document.getElementById('t-to').innerHTML=html;
   if(document.getElementById('t-to').options.length>1)document.getElementById('t-to').selectedIndex=1;
+}
+
+
+/* ── Edit an existing log entry ───────────────────────────── */
+const EDITABLE_TXN=t=>(t.type==='expense'||t.type==='income'||t.type==='transfer')&&!t.splitSettle;
+function fillEditInst(selId){
+  const t=document.getElementById('et-actype').value,s=document.getElementById('et-inst');
+  if(t==='bank')s.innerHTML=state.banks.length?state.banks.map(b=>`<option value="${b.id}">${esc(b.name)}</option>`).join(''):'<option value="">No banks added</option>';
+  else if(t==='cc')s.innerHTML=state.cards.length?state.cards.map(c=>`<option value="${c.id}">${esc(c.name)}</option>`).join(''):'<option value="">No cards added</option>';
+  else s.innerHTML='<option value="cash">Cash</option>';
+  if(selId)s.value=selId;
+}
+function openEditTxn(id){
+  const t=state.transactions.find(x=>x.id===id);
+  if(!t)return;
+  if(!EDITABLE_TXN(t)){toast(t.splitSettle?'Split settlements can only be deleted':'Manage this from the Investments tab');return;}
+  const isExp=t.type==='expense',isInc=t.type==='income',isTr=t.type==='transfer';
+  const owed=isExp&&t.acType==='shared';
+  document.getElementById('et-id').value=id;
+  document.getElementById('et-title').textContent='Edit '+(isExp?'Expense':isInc?'Income':'Transfer');
+  document.getElementById('et-amt').value=t.amount;
+  document.getElementById('et-amt-label').textContent=(isExp&&t.shared)?'Total Bill Amount (INR)':'Amount (INR)';
+  setDateVal('et-date',t.date);
+  const shareWrap=document.getElementById('et-share-wrap');
+  shareWrap.classList.toggle('hidden',!(isExp&&t.shared));
+  document.getElementById('et-share').value=isExp&&t.shared?(t.myShare??t.amount):'';
+  document.getElementById('et-cat-wrap').classList.toggle('hidden',isTr);
+  document.getElementById('et-acc-wrap').classList.toggle('hidden',isTr||owed);
+  document.getElementById('et-tr-wrap').classList.toggle('hidden',!isTr);
+  document.getElementById('et-desc-label').textContent=isTr?'Note':'Description';
+  document.getElementById('et-desc').value=(isTr?t.note:t.desc)||'';
+  if(!isTr){
+    const list=state.categories[isExp?'expense':'income'].slice();
+    if(t.category&&!list.includes(t.category))list.push(t.category);
+    document.getElementById('et-cat').innerHTML=list.map(c=>`<option value="${esc(c)}">${esc(c)}</option>`).join('');
+    document.getElementById('et-cat').value=t.category;
+    if(!owed){
+      const type=isExp?t.acType:t.destType,inst=isExp?t.acId:t.destId;
+      document.getElementById('et-actype').value=type;
+      fillEditInst(inst);
+    }
+  }else{
+    let html='';
+    state.banks.forEach(b=>html+=`<option value="bank:${b.id}">${esc(b.name)} (Bank)</option>`);
+    html+='<option value="cash">Cash</option>';
+    state.cards.forEach(c=>html+=`<option value="cc:${c.id}">${esc(c.name)} (CC Bill)</option>`);
+    state.investments.accounts.forEach(a=>html+=`<option value="inv:${a.id}">${esc(a.name)} (Investment)</option>`);
+    document.getElementById('et-from').innerHTML=html;document.getElementById('et-to').innerHTML=html;
+    document.getElementById('et-from').value=t.fromKey;document.getElementById('et-to').value=t.toKey;
+  }
+  openModal('modal-txn-edit');
+}
+function saveEditTxn(){
+  const t=state.transactions.find(x=>x.id===document.getElementById('et-id').value);
+  if(!t){closeModal('modal-txn-edit');return;}
+  const amt=Number(document.getElementById('et-amt').value),date=document.getElementById('et-date').value;
+  const desc=document.getElementById('et-desc').value.trim();
+  if(!amt||amt<=0){toast('Enter a valid amount');return;}
+  if(!date){toast('Select a date');return;}
+  const accOk=(type,id)=>type==='cash'||(type==='bank'&&state.banks.some(b=>b.id===id))||(type==='cc'&&state.cards.some(c=>c.id===id));
+  if(t.type==='transfer'){
+    const from=document.getElementById('et-from').value,to=document.getElementById('et-to').value;
+    if(!from||!to||from===to){toast('From and To must differ');return;}
+    Object.assign(t,{amount:amt,date,fromKey:from,toKey:to,note:desc});
+  }else{
+    const category=document.getElementById('et-cat').value;
+    if(!category){toast('Select a category');return;}
+    if(t.type==='expense'){
+      const owed=t.acType==='shared';
+      if(t.shared){
+        const share=Number(document.getElementById('et-share').value);
+        if(!(share>0)){toast('Enter your share amount');return;}
+        if(share>amt){toast('Your share cannot exceed the total bill amount');return;}
+        t.myShare=share;
+      }else t.myShare=amt;
+      if(!owed){
+        const type=document.getElementById('et-actype').value,inst=type==='cash'?'cash':document.getElementById('et-inst').value;
+        if(!accOk(type,inst)){toast('No account selected');return;}
+        t.acType=type;t.acId=inst;
+      }
+    }else{
+      const type=document.getElementById('et-actype').value,inst=type==='cash'?'cash':document.getElementById('et-inst').value;
+      if(!accOk(type,inst)){toast('No account selected');return;}
+      t.destType=type;t.destId=inst;
+    }
+    if(t.loanId){
+      const loan=state.loans.find(l=>l.id===t.loanId);
+      if(loan)loan.outstanding=Math.max(0,(Number(loan.outstanding)||0)+(Number(t.amount)||0)-amt);
+    }
+    Object.assign(t,{amount:amt,date,category,desc});
+  }
+  saveState();closeModal('modal-txn-edit');rebuildAll();toast('Transaction updated');
 }
 
 /* ── Chips ────────────────────────────────────────────────── */
@@ -188,13 +280,13 @@ function submitExpense(){
   }else{
     acType=document.getElementById('e-actype').value;
     const ai=document.getElementById('e-inst').value;
-    if((acType==='bank'||acType==='cc')&&!ai){toast('No account selected');return;}
+    if((acType==='bank'&&!state.banks.some(b=>b.id===ai))||(acType==='cc'&&!state.cards.some(c=>c.id===ai))){toast('No account selected');return;}
     acId=acType==='cash'?'cash':ai;
     state.transactions.push({id:uid(),date,type:'expense',amount:amt,acType,acId,category:selExpCat,desc,myShare,shared:isSplit,sharedMode:isSplit?'fronted':undefined,settled:isSplit?false:undefined,tags});
   }
   if(isRecur){
     const freq=document.getElementById('e-recur-freq').value;
-    createRecurringFromEntry({type:'expense',amount:amt,acType,acId,category:selExpCat,desc,myShare,tags,frequency:freq,anchorDate:date});
+    createRecurringFromEntry({type:'expense',amount:amt,acType,acId,category:selExpCat,desc,myShare,shared:isSplit,sharedMode:isSplit?expSplitMode:undefined,tags,frequency:freq,anchorDate:date});
   }
   saveState();
   document.getElementById('e-amt').value='';document.getElementById('e-desc').value='';
@@ -209,7 +301,7 @@ function submitIncome(){
   if(!amt||amt<=0){toast('Enter a valid amount');return;}
   if(!date){toast('Select a date');return;}
   if(!selIncCat){toast('Select a source category');return;}
-  if((dt==='bank'||dt==='cc')&&!di){toast('No account selected');return;}
+  if((dt==='bank'&&!state.banks.some(b=>b.id===di))||(dt==='cc'&&!state.cards.some(c=>c.id===di))){toast('No account selected');return;}
   const destId=dt==='cash'?'cash':di;
   const tags=selIncTags.slice();
   state.transactions.push({id:uid(),date,type:'income',amount:amt,destType:dt,destId,category:selIncCat,desc,tags});

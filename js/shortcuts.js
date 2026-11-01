@@ -10,7 +10,7 @@ function anyModalOpen(){
 function closeTopModal(){
   const openModals=document.querySelectorAll('.mo:not(.hidden):not(#auth-gate)');
   if(!openModals.length)return false;
-  openModals[openModals.length-1].classList.add('hidden');
+  closeModal(openModals[openModals.length-1].id);
   return true;
 }
 document.addEventListener('keydown',e=>{
@@ -20,7 +20,9 @@ document.addEventListener('keydown',e=>{
     return;
   }
   // Ignore other shortcuts while typing in a field or while a modal is open
-  if(isTypingContext(e.target))return;
+  if(e.ctrlKey||e.metaKey||e.altKey||e.repeat)return;
+  if(!document.getElementById('auth-gate').classList.contains('hidden'))return;
+  if(isTypingContext(e.target)||(e.target.closest&&e.target.closest('#calc-box')))return;
   if(anyModalOpen())return;
   if(e.key==='n'||e.key==='N'){
     e.preventDefault();

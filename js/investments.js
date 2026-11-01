@@ -118,7 +118,7 @@ async function searchMF(){
   if(!q){wrap.innerHTML='';return;}
   wrap.innerHTML='<div style="font-size:.75rem;color:#a8a29e;padding:4px 2px">Searching…</div>';
   try{
-    const res=await fetch(`https://api.mfapi.in/mf/search?q=${encodeURIComponent(q)}`);
+    const res=await fetchT(`https://api.mfapi.in/mf/search?q=${encodeURIComponent(q)}`);
     const list=await res.json();
     if(!Array.isArray(list)||!list.length){wrap.innerHTML='<div style="font-size:.75rem;color:#a8a29e;padding:4px 2px">No matches</div>';return;}
     wrap.innerHTML=list.slice(0,8).map(f=>{
@@ -170,7 +170,7 @@ async function searchTicker(){
   msg('Searching…');
   try{
     if(!STOCK_PROXY_URL||STOCK_PROXY_URL.includes('PASTE-YOUR'))throw new Error('Stock price proxy not configured yet');
-    const res=await fetch(`${STOCK_PROXY_URL}?search=${encodeURIComponent(q)}&type=${type==='etf'?'etf':'stock'}`);
+    const res=await fetchT(`${STOCK_PROXY_URL}?search=${encodeURIComponent(q)}&type=${type==='etf'?'etf':'stock'}`);
     if(!res.ok)throw new Error('search failed');
     const j=await res.json();
     const list=(j.results||[]).slice(0,8);
@@ -241,10 +241,12 @@ function confirmDeleteInvAccount(id){
   document.getElementById('confirm-ok-btn').onclick=()=>{
     const removedAccount=a;
     const removedHoldings=state.investments.holdings.filter(h=>h.accountId===id);
-    const removedTxns=state.transactions.filter(t=>t.type==='invest'&&t.accountId===id);
+    const holdIds=new Set(removedHoldings.map(h=>h.id));
+    const gone=t=>(t.type==='invest'&&t.accountId===id)||(t.type==='divest'&&holdIds.has(t.holdingId));
+    const removedTxns=state.transactions.filter(gone);
     state.investments.accounts=state.investments.accounts.filter(x=>x.id!==id);
     state.investments.holdings=state.investments.holdings.filter(h=>h.accountId!==id);
-    state.transactions=state.transactions.filter(t=>!(t.type==='invest'&&t.accountId===id));
+    state.transactions=state.transactions.filter(t=>!gone(t));
     saveState();rebuildAll();
     if(removedAccount)showUndoToast('Investment account deleted',()=>{
       state.investments.accounts.push(removedAccount);
@@ -397,7 +399,13 @@ function openInvHoldModal(accId, holdId){
   updateInvHoldCashHint();
 }
 
+let _savingHold=false;
 async function saveInvHolding(){
+  if(_savingHold)return;
+  _savingHold=true;
+  try{await _saveInvHoldingImpl();}finally{_savingHold=false;}
+}
+async function _saveInvHoldingImpl(){
   const id=document.getElementById('inv-hold-id').value;
   const accountId=document.getElementById('inv-hold-acc').value;
   const type=document.getElementById('inv-hold-type').value;
@@ -430,6 +438,14 @@ async function saveInvHolding(){
       return;
     }
   }
+  // Validate and fetch SIP data before anything is mutated, so a failure can't leave a half-edited holding
+  let sipNav=0;
+  if(isSip){
+    if(!schemeCode){toast('Select an AMFI scheme for SIP series');return;}
+    if(!sipMonths){toast('Enter a valid SIP duration');return;}
+    try{sipNav=nav||await fetchMFNav(schemeCode);}catch(e){toast(e?.message||'Could not fetch NAV');return;}
+    if(!(sipNav>0)){toast('NAV unavailable for this scheme');return;}
+  }
   const amountMode=!isSip&&holdEntryMode()==='amount';
   if(amountMode&&!(buyPriceToSave>0)){toast('Enter the price/NAV per unit (or use Fetch) so units can be calculated');return;}
   const unitsFinal=amountMode?units/buyPriceToSave:units;
@@ -438,6 +454,14 @@ async function saveInvHolding(){
   if(id){
     const h=state.investments.holdings.find(x=>x.id===id);
     if(!h)return;
+    if(state.transactions.some(x=>x.type==='divest'&&x.holdingId===h.id)){
+      // Units/price/date changes would rewrite the cost of units that were already sold
+      Object.assign(h,{name,nav,symbol,schemeCode});
+      state.transactions.forEach(x=>{if(x.holdingId===h.id)x.name=name;});
+      saveState();closeModal('modal-inv-hold');rebuildAll();
+      toast('Holding has sales recorded — only name and current NAV were updated');
+      return;
+    }
     const oldAmount=h.type==='sip'
       ?((Number(h.monthlyAmount)||0)*(Number(h.durationMonths)||0))
       :(Number(h.units)||0)*(Number(h.buyPrice)||0);
@@ -451,9 +475,7 @@ async function saveInvHolding(){
     }
     Object.assign(h,{accountId,type,date,name,units:isSip?sipAmount:unitsFinal,buyPrice:isSip?sipMonths:buyPriceToSave,nav,symbol,schemeCode,monthlyAmount:isSip?sipAmount:undefined,durationMonths:isSip?sipMonths:undefined,buyPriceMode:isSip?undefined:buyMode,sourceKey});
     if(isSip){
-      if(!schemeCode){toast('Select an AMFI scheme for SIP series');return;}
-      if(!sipMonths){toast('Enter a valid SIP duration');return;}
-      const liveNav=nav||await fetchMFNav(schemeCode);
+      const liveNav=sipNav;
       const start=new Date(date+'T00:00:00');
       const series=[];
       let totalUnits=0;
@@ -468,7 +490,7 @@ async function saveInvHolding(){
       }
       series.sort((a,b)=>a.date.localeCompare(b.date));
       state.transactions.push(...series);
-      Object.assign(h,{units:totalUnits,buyPrice:sipAmount,nav:liveNav,txnId:series[series.length-1]?.id||'',seriesTxnIds:series.map(t=>t.id),monthlyAmount:sipAmount,durationMonths:sipMonths,sipSeries:true,sourceKey});
+      Object.assign(h,{units:totalUnits,buyPrice:(sipAmount*sipMonths)/totalUnits,avgPriceFixed:true,nav:liveNav,txnId:series[series.length-1]?.id||'',seriesTxnIds:series.map(t=>t.id),monthlyAmount:sipAmount,durationMonths:sipMonths,sipSeries:true,sourceKey});
     }else{
       const txn=state.transactions.find(x=>x.id===h.txnId);
       if(txn)Object.assign(txn,{date,accountId,amount:newAmount,name,units:unitsFinal,buyPrice:buyPriceToSave,sourceKey});
@@ -479,9 +501,7 @@ async function saveInvHolding(){
     const directAvail=fundMode==='bank'?(bal.bk[bankId]||0):avail;
     if(newAmount>directAvail){toast(`Insufficient cash — only ${fmt(directAvail)} available in this account${fundMode==='bank'?' / bank account':''}.`);return;}
     if(isSip){
-      if(!schemeCode){toast('Select an AMFI scheme for SIP series');return;}
-      if(!sipMonths){toast('Enter a valid SIP duration');return;}
-      const liveNav=nav||await fetchMFNav(schemeCode);
+      const liveNav=sipNav;
       const start=new Date(date+'T00:00:00');
       const hid=uid();
       const series=[];
@@ -497,7 +517,7 @@ async function saveInvHolding(){
       }
       series.sort((a,b)=>a.date.localeCompare(b.date));
       state.transactions.push(...series);
-      state.investments.holdings.push({id:hid,accountId,type,date,name,units:totalUnits,buyPrice:sipAmount,nav:liveNav,symbol,schemeCode,txnId:series[series.length-1]?.id||'',seriesTxnIds:series.map(t=>t.id),monthlyAmount:sipAmount,durationMonths:sipMonths,sipSeries:true,sourceKey});
+      state.investments.holdings.push({id:hid,accountId,type,date,name,units:totalUnits,buyPrice:(sipAmount*sipMonths)/totalUnits,avgPriceFixed:true,nav:liveNav,symbol,schemeCode,txnId:series[series.length-1]?.id||'',seriesTxnIds:series.map(t=>t.id),monthlyAmount:sipAmount,durationMonths:sipMonths,sipSeries:true,sourceKey});
     }else{
       const hid=uid(),tid=uid();
       state.investments.holdings.push({id:hid,accountId,type,date,name,units:unitsFinal,buyPrice:buyPriceToSave,nav,symbol,schemeCode,txnId:tid,buyPriceMode:buyMode,sourceKey});
@@ -510,13 +530,15 @@ async function saveInvHolding(){
 
 function confirmDeleteInvHolding(id){
   const h=state.investments.holdings.find(x=>x.id===id);
-  document.getElementById('confirm-body').textContent=`Delete "${h?h.name:'holding'}"? The invested amount will be returned to the account's available cash. You can undo this right after.`;
+  document.getElementById('confirm-body').textContent=`Delete "${h?h.name:'holding'}"? The invested amount (and any sale proceeds from it) will be removed from your account balances. You can undo this right after.`;
   document.getElementById('confirm-ok-btn').onclick=()=>{
     let removedTxns=[];
     if(h){
       const ids=h.seriesTxnIds?.length?h.seriesTxnIds:[h.txnId];
-      removedTxns=state.transactions.filter(x=>ids.includes(x.id));
-      state.transactions=state.transactions.filter(x=>!ids.includes(x.id));
+      // Sales go with the holding, otherwise cash would get both the refunded cost and the proceeds
+      const gone=x=>ids.includes(x.id)||(x.type==='divest'&&x.holdingId===h.id);
+      removedTxns=state.transactions.filter(gone);
+      state.transactions=state.transactions.filter(x=>!gone(x));
     }
     state.investments.holdings=state.investments.holdings.filter(x=>x.id!==id);
     saveState();rebuildAll();
@@ -531,7 +553,7 @@ function confirmDeleteInvHolding(id){
 }
 
 function holdMetrics(h){
-  const invested=h.units*h.buyPrice, currentValue=h.units*h.nav;
+  const invested=h.units*h.buyPrice, currentValue=h.units*(Number(h.nav)||Number(h.buyPrice)||0);
   const gain=currentValue-invested, gainPct=invested>0?(gain/invested)*100:0;
   return{invested,currentValue,gain,gainPct};
 }
@@ -608,16 +630,21 @@ function isoToDmy(iso){
   return `${d}-${m}-${y}`;
 }
 
+/* fetch with a timeout so a hung proxy can't freeze the UI */
+function fetchT(url,ms=10000){
+  const ctl=new AbortController(),timer=setTimeout(()=>ctl.abort(),ms);
+  return fetch(url,{signal:ctl.signal}).catch(e=>{throw e&&e.name==='AbortError'?new Error('Request timed out'):e;}).finally(()=>clearTimeout(timer));
+}
 async function fetchMFNav(schemeCode,date=''){
   if(!date){
-    const res=await fetch(`https://api.mfapi.in/mf/${encodeURIComponent(schemeCode)}`);
+    const res=await fetchT(`https://api.mfapi.in/mf/${encodeURIComponent(schemeCode)}`);
     if(!res.ok)throw new Error('MF history request failed');
     const j=await res.json();
     const nav=Number(j?.data?.[0]?.nav);
     if(!nav)throw new Error('No NAV returned');
     return nav;
   }
-  const res=await fetch(`https://api.mfapi.in/mf/${encodeURIComponent(schemeCode)}`);
+  const res=await fetchT(`https://api.mfapi.in/mf/${encodeURIComponent(schemeCode)}`);
   if(!res.ok)throw new Error('MF history request failed');
   const j=await res.json();
   const target=Date.parse(`${date}T00:00:00`);
@@ -629,7 +656,7 @@ async function fetchMFNav(schemeCode,date=''){
 }
 async function fetchStockPrice(symbol,date=''){
   if(!STOCK_PROXY_URL||STOCK_PROXY_URL.includes('PASTE-YOUR'))throw new Error('Stock price proxy not configured yet');
-  const res=await fetch(`${STOCK_PROXY_URL}?symbol=${encodeURIComponent(symbol)}${date?`&date=${encodeURIComponent(date)}`:''}`);
+  const res=await fetchT(`${STOCK_PROXY_URL}?symbol=${encodeURIComponent(symbol)}${date?`&date=${encodeURIComponent(date)}`:''}`);
   if(!res.ok)throw new Error(date?'No price returned for the selected date':'Price proxy request failed');
   const j=await res.json();
   const price=Number(j.price);
@@ -642,16 +669,21 @@ async function refreshAllPrices(){
   const btn=document.getElementById('refresh-prices-btn');
   if(btn){btn.disabled=true;btn.textContent='Refreshing…';}
   let ok=0,fail=0;
-  for(const h of holdings){
-    try{
-      let price=null;
-      if(h.type==='mf'&&h.schemeCode)price=await fetchMFNav(h.schemeCode);
-      else if(isExchangeTraded(h.type)&&h.symbol)price=await fetchStockPrice(h.symbol);
-      if(price){h.nav=price;ok++;}else fail++;
-    }catch(e){fail++;}
+  try{
+    // Resolve in small parallel batches instead of one request at a time
+    const lookup=async h=>{
+      try{
+        let price=null;
+        if(h.type==='mf'&&h.schemeCode)price=await fetchMFNav(h.schemeCode);
+        else if(isExchangeTraded(h.type)&&h.symbol)price=await fetchStockPrice(h.symbol);
+        if(price){h.nav=price;ok++;}else fail++;
+      }catch(e){fail++;}
+    };
+    for(let i=0;i<holdings.length;i+=4)await Promise.all(holdings.slice(i,i+4).map(lookup));
+    saveState();rebuildAll();
+  }finally{
+    if(btn){btn.disabled=false;btn.textContent='↻ Refresh Prices';}
   }
-  saveState();rebuildAll();
-  if(btn){btn.disabled=false;btn.textContent='↻ Refresh Prices';}
   toast(fail?`Updated ${ok} price(s), ${fail} failed (missing symbol/scheme or lookup error)`:`Updated ${ok} price(s)`,3200);
 }
 

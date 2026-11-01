@@ -1,6 +1,9 @@
 /* ── Investments ──────────────────────────────────────────── */
 const invAccTypeLabel=t=>t==='demat'?'Demat Account':'Mutual Fund Platform';
-const invHoldTypeLabel=t=>t==='mf'?'Mutual Fund':'Stock';
+const invHoldTypeLabel=t=>t==='mf'?'Mutual Fund':t==='etf'?'ETF':'Stock';
+/* Stocks and ETFs both trade on NSE and share the symbol-based price lookup */
+const isExchangeTraded=t=>t==='stock'||t==='etf';
+const invBucketKey=t=>t==='stock'?'Stock':t==='etf'?'ETF':'MF';
 
 /* Non-SIP holdings can be entered by units or by rupee amount (units = amount / price) */
 function holdEntryMode(){
@@ -29,8 +32,8 @@ function updateHoldUnitsPreview(){
 
 function toggleHoldLookupFields(){
   const t=document.getElementById('inv-hold-type').value;
-  document.getElementById('inv-hold-stock-wrap').classList.toggle('hidden',t!=='stock');
-  document.getElementById('inv-hold-mf-wrap').classList.toggle('hidden',t==='stock');
+  document.getElementById('inv-hold-stock-wrap').classList.toggle('hidden',!isExchangeTraded(t));
+  document.getElementById('inv-hold-mf-wrap').classList.toggle('hidden',isExchangeTraded(t));
   document.getElementById('inv-hold-buy-mode-wrap').classList.toggle('hidden',t==='sip');
   const unitsLabel=document.getElementById('inv-hold-units-label');
   const buyLabel=document.getElementById('inv-hold-buy-label');
@@ -81,7 +84,7 @@ function toggleHoldPriceMode(){
 }
 
 async function resolveHoldPurchasePrice(type,date,symbol,schemeCode){
-  if(type==='stock'){
+  if(isExchangeTraded(type)){
     if(!symbol)throw new Error('Enter an NSE symbol first');
     return await fetchStockPrice(symbol,date);
   }
@@ -89,7 +92,7 @@ async function resolveHoldPurchasePrice(type,date,symbol,schemeCode){
     if(!schemeCode)throw new Error('Select an AMFI scheme first');
     return await fetchMFNav(schemeCode,date);
   }
-  throw new Error('Price fetch is only available for stocks and mutual funds');
+  throw new Error('Price fetch is only available for stocks, ETFs and mutual funds');
 }
 
 async function fetchHoldPurchasePrice(){
@@ -136,6 +139,66 @@ function pickMF(code,name){
   if(!document.getElementById('inv-hold-name').value.trim())document.getElementById('inv-hold-name').value=name;
   document.getElementById('inv-hold-mfresults').innerHTML='';
   document.getElementById('inv-hold-mfpicked').textContent=`Linked to scheme ${code} — ${name}`;
+}
+
+/* ── NSE ticker search (Stocks & ETFs) ───────────────────── */
+let _tkTimer=null;
+function debouncedSearchTicker(){
+  clearTimeout(_tkTimer);
+  _tkTimer=setTimeout(searchTicker,350);
+}
+function clearPickedTicker(){
+  document.getElementById('inv-hold-symbol').value='';
+  document.getElementById('inv-hold-tkpicked').textContent='';
+  document.getElementById('inv-hold-tkresults').innerHTML='';
+  document.getElementById('inv-hold-tksearch').value='';
+}
+function onHoldTypeChange(){
+  /* a Stock pick isn't valid for an ETF (and vice versa), so start over */
+  const t=document.getElementById('inv-hold-type').value;
+  const prev=document.getElementById('inv-hold-tkresults').dataset.type;
+  if(isExchangeTraded(t)&&prev&&prev!==t)clearPickedTicker();
+  toggleHoldLookupFields();
+}
+async function searchTicker(){
+  clearTimeout(_tkTimer);
+  const q=document.getElementById('inv-hold-tksearch').value.trim();
+  const type=document.getElementById('inv-hold-type').value;
+  const wrap=document.getElementById('inv-hold-tkresults');
+  const msg=(t,c='#a8a29e')=>{wrap.innerHTML=`<div style="font-size:.75rem;color:${c};padding:4px 2px">${t}</div>`;};
+  if(!q){wrap.innerHTML='';return;}
+  msg('Searching…');
+  try{
+    if(!STOCK_PROXY_URL||STOCK_PROXY_URL.includes('PASTE-YOUR'))throw new Error('Stock price proxy not configured yet');
+    const res=await fetch(`${STOCK_PROXY_URL}?search=${encodeURIComponent(q)}&type=${type==='etf'?'etf':'stock'}`);
+    if(!res.ok)throw new Error('search failed');
+    const j=await res.json();
+    const list=(j.results||[]).slice(0,8);
+    /* ignore a stale response if the user switched type or edited the query meanwhile */
+    if(document.getElementById('inv-hold-tksearch').value.trim()!==q||document.getElementById('inv-hold-type').value!==type)return;
+    wrap.dataset.type=type;
+    if(!list.length){msg(`No NSE ${type==='etf'?'ETF':'stock'} matches`);return;}
+    wrap.innerHTML=list.map(x=>{
+      const sym=esc(x.symbol);
+      const name=esc(String(x.name||x.symbol));
+      return `<div class="sb-item" style="cursor:pointer" role="button" tabindex="0" data-tk-sym="${sym}" data-tk-name="${name}"><span class="sb-name"><b>${sym}</b> &middot; ${name}</span></div>`;
+    }).join('');
+    wrap.querySelectorAll('[data-tk-sym]').forEach(el=>{
+      const pick=()=>pickTicker(el.dataset.tkSym||'',el.dataset.tkName||'',type);
+      el.addEventListener('click',pick);
+      el.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();pick();}});
+    });
+  }catch(e){
+    msg('Search failed — try again','#ef4444');
+  }
+}
+function pickTicker(sym,name,type){
+  document.getElementById('inv-hold-symbol').value=sym;
+  document.getElementById('inv-hold-tkresults').innerHTML='';
+  document.getElementById('inv-hold-tkresults').dataset.type=type;
+  document.getElementById('inv-hold-tksearch').value='';
+  if(!document.getElementById('inv-hold-name').value.trim())document.getElementById('inv-hold-name').value=name;
+  document.getElementById('inv-hold-tkpicked').textContent=`Linked to ${sym} — ${name}`;
 }
 
 function openInvAccModal(id){
@@ -218,24 +281,24 @@ function renderInvTopSummary(){
   const wrap=document.getElementById('inv-top-summary');
   if(!wrap)return;
   const holdings=state.investments.holdings||[];
-  const buckets={MF:{invested:0,current:0},Stock:{invested:0,current:0}};
+  const buckets={MF:{invested:0,current:0},Stock:{invested:0,current:0},ETF:{invested:0,current:0}};
   holdings.forEach(h=>{
-    const key=h.type==='stock'?'Stock':'MF';
+    const key=invBucketKey(h.type);
     const m=holdMetrics(h);
     buckets[key].invested+=m.invested;
     buckets[key].current+=m.currentValue;
   });
   const bal=computeBal();
-  const totalInvested=buckets.MF.invested+buckets.Stock.invested;
-  const totalCurrent=buckets.MF.current+buckets.Stock.current;
+  const totalInvested=buckets.MF.invested+buckets.Stock.invested+buckets.ETF.invested;
+  const totalCurrent=buckets.MF.current+buckets.Stock.current+buckets.ETF.current;
   const cashValue=bal.totInvCash+bal.ca+bal.totBank-bal.totCC;
   const mode=invSummaryMode;
   const mainLabel=mode==='cash'?'Overall Cash':'Total Amount Invested';
   const mainValue=mode==='cash'?fmt(cashValue):fmt(totalInvested);
-  const subLine=mode==='cash'?'Across bank, cash and investment balances':'MF + Stocks';
+  const subLine=mode==='cash'?'Across bank, cash and investment balances':'MF + Stocks + ETFs';
   const rows=mode==='cash'
     ?[`<div class="row"><span>Investment cash</span><span class="num">${fmt(bal.totInvCash)}</span></div>`,`<div class="row"><span>Bank + cash</span><span class="num">${fmt(bal.totBank+bal.ca)}</span></div>`]
-    :[`<div class="row"><span>Stocks (Equity)</span><span class="num">${fmt(buckets.Stock.invested)}</span></div>`,`<div class="row"><span>Mutual Funds</span><span class="num">${fmt(buckets.MF.invested)}</span></div>`];
+    :[`<div class="row"><span>Stocks (Equity)</span><span class="num">${fmt(buckets.Stock.invested)}</span></div>`,`<div class="row"><span>ETFs</span><span class="num">${fmt(buckets.ETF.invested)}</span></div>`,`<div class="row"><span>Mutual Funds</span><span class="num">${fmt(buckets.MF.invested)}</span></div>`];
   wrap.innerHTML=`
     <div class="stat-tile" style="padding:10px 12px">
       <div style="display:flex;align-items:center;justify-content:space-between;gap:8px">
@@ -289,7 +352,8 @@ function openInvHoldModal(accId, holdId){
   document.getElementById('inv-hold-mfpicked').textContent='';
   document.getElementById('inv-hold-mfsearch').value='';
   document.getElementById('inv-hold-schemecode').value='';
-  document.getElementById('inv-hold-symbol').value='';
+  clearPickedTicker();
+  delete document.getElementById('inv-hold-tkresults').dataset.type;
   if(isEdit){
     const h=state.investments.holdings.find(x=>x.id===holdId);
     if(!h)return;
@@ -305,6 +369,7 @@ function openInvHoldModal(accId, holdId){
     document.getElementById('inv-hold-buy').value=h.buyPrice;
     document.getElementById('inv-hold-nav').value=h.nav;
     document.getElementById('inv-hold-symbol').value=h.symbol||'';
+    if(h.symbol){document.getElementById('inv-hold-tkpicked').textContent=`Linked to ${h.symbol}`;document.getElementById('inv-hold-tkresults').dataset.type=h.type;}
     if(h.schemeCode){
       document.getElementById('inv-hold-schemecode').value=h.schemeCode;
       document.getElementById('inv-hold-mfpicked').textContent=`Linked to scheme ${h.schemeCode}`;
@@ -349,6 +414,7 @@ async function saveInvHolding(){
   const sourceKey=fundMode==='bank'?`bank:${bankId}`:`inv:${accountId}`;
   if(!accountId){toast('Select an account');return;}
   if(!name){toast('Enter a name');return;}
+  if(isExchangeTraded(type)&&!symbol){toast(`Search and select a ${type==='etf'?'ETF':'stock'} ticker from the list`);return;}
   if(units<=0){toast(type==='sip'?'Enter monthly SIP amount':(holdEntryMode()==='amount'?'Enter the amount invested':'Enter units/quantity'));return;}
   if(!date){toast('Select a purchase date');return;}
   const isSip=type==='sip';
@@ -484,7 +550,7 @@ function openInvSellModal(holdId){
   if(!h){toast('Holding not found');return;}
   if(!(Number(h.units)>0)){toast('No units available to sell');return;}
   document.getElementById('inv-sell-hold-id').value=holdId;
-  document.getElementById('inv-sell-name').textContent=`${h.name} (${h.type==='stock'?'Stock':'Mutual Fund'})`;
+  document.getElementById('inv-sell-name').textContent=`${h.name} (${invHoldTypeLabel(h.type)})`;
   document.getElementById('inv-sell-avail').textContent=`Available: ${h.units} units · Avg buy price ${fmt(h.buyPrice)} · Current NAV ${fmt(h.nav)}`;
   document.getElementById('inv-sell-units').value=h.units;
   document.getElementById('inv-sell-units').max=h.units;
@@ -542,10 +608,6 @@ function isoToDmy(iso){
   return `${d}-${m}-${y}`;
 }
 
-function timestampToIsoIndia(ts){
-  return new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Kolkata',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date(ts*1000));
-}
-
 async function fetchMFNav(schemeCode,date=''){
   if(!date){
     const res=await fetch(`https://api.mfapi.in/mf/${encodeURIComponent(schemeCode)}`);
@@ -566,30 +628,12 @@ async function fetchMFNav(schemeCode,date=''){
   return nav;
 }
 async function fetchStockPrice(symbol,date=''){
-  if(!date){
-    if(!STOCK_PROXY_URL||STOCK_PROXY_URL.includes('PASTE-YOUR'))throw new Error('Stock price proxy not configured yet');
-    const res=await fetch(`${STOCK_PROXY_URL}?symbol=${encodeURIComponent(symbol)}`);
-    if(!res.ok)throw new Error('Price proxy request failed');
-    const j=await res.json();
-    const price=Number(j.price);
-    if(!price)throw new Error('No price returned');
-    return price;
-  }
-  const target=Date.parse(`${date}T00:00:00`);
-  const start=Math.floor((target-10*24*60*60*1000)/1000);
-  const end=Math.floor((target+24*60*60*1000)/1000);
-  const res=await fetch(`https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}.NS?period1=${start}&period2=${end}&interval=1d&includePrePost=false&events=div%2Csplits`);
-  if(!res.ok)throw new Error('Historical price request failed');
+  if(!STOCK_PROXY_URL||STOCK_PROXY_URL.includes('PASTE-YOUR'))throw new Error('Stock price proxy not configured yet');
+  const res=await fetch(`${STOCK_PROXY_URL}?symbol=${encodeURIComponent(symbol)}${date?`&date=${encodeURIComponent(date)}`:''}`);
+  if(!res.ok)throw new Error(date?'No price returned for the selected date':'Price proxy request failed');
   const j=await res.json();
-  const result=j?.chart?.result?.[0];
-  const timestamps=result?.timestamp||[];
-  const closes=result?.indicators?.quote?.[0]?.close||[];
-  const points=timestamps
-    .map((ts,i)=>({date:timestampToIsoIndia(ts),close:Number(closes[i])}))
-    .filter(p=>p.date&&Number.isFinite(p.close))
-    .filter(p=>Date.parse(`${p.date}T00:00:00`)<=target);
-  const price=points.length?points[points.length-1].close:NaN;
-  if(!price)throw new Error('No price returned for the selected date');
+  const price=Number(j.price);
+  if(!price)throw new Error('No price returned');
   return price;
 }
 async function refreshAllPrices(){
@@ -602,7 +646,7 @@ async function refreshAllPrices(){
     try{
       let price=null;
       if(h.type==='mf'&&h.schemeCode)price=await fetchMFNav(h.schemeCode);
-      else if(h.type==='stock'&&h.symbol)price=await fetchStockPrice(h.symbol);
+      else if(isExchangeTraded(h.type)&&h.symbol)price=await fetchStockPrice(h.symbol);
       if(price){h.nav=price;ok++;}else fail++;
     }catch(e){fail++;}
   }
@@ -619,9 +663,9 @@ function renderInvestments(){
   holdings.forEach(h=>{const m=holdMetrics(h);totInvested+=m.invested;totCurrent+=m.currentValue;});
   const totGain=totCurrent-totInvested, totGainPct=totInvested>0?(totGain/totInvested)*100:0;
   const gc=totGain>=0?'#166534':'#ef4444';
-  const invBuckets={MF:{invested:0,current:0,profit:0},Stock:{invested:0,current:0,profit:0}};
+  const invBuckets={MF:{invested:0,current:0,profit:0},Stock:{invested:0,current:0,profit:0},ETF:{invested:0,current:0,profit:0}};
   holdings.forEach(h=>{
-    const key=h.type==='stock'?'Stock':'MF';
+    const key=invBucketKey(h.type);
     const m=holdMetrics(h);
     invBuckets[key].invested+=m.invested;
     invBuckets[key].current+=m.currentValue;
@@ -630,10 +674,10 @@ function renderInvestments(){
   const bucketReturnPct=v=>v.invested>0?(v.profit/v.invested)*100:0;
   document.getElementById('inv-stat-tiles').innerHTML=[
     {label:'Available Cash',val:fmt(bal.totInvCash),color:'#1d4ed8',sub:'Transferred, not yet invested'},
-    {label:'Invested Value',val:fmt(totInvested),color:'#1c1917',sub:`${holdings.length} holding(s)`,breakdown:[['Stocks (Equity)',fmt(invBuckets.Stock.invested)],['Mutual Funds',fmt(invBuckets.MF.invested)]]},
-    {label:'Current Value',val:fmt(totCurrent),color:'#1c1917',sub:`${holdings.length} holding(s)`,breakdown:[['Stocks (Equity)',fmt(invBuckets.Stock.current)],['Mutual Funds',fmt(invBuckets.MF.current)]]},
-    {label:'Total Gain / Loss',val:fmt(totGain),color:gc,sub:totGain>=0?'Unrealized profit':'Unrealized loss',breakdown:[['Stocks (Equity)',`${invBuckets.Stock.profit>=0?'+':''}${fmt(invBuckets.Stock.profit)}`],['Mutual Funds',`${invBuckets.MF.profit>=0?'+':''}${fmt(invBuckets.MF.profit)}`]]},
-    {label:'Overall Return',val:`${totGainPct>=0?'+':''}${totGainPct.toFixed(2)}%`,color:gc,sub:'Since purchase',breakdown:[['Stocks (Equity)',`${bucketReturnPct(invBuckets.Stock)>=0?'+':''}${bucketReturnPct(invBuckets.Stock).toFixed(2)}%`],['Mutual Funds',`${bucketReturnPct(invBuckets.MF)>=0?'+':''}${bucketReturnPct(invBuckets.MF).toFixed(2)}%`]]},
+    {label:'Invested Value',val:fmt(totInvested),color:'#1c1917',sub:`${holdings.length} holding(s)`,breakdown:[['Stocks (Equity)',fmt(invBuckets.Stock.invested)],['ETFs',fmt(invBuckets.ETF.invested)],['Mutual Funds',fmt(invBuckets.MF.invested)]]},
+    {label:'Current Value',val:fmt(totCurrent),color:'#1c1917',sub:`${holdings.length} holding(s)`,breakdown:[['Stocks (Equity)',fmt(invBuckets.Stock.current)],['ETFs',fmt(invBuckets.ETF.current)],['Mutual Funds',fmt(invBuckets.MF.current)]]},
+    {label:'Total Gain / Loss',val:fmt(totGain),color:gc,sub:totGain>=0?'Unrealized profit':'Unrealized loss',breakdown:[['Stocks (Equity)',`${invBuckets.Stock.profit>=0?'+':''}${fmt(invBuckets.Stock.profit)}`],['ETFs',`${invBuckets.ETF.profit>=0?'+':''}${fmt(invBuckets.ETF.profit)}`],['Mutual Funds',`${invBuckets.MF.profit>=0?'+':''}${fmt(invBuckets.MF.profit)}`]]},
+    {label:'Overall Return',val:`${totGainPct>=0?'+':''}${totGainPct.toFixed(2)}%`,color:gc,sub:'Since purchase',breakdown:[['Stocks (Equity)',`${bucketReturnPct(invBuckets.Stock)>=0?'+':''}${bucketReturnPct(invBuckets.Stock).toFixed(2)}%`],['ETFs',`${bucketReturnPct(invBuckets.ETF)>=0?'+':''}${bucketReturnPct(invBuckets.ETF).toFixed(2)}%`],['Mutual Funds',`${bucketReturnPct(invBuckets.MF)>=0?'+':''}${bucketReturnPct(invBuckets.MF).toFixed(2)}%`]]},
   ].map(({label,val,color,sub,breakdown})=>`
     <div class="stat-tile">
       <div class="slabel">${label}</div>
@@ -643,8 +687,9 @@ function renderInvestments(){
     </div>`).join('');
 
   const profitData=[
-    {label:`MF ${invBuckets.MF.profit<0?'Loss':'Profit'}`,value:Math.abs(invBuckets.MF.profit),raw:invBuckets.MF.profit},
-    {label:`Stock ${invBuckets.Stock.profit<0?'Loss':'Profit'}`,value:Math.abs(invBuckets.Stock.profit),raw:invBuckets.Stock.profit},
+    {label:`MF ${invBuckets.MF.profit<0?'Loss':'Profit'}`,bg:'#dcfce7',fg:'#16a34a',value:Math.abs(invBuckets.MF.profit),raw:invBuckets.MF.profit},
+    {bg:'#dbeafe',fg:'#2563eb',label:`Stock ${invBuckets.Stock.profit<0?'Loss':'Profit'}`,value:Math.abs(invBuckets.Stock.profit),raw:invBuckets.Stock.profit},
+    {bg:'#fef3c7',fg:'#d97706',label:`ETF ${invBuckets.ETF.profit<0?'Loss':'Profit'}`,value:Math.abs(invBuckets.ETF.profit),raw:invBuckets.ETF.profit},
   ].filter(x=>x.value>0);
   const profitEmpty=!profitData.length;
   document.getElementById('inv-profit-empty').classList.toggle('hidden',!profitEmpty);
@@ -652,8 +697,8 @@ function renderInvestments(){
     destroyChart('invProfit');
     document.getElementById('inv-profit-leg').innerHTML='';
   }else{
-    const profitBgs=['#dcfce7','#dbeafe'];
-    const profitFgs=['#16a34a','#2563eb'];
+    const profitBgs=profitData.map(d=>d.bg);
+    const profitFgs=profitData.map(d=>d.fg);
     destroyChart('invProfit');
     CH.invProfit=new Chart(document.getElementById('inv-profit-donut').getContext('2d'),{
       type:'doughnut',
@@ -665,8 +710,9 @@ function renderInvestments(){
   }
 
   const allocData=[
-    {label:'MF',value:invBuckets.MF.current},
-    {label:'Stock',value:invBuckets.Stock.current},
+    {label:'MF',bg:'#f0fdf4',fg:'#16a34a',value:invBuckets.MF.current},
+    {label:'Stock',bg:'#eff6ff',fg:'#2563eb',value:invBuckets.Stock.current},
+    {label:'ETF',bg:'#fffbeb',fg:'#d97706',value:invBuckets.ETF.current},
   ].filter(x=>x.value>0);
   const allocEmpty=!allocData.length;
   document.getElementById('inv-alloc-empty').classList.toggle('hidden',!allocEmpty);
@@ -674,8 +720,8 @@ function renderInvestments(){
     destroyChart('invAlloc');
     document.getElementById('inv-alloc-leg').innerHTML='';
   }else{
-    const allocBgs=['#f0fdf4','#eff6ff'];
-    const allocFgs=['#16a34a','#2563eb'];
+    const allocBgs=allocData.map(d=>d.bg);
+    const allocFgs=allocData.map(d=>d.fg);
     destroyChart('invAlloc');
     CH.invAlloc=new Chart(document.getElementById('inv-alloc-donut').getContext('2d'),{
       type:'doughnut',
@@ -708,7 +754,7 @@ function renderInvestments(){
         const lookupTag=h.type==='mf'?(h.schemeCode?`<span class="badge-sm" style="background:#f0fdf4;color:#166534" title="AMFI scheme code">#${h.schemeCode}</span>`:''):(h.symbol?`<span class="badge-sm" style="background:#eff6ff;color:#1d4ed8" title="NSE symbol">${esc(h.symbol)}</span>`:'');
         return`<div class="hold-card">
           <div class="hold-card-top">
-            <span class="badge-sm" style="background:${h.type==='mf'?'#ede9fe':'#dbeafe'};color:${h.type==='mf'?'#5b21b6':'#1e40af'}">${h.type==='mf'?'MF':'Stock'}</span>
+            <span class="badge-sm" style="background:${h.type==='mf'?'#ede9fe':h.type==='etf'?'#fef3c7':'#dbeafe'};color:${h.type==='mf'?'#5b21b6':h.type==='etf'?'#92400e':'#1e40af'}">${h.type==='mf'?'MF':h.type==='etf'?'ETF':'Stock'}</span>
             <span class="hold-name" title="${esc(h.name)}">${esc(h.name)}</span>
             ${lookupTag}
             <span class="hold-gain num" style="color:${hgc}">${m.gain>=0?'+':''}${m.gainPct.toFixed(1)}%</span>

@@ -47,6 +47,9 @@ function renderSidebar(){
     liquid.textContent=fmt(bal.liquid);
     liquid.style.color=bal.liquid>=0?'#86efac':'#fca5a5';
   }
+  const msL=document.getElementById('ms-liquid'),msW=document.getElementById('ms-worth');
+  if(msL)msL.textContent=fmt(bal.liquid);
+  if(msW)msW.textContent=fmt(bal.netWorth);
   const nw=document.getElementById('sb-worth-secondary');
   if(nw){
     nw.textContent=fmt(bal.netWorth);

@@ -34,7 +34,7 @@
     <button class="nav-tab" id="nav-analytics" onclick="switchView('analytics')">Analytics</button>
   </div>
   <div style="display:flex;align-items:center;gap:5px">
-    <button id="theme-toggle" class="theme-btn" onclick="toggleTheme()" title="Toggle dark mode" aria-label="Toggle dark mode">
+    <button id="theme-toggle" class="theme-btn" onclick="toggleTheme()" title="Toggle dark mode" data-tip="Dark mode" aria-label="Toggle dark mode">
       <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path id="theme-icon" stroke-linecap="round" stroke-linejoin="round" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.36 6.36l-.7-.7M6.34 6.34l-.7-.7m12.02 0l-.7.7M6.34 17.66l-.7.7M16 12a4 4 0 11-8 0 4 4 0 018 0z"/></svg>
     </button>
     <label style="font-size:.78rem;font-weight:500;color:#78716c;padding:5px 9px;border-radius:7px;cursor:pointer;border:1.5px solid #e7e5e4">
@@ -46,7 +46,7 @@
 </header>
 
 <!-- SIDEBAR -->
-<aside class="sidebar">
+<aside class="sidebar" id="sidebar">
   <div class="worth-banner">
     <div class="slabel" style="color:#57534e;margin-bottom:5px">Liquid Cash Available</div>
     <div class="num" id="sb-liquid-focus" style="font-size:1.45rem;font-weight:600;color:#fff">₹0.00</div>
@@ -124,6 +124,13 @@
 
 <!-- MAIN -->
 <main class="main">
+
+  <!-- Mobile-only: keep the headline numbers on top now that the sidebar sits below the content -->
+  <button type="button" class="mob-summary" id="mob-summary" onclick="scrollToAccounts()" aria-label="Show accounts and net worth">
+    <span><span class="ms-lbl">Liquid</span> <b class="num" id="ms-liquid">₹0.00</b></span>
+    <span><span class="ms-lbl">Net worth</span> <b class="num" id="ms-worth">₹0.00</b></span>
+    <span class="ms-go">Accounts ↓</span>
+  </button>
 
   <!-- DASHBOARD -->
   <div id="view-dashboard">
@@ -1097,15 +1104,20 @@
       <h3 style="font-weight:600;font-size:.93rem">Select Date</h3>
       <button class="btn-i" onclick="closeModal('modal-datewheel')"><svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg></button>
     </div>
-    <div class="wheel-wrap">
+    <div class="wheel-wrap" title="Arrow keys: change value · Left/Right: switch column · Enter: confirm">
       <div class="wheel-highlight"></div>
-      <div class="wheel-col" id="wheel-day" onscroll="onWheelScroll(this)"></div>
-      <div class="wheel-col" id="wheel-month" onscroll="onWheelScroll(this)"></div>
-      <div class="wheel-col" id="wheel-year" onscroll="onWheelScroll(this)"></div>
+      <div class="wheel-col" id="wheel-day" role="spinbutton" tabindex="0" aria-label="Day" onscroll="onWheelScroll(this)"></div>
+      <div class="wheel-col" id="wheel-month" role="spinbutton" tabindex="0" aria-label="Month" onscroll="onWheelScroll(this)"></div>
+      <div class="wheel-col" id="wheel-year" role="spinbutton" tabindex="0" aria-label="Year" onscroll="onWheelScroll(this)"></div>
     </div>
     <button class="btn-p" style="width:100%;margin-top:14px" onclick="confirmDatePicker()">Done</button>
   </div>
 </div>
+
+<!-- Mobile quick-add button -->
+<button type="button" id="fab" onclick="quickAdd()" aria-label="Add transaction" data-tip="Add transaction (N)">
+  <svg width="22" height="22" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.4"><path stroke-linecap="round" stroke-linejoin="round" d="M12 5v14M5 12h14"/></svg>
+</button>
 
 <!-- Toast -->
 <div id="toast" class="hidden" role="status" aria-live="polite">
@@ -1137,5 +1149,6 @@
 <script src="js/charts-analytics.js"></script>
 <script src="js/app.js"></script>
 <script src="js/shortcuts.js"></script>
+<script src="js/swipe.js"></script>
 </body>
 </html>

@@ -52,8 +52,11 @@ auth.onAuthStateChanged(async user=>{
     currentUid=user.uid;
     document.getElementById('auth-gate').classList.add('hidden');
     document.querySelector('.shell').style.display='grid';
+    const shell=document.querySelector('.shell');
+    shell.classList.add('loading'); // skeleton shimmer until data has arrived
     await loadStateFromCloud();
     boot();
+    shell.classList.remove('loading');
   }else{
     currentUid=null;
     document.getElementById('auth-gate').classList.remove('hidden');
@@ -75,13 +78,51 @@ function buildWheelCol(el,items,selIdx){
   const spacer='<div class="wheel-spacer"></div>';
   el.innerHTML=spacer+items.map((label,i)=>`<div class="wheel-item${i===selIdx?' sel':''}">${label}</div>`).join('')+spacer;
   el._items=items;
+  el._kbIdx=undefined;
   el.scrollTop=selIdx*WHEEL_ITEM_H;
   markSelected(el,selIdx);
 }
 function markSelected(el,idx){
   el.querySelectorAll('.wheel-item').forEach((c,i)=>c.classList.toggle('sel',i===idx));
+  if(el._items)el.setAttribute('aria-valuetext',el._items[idx]);
 }
-function wheelIndex(el){return Math.max(0,Math.min(el._items.length-1,Math.round(el.scrollTop/WHEEL_ITEM_H)));}
+/* Keyboard control for the wheel: Up/Down +-1, PageUp/PageDown +-5, Home/End, Left/Right between
+   columns, Enter confirms. The wheels stay scrollable by mouse/touch exactly as before. */
+function wheelMove(el,idx){
+  if(!el._items)return;
+  idx=Math.max(0,Math.min(el._items.length-1,idx));
+  markSelected(el,idx);
+  el._kbIdx=idx;el._kbT=Date.now();
+  if(el.id==='wheel-month'||el.id==='wheel-year')setTimeout(syncDayWheel,0);
+  el.scrollTo({top:idx*WHEEL_ITEM_H,behavior:window.matchMedia('(prefers-reduced-motion: reduce)').matches?'auto':'smooth'});
+}
+document.addEventListener('keydown',e=>{
+  const el=e.target;
+  if(el.classList&&el.classList.contains('date-trigger')&&(e.key==='Enter'||e.key===' ')){e.preventDefault();el.click();return;}
+  if(!el.classList||!el.classList.contains('wheel-col'))return;
+  const cols=['wheel-day','wheel-month','wheel-year'].map(id=>document.getElementById(id));
+  const cur=wheelIndex(el);
+  const step={ArrowUp:-1,ArrowDown:1,PageUp:-5,PageDown:5}[e.key];
+  if(step){e.preventDefault();wheelMove(el,cur+step);}
+  else if(e.key==='Home'){e.preventDefault();wheelMove(el,0);}
+  else if(e.key==='End'){e.preventDefault();wheelMove(el,el._items.length-1);}
+  else if(e.key==='ArrowLeft'||e.key==='ArrowRight'){
+    e.preventDefault();
+    const i=cols.indexOf(el)+(e.key==='ArrowRight'?1:-1);
+    if(cols[i])cols[i].focus();
+  }else if(e.key==='Enter'){e.preventDefault();confirmDatePicker();}
+});
+// Make every date field a real keyboard-reachable button
+document.querySelectorAll('.date-trigger').forEach(t=>{
+  t.setAttribute('tabindex','0');t.setAttribute('role','button');
+  const lbl=t.previousElementSibling;
+  t.setAttribute('aria-label',(lbl&&lbl.classList.contains('slabel')?lbl.textContent.trim():'Date')+' – choose date');
+});
+function wheelIndex(el){
+  // Right after a keyboard move the smooth scroll is still animating, so trust the target index
+  if(el._kbIdx!==undefined&&Date.now()-el._kbT<700)return el._kbIdx;
+  return Math.max(0,Math.min(el._items.length-1,Math.round(el.scrollTop/WHEEL_ITEM_H)));
+}
 function onWheelScroll(el){
   clearTimeout(el._st);
   el._st=setTimeout(()=>{
@@ -113,9 +154,11 @@ function openDatePicker(targetId){
     buildWheelCol(document.getElementById('wheel-day'),Array.from({length:dc},(_,i)=>String(i+1).padStart(2,'0')),Math.min(day,dc)-1);
     buildWheelCol(document.getElementById('wheel-month'),MONTH_NAMES,monthIdx);
     buildWheelCol(document.getElementById('wheel-year'),years,years.indexOf(String(year)));
+    document.getElementById('wheel-day').focus();
   });
 }
 function confirmDatePicker(){
+  syncDayWheel(); // e.g. month changed to Feb just before confirming: clamp the day first
   const dEl=document.getElementById('wheel-day'),mEl=document.getElementById('wheel-month'),yEl=document.getElementById('wheel-year');
   const day=dEl._items[wheelIndex(dEl)],monthIdx=wheelIndex(mEl),year=yEl._items[wheelIndex(yEl)];
   const iso=`${year}-${pad(monthIdx+1)}-${day}`;

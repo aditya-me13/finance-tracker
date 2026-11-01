@@ -62,6 +62,9 @@ function applyTheme(mode){
   document.getElementById('theme-icon').setAttribute('d',mode==='dark'?MOON_PATH:SUN_PATH);
 }
 function toggleTheme(){
+  // brief colour transition on toggle only, so normal interactions stay snappy
+  document.documentElement.classList.add('theme-anim');
+  setTimeout(()=>document.documentElement.classList.remove('theme-anim'),400);
   const mode=document.documentElement.classList.contains('dark')?'light':'dark';
   applyTheme(mode);
   localStorage.setItem('ft-theme',mode);

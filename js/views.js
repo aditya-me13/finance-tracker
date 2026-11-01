@@ -48,6 +48,18 @@ function setViewMode(mode){
 }
 
 /* ── View switching ───────────────────────────────────────── */
+function scrollToAccounts(){
+  const sb=document.getElementById('sidebar');
+  if(sb)sb.scrollIntoView({behavior:'smooth',block:'start'});
+}
+/* Mobile quick-add: jump to the entry form and focus the amount */
+function quickAdd(){
+  switchView('dashboard');
+  setTxn('expense');
+  const f=document.getElementById('form-expense');
+  if(f)f.scrollIntoView({behavior:'smooth',block:'center'});
+  setTimeout(()=>{const a=document.getElementById('e-amt');if(a)a.focus({preventScroll:true});},250);
+}
 function switchView(v){
   activeView=v;
   document.getElementById('view-dashboard').classList.toggle('hidden',v!=='dashboard');
@@ -186,7 +198,7 @@ function renderTxnLog(){
 }
 
 function buildRow(t,canDel,selectable){
-  const row=document.createElement('div');row.className='txnrow';
+  const row=document.createElement('div');row.className='txnrow';row.dataset.id=t.id;
   let iconBg,iconTxt,mainLabel,subLabel,amtStr,amtCol;
   if(t.type==='expense'){
     const ci=state.categories.expense.indexOf(t.category),col=cpal(ci>=0?ci:0);

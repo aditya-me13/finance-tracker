@@ -1,4 +1,4 @@
-const CACHE_NAME='finance-tracker-v2';
+const CACHE_NAME='finance-tracker-v3';
 const APP_SHELL=[
   './',
   './index.html',
@@ -21,6 +21,7 @@ const APP_SHELL=[
   './js/loans.js',
   './js/bulk-actions.js',
   './js/shortcuts.js',
+  './js/swipe.js',
   './icons/icon-192.png',
   './icons/icon-512.png',
   './icons/icon-512-maskable.png',

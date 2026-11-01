@@ -116,7 +116,9 @@ function normalizeState(){
   if(!state.tags)state.tags=[];
   if(!state.loans)state.loans=[];
   if(!state.recurring)state.recurring=[];
+  state.recurring.forEach(r=>{if(r.active===undefined)r.active=true;if(!r.tags)r.tags=[];});
   state.transactions.forEach(t=>{
+    if(typeof t.amount==='string')t.amount=Number(t.amount)||0;
     if(t.type==='expense'&&(t.myShare===undefined||t.myShare===null||t.myShare===''))t.myShare=Number(t.amount)||0;
     if(!t.tags)t.tags=[];
   });

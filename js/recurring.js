@@ -17,6 +17,7 @@ function createRecurringFromEntry(opts){
     amount:opts.amount,
     myShare:opts.myShare,
     acType:opts.acType,acId:opts.acId,
+    shared:!!opts.shared,sharedMode:opts.sharedMode,
     destType:opts.destType,destId:opts.destId,
     category:opts.category,
     desc:opts.desc,
@@ -50,7 +51,7 @@ function generateDueRecurring(){
     let guard=0;
     while(cursor<=todayStr&&guard<500){
       if(r.type==='expense'){
-        state.transactions.push({id:uid(),date:cursor,type:'expense',amount:r.amount,acType:r.acType,acId:r.acId,category:r.category,desc:r.desc||r.name,myShare:r.myShare!==undefined?r.myShare:r.amount,tags:(r.tags||[]).slice(),recurringId:r.id});
+        state.transactions.push({id:uid(),date:cursor,type:'expense',amount:r.amount,acType:r.acType,acId:r.acId,category:r.category,desc:r.desc||r.name,myShare:r.myShare!==undefined?r.myShare:r.amount,tags:(r.tags||[]).slice(),recurringId:r.id,...(r.shared?{shared:true,sharedMode:r.sharedMode,settled:false}:{})});
       }else{
         state.transactions.push({id:uid(),date:cursor,type:'income',amount:r.amount,destType:r.destType,destId:r.destId,category:r.category,desc:r.desc||r.name,tags:(r.tags||[]).slice(),recurringId:r.id});
       }
@@ -155,6 +156,12 @@ function toggleRecurringActive(id){
   const r=state.recurring.find(x=>x.id===id);
   if(!r)return;
   r.active=!r.active;
+  if(r.active){
+    // Skip occurrences that fell due while paused instead of back-filling them all on the next load
+    const t=today();let c=r.lastGeneratedDate||r.startDate,g=0;
+    for(let n=nextRecurDate(r,c);n<=t&&g<1000;n=nextRecurDate(r,n),g++)c=n;
+    r.lastGeneratedDate=c;
+  }
   saveState();openRecurringModal();renderRecurringWidget();
   toast(r.active?'Resumed':'Paused');
 }

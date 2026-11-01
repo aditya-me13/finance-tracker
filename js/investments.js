@@ -553,7 +553,7 @@ function confirmDeleteInvHolding(id){
 }
 
 function holdMetrics(h){
-  const invested=h.units*h.buyPrice, currentValue=h.units*h.nav;
+  const invested=h.units*h.buyPrice, currentValue=h.units*(Number(h.nav)||Number(h.buyPrice)||0);
   const gain=currentValue-invested, gainPct=invested>0?(gain/invested)*100:0;
   return{invested,currentValue,gain,gainPct};
 }

@@ -74,7 +74,9 @@ select.pl{width:100%;border:1.5px solid #e7e5e4;border-radius:9px;padding:9px 11
 .wbf{height:100%;border-radius:2px;background:#c4bfba;transition:width .3s}
 .wbf.today{background:#1c1917}
 .mo{position:fixed;inset:0;background:rgba(0,0,0,.35);backdrop-filter:blur(3px);z-index:50;display:flex;align-items:center;justify-content:center;padding:16px}
-.mb{background:#fff;border-radius:16px;padding:22px;width:100%;max-width:430px;box-shadow:0 12px 48px rgba(0,0,0,.16)}
+.mb{background:#fff;border-radius:16px;padding:22px;width:100%;max-width:430px;box-shadow:0 12px 48px rgba(0,0,0,.16);max-height:calc(100vh - 32px);max-height:calc(100dvh - 32px);overflow-y:auto}
+#modal-confirm{z-index:60}
+#modal-datewheel{z-index:70}
 .mb.wide{max-width:580px}
 .mb.narrow{max-width:360px}
 .bud-row{display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid #f4f3f0}

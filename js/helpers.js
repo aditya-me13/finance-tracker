@@ -1,5 +1,5 @@
 /* ── Helpers ──────────────────────────────────────────────── */
-const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,6);
+const uid=()=>(window.crypto&&crypto.randomUUID)?crypto.randomUUID():Date.now().toString(36)+Math.random().toString(36).slice(2,10);
 const pad=n=>String(n).padStart(2,'0');
 const today=()=>{const d=new Date();return`${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;};
 const mkOf=s=>s.slice(0,7);
@@ -10,7 +10,7 @@ const curFY=()=>fyOf(today());
 const fyLabel=fy=>`FY ${fy}-${String(Number(fy)+1).slice(-2)}`;
 const fyRange=fy=>({from:`${fy}-04-01`,to:`${Number(fy)+1}-03-31`});
 const fmt=n=>'₹'+Number(n).toLocaleString('en-IN',{minimumFractionDigits:2,maximumFractionDigits:2});
-const esc=s=>String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+const esc=s=>String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
 const ordSuffix=n=>{const v=n%100;return(v>=11&&v<=13)?'th':({1:'st',2:'nd',3:'rd'}[n%10]||'th');};
 const dateToStr=d=>`${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
 /* Shared-expense helpers:
@@ -27,7 +27,7 @@ function toast(msg,ms=2400,action=null){
   if(action&&actionBtn){
     actionBtn.textContent=action.label;
     actionBtn.classList.remove('hidden');
-    actionBtn.onclick=()=>{action.onClick();el.classList.add('hiding');setTimeout(()=>el.classList.add('hidden'),200);clearTimeout(_tt);};
+    actionBtn.onclick=()=>{clearTimeout(_tt);el.classList.add('hidden');action.onClick();}; // onClick may show its own toast, so hide first
   }else if(actionBtn){
     actionBtn.classList.add('hidden');
     actionBtn.onclick=null;

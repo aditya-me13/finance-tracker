@@ -44,7 +44,7 @@ function computeBal(){
   const totBank=state.banks.filter(b=>b.includeInNetWorth!==false).reduce((s,b)=>s+(bk[b.id]||0),0);
   const totCC=Object.values(cd).reduce((s,v)=>s+v,0);
   const totInvCash=Object.values(iv).reduce((s,v)=>s+v,0);
-  const totHoldingsValue=state.investments.holdings.reduce((s,h)=>s+(Number(h.units)||0)*(Number(h.nav)||0),0);
+  const totHoldingsValue=state.investments.holdings.reduce((s,h)=>s+(Number(h.units)||0)*(Number(h.nav)||Number(h.buyPrice)||0),0);
   const liquid=totBank+ca-totCC;
   const investWorth=totInvCash+totHoldingsValue;
   return{bk,ca,cd,iv,totBank,totBankAll,totCC,totInvCash,totHoldingsValue,liquid,investWorth,netWorth:liquid+investWorth};

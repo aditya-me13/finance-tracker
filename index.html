@@ -159,7 +159,7 @@
                 </div>
                 <div style="display:grid;grid-template-columns:1fr 90px;gap:8px;align-items:end">
                   <div><div class="slabel" style="margin-bottom:4px">My Share (₹)</div>
-                    <div class="fw"><div class="fp">₹</div><input id="e-my-share" class="fi no-spin" type="number" min="0" step="0.01" placeholder="0.00"/></div>
+                    <div class="fw"><div class="fp">₹</div><input id="e-my-share" class="fi no-spin" oninput="this.dataset.touched='1'" type="number" min="0" step="0.01" placeholder="0.00"/></div>
                   </div>
                   <div><div class="slabel" style="margin-bottom:4px">÷ People</div>
                     <div class="fw"><input id="e-split-people" class="fi no-spin" type="number" min="2" step="1" placeholder="4" style="text-align:center"/></div>
@@ -1046,6 +1046,44 @@
     <div style="display:flex;gap:8px;margin-top:16px">
       <button class="btn-g" style="flex:1" onclick="closeModal('modal-bulk-tag')">Cancel</button>
       <button class="btn-p" style="flex:1" onclick="confirmBulkTag()">Apply</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: Edit Transaction -->
+<div id="modal-txn-edit" class="mo hidden" onclick="if(event.target.id==='modal-txn-edit')closeModal('modal-txn-edit')">
+  <div class="mb">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+      <h3 style="font-weight:600;font-size:.93rem" id="et-title">Edit Transaction</h3>
+      <button class="btn-i" onclick="closeModal('modal-txn-edit')"><svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg></button>
+    </div>
+    <input type="hidden" id="et-id"/>
+    <div style="display:flex;flex-direction:column;gap:11px">
+      <div style="display:grid;grid-template-columns:1fr 136px;gap:8px">
+        <div style="min-width:0"><div class="slabel" style="margin-bottom:4px" id="et-amt-label">Amount (INR)</div>
+          <div class="fw"><div class="fp">₹</div><input id="et-amt" class="fi" type="number" min="0" step="0.01" placeholder="0.00"/></div></div>
+        <div style="min-width:0"><div class="slabel" style="margin-bottom:4px">Date</div>
+          <div class="date-trigger" onclick="openDatePicker('et-date')"><span id="et-date-disp">Select date</span></div>
+          <input id="et-date" type="hidden"/></div>
+      </div>
+      <div id="et-share-wrap" class="hidden"><div class="slabel" style="margin-bottom:4px">My Share (INR)</div>
+        <div class="fw"><div class="fp">₹</div><input id="et-share" class="fi" type="number" min="0" step="0.01" placeholder="0.00"/></div></div>
+      <div id="et-cat-wrap"><div class="slabel" style="margin-bottom:4px">Category</div><select id="et-cat" class="pl"></select></div>
+      <div id="et-acc-wrap" style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+        <div><div class="slabel" style="margin-bottom:4px">Account Type</div>
+          <select id="et-actype" class="pl" onchange="fillEditInst()"><option value="bank">Bank Account</option><option value="cc">Credit Card</option><option value="cash">Cash</option></select></div>
+        <div><div class="slabel" style="margin-bottom:4px">Instrument</div><select id="et-inst" class="pl"></select></div>
+      </div>
+      <div id="et-tr-wrap" class="hidden" style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+        <div><div class="slabel" style="margin-bottom:4px">From</div><select id="et-from" class="pl"></select></div>
+        <div><div class="slabel" style="margin-bottom:4px">To</div><select id="et-to" class="pl"></select></div>
+      </div>
+      <div><div class="slabel" style="margin-bottom:4px" id="et-desc-label">Description</div>
+        <div class="fw"><input id="et-desc" class="fi" type="text" placeholder="Optional"/></div></div>
+    </div>
+    <div style="display:flex;gap:8px;margin-top:16px">
+      <button class="btn-g" style="flex:1" onclick="closeModal('modal-txn-edit')">Cancel</button>
+      <button class="btn-p" style="flex:1" onclick="saveEditTxn()">Save Changes</button>
     </div>
   </div>
 </div>

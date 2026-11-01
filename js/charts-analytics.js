@@ -41,7 +41,7 @@ function buildDonut(key,canvasId,legId,labels,data,bgs,fgs,emptyMsg){
   const empty=!labels.length;
   const leg=document.getElementById(legId);
   leg.innerHTML=empty?`<span style="font-size:.77rem;color:#c4bfba">${emptyMsg}</span>`:
-    (()=>{const tot=data.reduce((a,b)=>a+b,0);return labels.map((l,i)=>`<div style="display:flex;align-items:center;gap:5px;margin-bottom:2px"><span style="width:8px;height:8px;border-radius:2px;background:${fgs[i]};flex-shrink:0"></span><span style="font-size:.75rem;color:#57534e;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(l)}</span><span class="num" style="font-size:.7rem;color:#a8a29e">${((data[i]/tot)*100).toFixed(0)}%</span></div>`).join('');})();
+    (()=>{const tot=data.reduce((a,b)=>a+b,0);return labels.map((l,i)=>`<div style="display:flex;align-items:center;gap:5px;margin-bottom:2px"><span style="width:8px;height:8px;border-radius:2px;background:${fgs[i]};flex-shrink:0"></span><span style="font-size:.75rem;color:#57534e;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(l)}</span><span class="num" style="font-size:.7rem;color:#a8a29e">${tot>0?((data[i]/tot)*100).toFixed(0):0}%</span></div>`).join('');})();
   destroyChart(key);
   CH[key]=new Chart(document.getElementById(canvasId).getContext('2d'),{
     type:'doughnut',
@@ -166,15 +166,18 @@ function renderStatTiles(totalSpent,totalInc,surplus,exps,incs,trueSpent,fronted
     </div>`).join('');
 }
 
-function renderBvaChart(exps){
+function renderBvaChart(exps,from,to){
   const budCats=state.categories.expense.filter(cat=>state.categoryBudgets[cat]>0);
   const spentCats=new Set(exps.map(e=>e.category));
   const allCats=[...new Set([...budCats,...Array.from(spentCats)])];
   const wrap=document.getElementById('an-bva-wrap'),empty=document.getElementById('an-bva-empty');
-  if(!allCats.length){empty.classList.remove('hidden');wrap.style.height='80px';return;}
+  if(!allCats.length){destroyChart('bva');empty.classList.remove('hidden');wrap.style.height='80px';return;}
   empty.classList.add('hidden');
   wrap.style.height=Math.max(allCats.length*48+70,220)+'px';
-  const budData=allCats.map(cat=>state.categoryBudgets[cat]||0);
+  // Category budgets are per month; scale them to the number of calendar months in the range
+  let months=1;
+  if(from&&to&&from<=to){const[fy,fm]=from.split('-').map(Number),[ty,tm]=to.split('-').map(Number);months=(ty-fy)*12+(tm-fm)+1;}
+  const budData=allCats.map(cat=>(state.categoryBudgets[cat]||0)*months);
   const actData=allCats.map(cat=>exps.filter(e=>e.category===cat).reduce((s,e)=>s+shareAmount(e),0));
   destroyChart('bva');
   CH.bva=new Chart(document.getElementById('an-bva').getContext('2d'),{

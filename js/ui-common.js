@@ -129,9 +129,16 @@ function confirmDelete(id){
       const removed=state.transactions.find(x=>x.id===_pendingDeleteId);
       state.transactions=state.transactions.filter(x=>x.id!==_pendingDeleteId);
       _pendingDeleteId=null;
+      let tenureBumped=false;
+      const loan=removed&&removed.loanId?state.loans.find(l=>l.id===removed.loanId):null;
+      if(loan){ // an EMI entry reduced the loan when logged, so give that back
+        loan.outstanding=(Number(loan.outstanding)||0)+(Number(removed.amount)||0);
+        if(loan.tenureMonths>0){loan.tenureMonths+=1;tenureBumped=true;}
+      }
       saveState();rebuildAll();
       if(removed)showUndoToast('Transaction deleted',()=>{
         state.transactions.push(removed);
+        if(loan){loan.outstanding=Math.max(0,(Number(loan.outstanding)||0)-(Number(removed.amount)||0));if(tenureBumped)loan.tenureMonths=Math.max(0,loan.tenureMonths-1);}
         saveState();rebuildAll();
         toast('Restored');
       });

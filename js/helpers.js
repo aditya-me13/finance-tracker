@@ -11,6 +11,7 @@ const fyLabel=fy=>`FY ${fy}-${String(Number(fy)+1).slice(-2)}`;
 const fyRange=fy=>({from:`${fy}-04-01`,to:`${Number(fy)+1}-03-31`});
 const fmt=n=>'₹'+Number(n).toLocaleString('en-IN',{minimumFractionDigits:2,maximumFractionDigits:2});
 const esc=s=>String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+const ordSuffix=n=>{const v=n%100;return(v>=11&&v<=13)?'th':({1:'st',2:'nd',3:'rd'}[n%10]||'th');};
 const dateToStr=d=>`${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
 /* Shared-expense helpers:
    realAmount  = money that actually left a real bank/cash/CC account (for balances & cash flow)

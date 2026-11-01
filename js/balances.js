@@ -56,16 +56,37 @@ function getDueDateStatus(card){
   const now=new Date();
   const day=parseInt(card.dueDay,10);
   const remind=parseInt(card.remindDays,10)||5;
-  let due=new Date(now.getFullYear(),now.getMonth(),day);
-  if(due<now)due=new Date(now.getFullYear(),now.getMonth()+1,day);
-  const diffMs=due-now;
-  const diffDays=Math.ceil(diffMs/(1000*60*60*24));
+  // Compare whole days against the start of today (so the due day itself counts as "Due Today"),
+  // and clamp the day to the month length (day 31 in a 30-day month, 29-31 in February).
+  const startToday=new Date(now.getFullYear(),now.getMonth(),now.getDate());
+  const dueIn=(y,m)=>new Date(y,m,Math.min(day,daysInMonth(y,m)));
+  let due=dueIn(now.getFullYear(),now.getMonth());
+  if(due<startToday)due=dueIn(now.getFullYear(),now.getMonth()+1);
+  const diffDays=Math.round((due-startToday)/(1000*60*60*24));
   let status='ok',label='';
   if(diffDays<0){status='overdue';label=`Overdue by ${-diffDays}d`;}
   else if(diffDays===0){status='urgent';label='Due Today';}
   else if(diffDays<=remind){status='soon';label=`Due in ${diffDays}d`;}
   else{status='ok';label=`Due ${due.toLocaleDateString('en-IN',{day:'numeric',month:'short'})}`;}
   return{status,label,due,diffDays};
+}
+
+/* Card outstanding as of a date (inclusive): startDue plus card-affecting transactions up to that day.
+   Same sign rules as computeBal(). */
+function cardDueAsOf(cardId,dateStr){
+  const c=state.cards.find(x=>x.id===cardId);
+  let due=Number(c&&c.startDue)||0;
+  for(const t of state.transactions){
+    if(t.date>dateStr)continue;
+    const a=Number(t.amount)||0;
+    if(t.type==='expense'&&t.acType==='cc'&&t.acId===cardId)due+=a;
+    else if(t.type==='income'&&t.destType==='cc'&&t.destId===cardId)due-=a;
+    else if(t.type==='transfer'){
+      if(t.toKey==='cc:'+cardId)due-=a;
+      if(t.fromKey==='cc:'+cardId)due+=a;
+    }
+  }
+  return due;
 }
 
 /* ── Splitwise / Roommate Settlement ──────────────────────── */

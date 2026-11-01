@@ -632,6 +632,24 @@
             <div class="fw"><input id="ac-reminddays" class="fi" type="number" min="1" max="30" placeholder="e.g. 5"/></div></div>
         </div>
         <p style="font-size:.71rem;color:#a8a29e;margin-top:4px">We'll highlight upcoming due dates in the sidebar.</p>
+        <!-- Auto-debit -->
+        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;margin-top:12px">
+          <input type="checkbox" id="ac-ad-on" onchange="toggleAutoDebitFields()" style="accent-color:#1c1917"/>
+          <span style="font-size:.8rem;color:#44403c">Auto-debit this bill from a bank account</span>
+        </label>
+        <div id="ac-ad-fields" class="hidden" style="display:flex;flex-direction:column;gap:9px;margin-top:9px">
+          <div><div class="slabel" style="margin-bottom:4px">Pay from</div>
+            <div class="fw"><select id="ac-ad-bank" class="fi"></select></div></div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+            <div><div class="slabel" style="margin-bottom:4px">Debit on day (1–31)</div>
+              <div class="fw"><input id="ac-ad-day" class="fi" type="number" min="1" max="31" placeholder="e.g. 15"/></div></div>
+            <div><div class="slabel" style="margin-bottom:4px">Amount</div>
+              <div class="fw"><select id="ac-ad-mode" class="fi" onchange="toggleAutoDebitFields()"><option value="total">Full outstanding</option><option value="fixed">Fixed amount</option></select></div></div>
+          </div>
+          <div id="ac-ad-fixed-wrap" class="hidden"><div class="slabel" style="margin-bottom:4px">Fixed amount (INR)</div>
+            <div class="fw"><div class="fp">₹</div><input id="ac-ad-fixed" class="fi" type="number" min="0" step="0.01" placeholder="0.00"/></div></div>
+          <p style="font-size:.71rem;color:#a8a29e">Logged as a transfer from the bank to this card when you open the app on or after the debit day.</p>
+        </div>
       </div>
       <!-- Net Worth inclusion (bank accounts only) -->
       <div id="ac-nw-wrap" class="hidden">

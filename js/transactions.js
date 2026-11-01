@@ -2,15 +2,15 @@
 function fillExpInst(){
   const t=document.getElementById('e-actype').value,s=document.getElementById('e-inst');
   s.innerHTML='';
-  if(t==='bank'){if(!state.banks.length){s.innerHTML='<option>No banks added</option>';return;}state.banks.forEach(b=>s.innerHTML+=`<option value="${b.id}">${esc(b.name)}</option>`);}
-  else if(t==='cc'){if(!state.cards.length){s.innerHTML='<option>No cards added</option>';return;}state.cards.forEach(c=>s.innerHTML+=`<option value="${c.id}">${esc(c.name)}</option>`);}
+  if(t==='bank'){if(!state.banks.length){s.innerHTML='<option value="">No banks added</option>';return;}state.banks.forEach(b=>s.innerHTML+=`<option value="${b.id}">${esc(b.name)}</option>`);}
+  else if(t==='cc'){if(!state.cards.length){s.innerHTML='<option value="">No cards added</option>';return;}state.cards.forEach(c=>s.innerHTML+=`<option value="${c.id}">${esc(c.name)}</option>`);}
   else s.innerHTML='<option value="cash">Cash</option>';
 }
 function fillIncInst(){
   const t=document.getElementById('i-actype').value,s=document.getElementById('i-inst');
   s.innerHTML='';
-  if(t==='bank'){if(!state.banks.length)s.innerHTML='<option>No banks added</option>';else state.banks.forEach(b=>s.innerHTML+=`<option value="${b.id}">${esc(b.name)}</option>`);}
-  else if(t==='cc'){if(!state.cards.length)s.innerHTML='<option>No cards added</option>';else state.cards.forEach(c=>s.innerHTML+=`<option value="${c.id}">${esc(c.name)}</option>`);}
+  if(t==='bank'){if(!state.banks.length)s.innerHTML='<option value="">No banks added</option>';else state.banks.forEach(b=>s.innerHTML+=`<option value="${b.id}">${esc(b.name)}</option>`);}
+  else if(t==='cc'){if(!state.cards.length)s.innerHTML='<option value="">No cards added</option>';else state.cards.forEach(c=>s.innerHTML+=`<option value="${c.id}">${esc(c.name)}</option>`);}
   else s.innerHTML='<option value="cash">Cash</option>';
   document.getElementById('i-cc-hint')?.classList.toggle('hidden',t!=='cc');
 }
@@ -188,7 +188,7 @@ function submitExpense(){
   }else{
     acType=document.getElementById('e-actype').value;
     const ai=document.getElementById('e-inst').value;
-    if((acType==='bank'||acType==='cc')&&!ai){toast('No account selected');return;}
+    if((acType==='bank'&&!state.banks.some(b=>b.id===ai))||(acType==='cc'&&!state.cards.some(c=>c.id===ai))){toast('No account selected');return;}
     acId=acType==='cash'?'cash':ai;
     state.transactions.push({id:uid(),date,type:'expense',amount:amt,acType,acId,category:selExpCat,desc,myShare,shared:isSplit,sharedMode:isSplit?'fronted':undefined,settled:isSplit?false:undefined,tags});
   }
@@ -209,7 +209,7 @@ function submitIncome(){
   if(!amt||amt<=0){toast('Enter a valid amount');return;}
   if(!date){toast('Select a date');return;}
   if(!selIncCat){toast('Select a source category');return;}
-  if((dt==='bank'||dt==='cc')&&!di){toast('No account selected');return;}
+  if((dt==='bank'&&!state.banks.some(b=>b.id===di))||(dt==='cc'&&!state.cards.some(c=>c.id===di))){toast('No account selected');return;}
   const destId=dt==='cash'?'cash':di;
   const tags=selIncTags.slice();
   state.transactions.push({id:uid(),date,type:'income',amount:amt,destType:dt,destId,category:selIncCat,desc,tags});

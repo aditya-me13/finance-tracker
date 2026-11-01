@@ -124,7 +124,6 @@ function renderSplitwiseWidget(){
     <div style="padding:3px 8px 2px">
       <div class="num" style="font-size:.92rem;font-weight:600;color:${netColor}">${netLabel}</div>
       <div style="font-size:.67rem;color:#a8a29e;margin-top:2px">Fronted: ${fmt(fronted)} &middot; Owed: ${fmt(owed)}</div>
-      ${renderSplitPaymentsList()}
       <div style="display:flex;gap:6px;margin-top:8px">
         <button class="btn-g" style="flex:1;padding:6px 0;font-size:.76rem" onclick="openSplitPayModal()">Record Payment</button>
         <button class="btn-g" style="flex:1;padding:6px 0;font-size:.76rem" onclick="openSettleModal()">Settle Up</button>
@@ -139,33 +138,6 @@ function fillSettleAccOpts(selId){
 }
 
 /* ── Split settlement payments (partial, per-entry) ──────────── */
-function splitPaymentActive(p,alloc){
-  if(p.settled)return false;
-  const used=(p.allocations||[]).reduce((s,a)=>s+(Number(a.amt)||0),0);
-  if((Number(p.amount)||0)-used>0.004)return true;           /* has unallocated credit */
-  return (p.allocations||[]).some(a=>{                        /* or any entry it hit is still open */
-    const e=state.transactions.find(x=>x.id===a.id);
-    if(!e||e.settled)return false;
-    const tot=e.acType==='shared'?splitShareOf(e):Math.max(0,(Number(e.amount)||0)-splitShareOf(e));
-    return tot-(alloc[e.id]||0)>0.004;
-  });
-}
-function renderSplitPaymentsList(){
-  const alloc=buildSplitAllocMap();
-  const pays=state.transactions.filter(t=>t.splitSettle&&splitPaymentActive(t,alloc)).sort((a,b)=>b.date.localeCompare(a.date)).slice(0,5);
-  if(!pays.length)return'';
-  return`<div style="margin-top:8px;border-top:1px solid #f0eeec;padding-top:6px">
-    <div style="font-size:.64rem;color:#a8a29e;margin-bottom:3px;text-transform:uppercase;letter-spacing:.04em">Payments recorded</div>
-    ${pays.map(t=>{
-      const isPaid=t.splitSettle==='paid';
-      const n=(t.allocations||[]).length;
-      return`<div style="display:flex;align-items:center;gap:6px;font-size:.72rem;padding:2px 0">
-        <span style="flex:1;color:#78716c" title="${esc(t.desc||'')}">${fmtDate(t.date)} &middot; ${isPaid?'You paid':'You received'}${n?` &middot; ${n} entr${n>1?'ies':'y'}`:''}</span>
-        <span class="num" style="color:${isPaid?'#ef4444':'#166534'}">${isPaid?'&minus;':'+'}${fmt(t.amount)}</span>
-        <button class="btn-i" onclick="deleteSplitPayment('${t.id}')" title="Remove" style="padding:1px" onmouseover="this.style.color='#ef4444'" onmouseout="this.style.color='#c4bfba'"><svg width="11" height="11" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg></button>
-      </div>`;}).join('')}
-  </div>`;
-}
 let splitPayDir='paid';
 function setSplitPayDir(d){
   splitPayDir=d;
@@ -215,13 +187,6 @@ function confirmSplitPay(){
   const left=computeSplitwiseBalance();
   toast(`Payment of ${fmt(amt)} recorded`+(Math.abs(left.net)>0.004?'':' — all square'));
 }
-function deleteSplitPayment(id){
-  const idx=state.transactions.findIndex(t=>t.id===id);if(idx<0)return;
-  const removed=state.transactions[idx];
-  state.transactions.splice(idx,1);saveState();rebuildAll();
-  showUndoToast('Payment removed',()=>{state.transactions.push(removed);saveState();rebuildAll();});
-}
-
 function openSettleModal(){
   const{owed,fronted,paid,received,net,pending}=computeSplitwiseBalance();
   if(pending<=0.004){toast("Nothing to settle — you're all square");return;}

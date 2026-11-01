@@ -45,7 +45,7 @@ input:focus,select:focus{border-color:#a8a29e!important;box-shadow:0 0 0 3px rgb
 .fw{border:1.5px solid #e7e5e4;border-radius:9px;display:flex;align-items:stretch;background:#fff;transition:border-color .15s,box-shadow .15s}
 .fw:focus-within{border-color:#a8a29e;box-shadow:0 0 0 3px rgba(168,162,158,.12)}
 .fp{padding:0 10px;background:#faf9f7;border-right:1.5px solid #e7e5e4;color:#a8a29e;font-size:.8rem;display:flex;align-items:center;font-weight:500;flex-shrink:0}
-.fi{flex:1;padding:9px 11px;border:none;background:transparent;color:#1c1917}
+.fi{flex:1;min-width:0;width:100%;padding:9px 11px;border:none;background:transparent;color:#1c1917}
 select.pl{width:100%;border:1.5px solid #e7e5e4;border-radius:9px;padding:9px 11px;background:#fff;color:#1c1917;appearance:none;cursor:pointer;transition:border-color .15s}
 .tt{display:flex;border-radius:9px;overflow:hidden;border:1.5px solid #e7e5e4;margin-bottom:13px}
 .ttb{flex:1;padding:7px 4px;font-size:.79rem;font-weight:500;cursor:pointer;border:none;background:#fff;color:#a8a29e;transition:all .15s;font-family:'DM Sans',sans-serif;text-align:center}
@@ -128,3 +128,7 @@ html.dark{filter:invert(1) hue-rotate(180deg)}
 .hold-meta{display:flex;flex-wrap:wrap;gap:3px 14px;font-size:.72rem;color:#a8a29e}
 .hold-meta b{color:#57534e;font-family:'DM Mono',monospace;font-weight:600;white-space:nowrap;margin-left:3px}
 .hold-actions{display:flex;gap:2px;justify-content:flex-end;margin-top:2px}
+
+.fi.no-spin{-moz-appearance:textfield;appearance:textfield}
+.fi.no-spin::-webkit-outer-spin-button,.fi.no-spin::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
+#calc-box:focus-within #calc-display{border-color:#a8a29e}

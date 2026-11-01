@@ -109,15 +109,15 @@
   </div>
 
   <!-- Quick Calculator -->
-  <div class="sb-sec">
+  <div class="sb-sec" id="calc-box" tabindex="-1" onkeydown="calcKeyDown(event)" onclick="calcBoxFocus(event)" style="outline:none">
     <div class="sb-head"><span class="slabel">Quick Calculator</span>
       <button onclick="calcClear()" style="font-size:.68rem;color:#a8a29e;background:none;border:none;cursor:pointer;font-family:'DM Sans',sans-serif" onmouseover="this.style.color='#1c1917'" onmouseout="this.style.color='#a8a29e'">Clear</button>
     </div>
     <input id="calc-display" class="num" type="text" inputmode="decimal" readonly value="0"
-      onclick="calcCopy()" onkeydown="calcKeyDown(event)" title="Click to copy the result"
+      onclick="calcCopy()" title="Click to copy the result"
       style="width:100%;border:1.5px solid #e7e5e4;border-radius:8px;padding:9px 10px;font-size:1rem;font-weight:600;text-align:right;cursor:pointer;background:#faf9f7;color:#1c1917;margin-bottom:7px;caret-color:transparent"/>
     <div id="calc-grid" style="display:grid;grid-template-columns:repeat(4,1fr);gap:5px"></div>
-    <p style="font-size:.62rem;color:#a8a29e;margin-top:7px;line-height:1.4">Type digits/operators, <span class="num">Enter</span> for =, <span class="num">Esc</span> to clear. Click result to copy.</p>
+    <p style="font-size:.62rem;color:#a8a29e;margin-top:7px;line-height:1.4">Click the calculator, then type digits/operators, <span class="num">Enter</span> for =, <span class="num">Esc</span> to clear. Click result to copy.</p>
   </div>
 </aside>
 
@@ -159,10 +159,10 @@
                 </div>
                 <div style="display:grid;grid-template-columns:1fr 90px;gap:8px;align-items:end">
                   <div><div class="slabel" style="margin-bottom:4px">My Share (₹)</div>
-                    <div class="fw"><div class="fp">₹</div><input id="e-my-share" class="fi" type="number" min="0" step="0.01" placeholder="0.00"/></div>
+                    <div class="fw"><div class="fp">₹</div><input id="e-my-share" class="fi no-spin" type="number" min="0" step="0.01" placeholder="0.00"/></div>
                   </div>
                   <div><div class="slabel" style="margin-bottom:4px">÷ People</div>
-                    <div class="fw"><input id="e-split-people" class="fi" type="number" min="2" step="1" placeholder="4" style="text-align:center"/></div>
+                    <div class="fw"><input id="e-split-people" class="fi no-spin" type="number" min="2" step="1" placeholder="4" style="text-align:center"/></div>
                   </div>
                 </div>
                 <button type="button" onclick="calcEqualShare()" style="font-size:.71rem;color:#1d4ed8;background:none;border:none;cursor:pointer;margin-top:6px;padding:0;font-family:'DM Sans',sans-serif">Split equally →</button>
@@ -561,7 +561,7 @@
       <div class="card">
         <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px">
           <div class="card" style="padding:14px 14px 12px;min-width:0">
-            <span style="font-weight:600;font-size:.88rem;display:block;margin-bottom:10px">MF vs Stock Profit Share</span>
+            <span style="font-weight:600;font-size:.88rem;display:block;margin-bottom:10px">MF vs Stock vs ETF Profit Share</span>
             <div style="width:150px;height:150px;margin:0 auto 10px;position:relative">
               <canvas id="inv-profit-donut"></canvas>
               <div id="inv-profit-empty" class="chart-empty hidden" style="position:absolute;inset:0">No profit data yet</div>
@@ -569,7 +569,7 @@
             <div id="inv-profit-leg" style="display:flex;flex-direction:column;gap:5px;min-width:0"></div>
           </div>
           <div class="card" style="padding:14px 14px 12px;min-width:0">
-            <span style="font-weight:600;font-size:.88rem;display:block;margin-bottom:10px">MF vs Stock Allocation</span>
+            <span style="font-weight:600;font-size:.88rem;display:block;margin-bottom:10px">MF vs Stock vs ETF Allocation</span>
             <div style="width:150px;height:150px;margin:0 auto 10px;position:relative">
               <canvas id="inv-alloc-donut"></canvas>
               <div id="inv-alloc-empty" class="chart-empty hidden" style="position:absolute;inset:0">No holdings yet</div>
@@ -701,8 +701,9 @@
       </div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
         <div><div class="slabel" style="margin-bottom:4px">Holding Type</div>
-          <select id="inv-hold-type" class="pl" onchange="toggleHoldLookupFields()">
+          <select id="inv-hold-type" class="pl" onchange="onHoldTypeChange()">
             <option value="stock">Stock</option>
+            <option value="etf">ETF</option>
             <option value="mf">Mutual Fund</option>
             <option value="sip">Mutual Fund (SIP Series)</option>
           </select>
@@ -715,9 +716,15 @@
         <div class="fw"><input id="inv-hold-name" class="fi" type="text" placeholder="e.g. HDFC Bank, Parag Parikh Flexi Cap"/></div></div>
       <!-- Stock symbol lookup -->
       <div id="inv-hold-stock-wrap">
-        <div class="slabel" style="margin-bottom:4px">NSE Symbol (for live price)</div>
-        <div class="fw"><input id="inv-hold-symbol" class="fi" type="text" placeholder="e.g. RELIANCE, TCS, INFY"/></div>
-        <p style="font-size:.71rem;color:#a8a29e;margin-top:4px">Used by "Refresh Prices" to fetch the latest NSE quote.</p>
+        <div class="slabel" style="margin-bottom:4px">Find NSE Ticker (for live price)</div>
+        <div style="display:flex;gap:6px">
+          <div class="fw" style="flex:1"><input id="inv-hold-tksearch" class="fi" type="text" autocomplete="off" placeholder="Search ticker or name, e.g. RELIANCE, NIFTYBEES" oninput="debouncedSearchTicker()" onkeydown="if(event.key==='Enter'){event.preventDefault();searchTicker();}"/></div>
+          <button type="button" class="btn-g" onclick="searchTicker()">Search</button>
+        </div>
+        <div id="inv-hold-tkresults" style="max-height:140px;overflow-y:auto;margin-top:4px"></div>
+        <input type="hidden" id="inv-hold-symbol"/>
+        <p id="inv-hold-tkpicked" style="font-size:.71rem;color:#166534;margin-top:4px"></p>
+        <p style="font-size:.71rem;color:#a8a29e;margin-top:4px">Pick one result from the list. It's used by "Refresh Prices" to fetch the latest NSE quote.</p>
       </div>
       <!-- MF scheme lookup -->
       <div id="inv-hold-mf-wrap" class="hidden">

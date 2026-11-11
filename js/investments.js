@@ -792,6 +792,7 @@ function renderInvestments(){
             <span class="hold-gain num" style="color:${hgc}">${m.gain>=0?'+':''}${m.gainPct.toFixed(1)}%</span>
           </div>
           <div class="hold-meta">
+            ${h.date?`<span>${h.sipSeries?'SIP from':'Bought'}<b>${fmtDate(h.date)}</b></span>`:''}
             <span>Units<b>${h.units}</b></span>
             <span>Buy<b>${fmt(h.buyPrice)}</b></span>
             <span>NAV<b>${fmt(h.nav)}</b></span>

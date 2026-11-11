@@ -45,6 +45,7 @@ function rebuildAll(){
   renderWeekly();
   fillTxnFilterCatOpts();
   fillTxnFilterTagOpts();
+  fillTxnFilterAccOpts();
   renderTxnLog();
   fillExpInst();fillIncInst();fillTransferOpts();
   renderChips('expense');renderChips('income');

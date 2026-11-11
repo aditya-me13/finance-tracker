@@ -105,9 +105,30 @@ function fillTxnFilterTagOpts(){
   sel.innerHTML='<option value="">All Tags</option>'+state.tags.map(t=>`<option value="${esc(t)}">${esc(t)}</option>`).join('');
   if(prev&&Array.from(sel.options).some(o=>o.value===prev))sel.value=prev;
 }
-function isTxnFilterActive(){return!!(txnFilter.category||txnFilter.from||txnFilter.to||txnFilter.tag||txnFilter.search);}
+/* Payment method keys use the same 'cash' / 'bank:<id>' / 'cc:<id>' form as transfer keys, plus 'shared' */
+function fillTxnFilterAccOpts(){
+  const sel=document.getElementById('txn-filter-acc');
+  if(!sel)return;
+  const prev=sel.value;
+  let html='<option value="">All Payment Methods</option><option value="cash">Cash</option>';
+  if(state.banks.length)html+='<optgroup label="Bank / UPI">'+state.banks.map(b=>`<option value="bank:${esc(b.id)}">${esc(b.name)}</option>`).join('')+'</optgroup>';
+  if(state.cards.length)html+='<optgroup label="Credit Cards">'+state.cards.map(c=>`<option value="cc:${esc(c.id)}">${esc(c.name)}</option>`).join('')+'</optgroup>';
+  html+='<option value="shared">Roommate Split</option>';
+  sel.innerHTML=html;
+  if(prev&&Array.from(sel.options).some(o=>o.value===prev))sel.value=prev;
+}
+function txnAccKeys(t){
+  const key=(type,id)=>type==='cash'?'cash':type==='shared'?'shared':type?`${type}:${id}`:'';
+  if(t.type==='expense')return[key(t.acType,t.acId)];
+  if(t.type==='income')return[key(t.destType,t.destId)];
+  if(t.type==='invest')return[t.sourceKey||''];
+  if(t.type==='divest')return[t.destKey||''];
+  return[t.fromKey||'',t.toKey||''];
+}
+function isTxnFilterActive(){return!!(txnFilter.category||txnFilter.from||txnFilter.to||txnFilter.tag||txnFilter.search||txnFilter.account);}
 function txnMatchesFilter(t){
-  const{category,from,to,tag,search}=txnFilter;
+  const{category,from,to,tag,search,account}=txnFilter;
+  if(account&&!txnAccKeys(t).includes(account))return false;
   if(category){
     const idx=category.indexOf(':'),kind=category.slice(0,idx),name=category.slice(idx+1);
     if(kind==='exp'){if(t.type!=='expense'||t.category!==name)return false;}
@@ -130,6 +151,7 @@ function applyTxnFilter(){
     to:document.getElementById('txn-filter-to').value,
     tag:document.getElementById('txn-filter-tag')?document.getElementById('txn-filter-tag').value:'',
     search:document.getElementById('txn-filter-search')?document.getElementById('txn-filter-search').value.trim():'',
+    account:document.getElementById('txn-filter-acc')?document.getElementById('txn-filter-acc').value:'',
   };
   bulkSelectedIds.clear();
   renderTxnLog();
@@ -142,7 +164,8 @@ function clearTxnFilter(){
   document.getElementById('txn-filter-to-disp').textContent='To';
   if(document.getElementById('txn-filter-tag'))document.getElementById('txn-filter-tag').value='';
   if(document.getElementById('txn-filter-search'))document.getElementById('txn-filter-search').value='';
-  txnFilter={category:'',from:'',to:'',tag:'',search:''};
+  if(document.getElementById('txn-filter-acc'))document.getElementById('txn-filter-acc').value='';
+  txnFilter={category:'',from:'',to:'',tag:'',search:'',account:''};
   bulkSelectedIds.clear();
   renderTxnLog();
 }
@@ -160,7 +183,9 @@ function renderTxnLog(){
     const rangeText=(txnFilter.from||txnFilter.to)?`${txnFilter.from?fmtDate(txnFilter.from):'…'} – ${txnFilter.to?fmtDate(txnFilter.to):'…'}`:'All time';
     const tagText=txnFilter.tag?` · #${txnFilter.tag}`:'';
     const searchText=txnFilter.search?` · "${txnFilter.search}"`:'';
-    label.textContent=`Filtered: ${catText} · ${rangeText}${tagText}${searchText}`;
+    const accSel=document.getElementById('txn-filter-acc');
+    const accText=txnFilter.account&&accSel?` · ${accSel.options[accSel.selectedIndex].textContent}`:'';
+    label.textContent=`Filtered: ${catText} · ${rangeText}${tagText}${accText}${searchText}`;
     const expSum=txns.filter(t=>t.type==='expense'&&!t.splitSettle).reduce((s,t)=>s+Number(t.amount),0);
     const incSum=txns.filter(t=>t.type==='income'&&!t.splitSettle).reduce((s,t)=>s+Number(t.amount),0);
     const parts=[];

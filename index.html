@@ -146,7 +146,7 @@
           </div>
           <!-- EXPENSE -->
           <div id="form-expense">
-            <div style="display:grid;grid-template-columns:1fr 136px;gap:8px;margin-bottom:9px">
+            <div style="display:grid;grid-template-columns:1fr 152px;gap:8px;margin-bottom:9px">
               <div style="min-width:0"><div class="slabel" style="margin-bottom:4px" id="e-amt-label">Amount (INR)</div>
                 <div class="fw"><div class="fp">₹</div><input id="e-amt" class="fi" type="number" min="0" step="0.01" placeholder="0.00" oninput="onExpAmtInput()"/></div>
               </div>
@@ -215,7 +215,7 @@
           </div>
           <!-- INCOME -->
           <div id="form-income" class="hidden">
-            <div style="display:grid;grid-template-columns:1fr 136px;gap:8px;margin-bottom:9px">
+            <div style="display:grid;grid-template-columns:1fr 152px;gap:8px;margin-bottom:9px">
               <div style="min-width:0"><div class="slabel" style="margin-bottom:4px">Amount (INR)</div>
                 <div class="fw"><div class="fp">₹</div><input id="i-amt" class="fi" type="number" min="0" step="0.01" placeholder="0.00"/></div>
               </div>
@@ -261,7 +261,7 @@
           </div>
           <!-- TRANSFER -->
           <div id="form-transfer" class="hidden">
-            <div style="display:grid;grid-template-columns:1fr 136px;gap:8px;margin-bottom:9px">
+            <div style="display:grid;grid-template-columns:1fr 152px;gap:8px;margin-bottom:9px">
               <div style="min-width:0"><div class="slabel" style="margin-bottom:4px">Amount (INR)</div>
                 <div class="fw"><div class="fp">₹</div><input id="t-amt" class="fi" type="number" min="0" step="0.01" placeholder="0.00"/></div>
               </div>
@@ -1071,7 +1071,7 @@
     </div>
     <input type="hidden" id="et-id"/>
     <div style="display:flex;flex-direction:column;gap:11px">
-      <div style="display:grid;grid-template-columns:1fr 136px;gap:8px">
+      <div style="display:grid;grid-template-columns:1fr 152px;gap:8px">
         <div style="min-width:0"><div class="slabel" style="margin-bottom:4px" id="et-amt-label">Amount (INR)</div>
           <div class="fw"><div class="fp">₹</div><input id="et-amt" class="fi" type="number" min="0" step="0.01" placeholder="0.00"/></div></div>
         <div style="min-width:0"><div class="slabel" style="margin-bottom:4px">Date</div>
@@ -1102,12 +1102,18 @@
 
 <!-- MODAL: Date Wheel Picker -->
 <div id="modal-datewheel" class="mo hidden" onclick="if(event.target.id==='modal-datewheel')closeModal('modal-datewheel')">
-  <div class="mb" style="max-width:280px">
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
+  <div class="mb" style="max-width:310px">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
       <h3 style="font-weight:600;font-size:.93rem">Select Date</h3>
       <button class="btn-i" onclick="closeModal('modal-datewheel')"><svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg></button>
     </div>
-    <div class="wheel-wrap" title="Arrow keys: change value · Left/Right: switch column · Enter: confirm">
+    <div class="dw-head">
+      <button type="button" class="btn-i dw-step" onclick="shiftWeek(-1)" aria-label="Previous week" title="Previous week ( [ )"><svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.2"><path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7"/></svg></button>
+      <div id="dw-preview" class="dw-preview" aria-live="polite"></div>
+      <button type="button" class="btn-i dw-step" onclick="shiftWeek(1)" aria-label="Next week" title="Next week ( ] )"><svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/></svg></button>
+    </div>
+    <div id="dw-quick" class="dw-quick"></div>
+    <div class="wheel-wrap" title="Arrow keys: change value · Left/Right: switch column · [ / ]: prev/next day · T: today · Enter: confirm">
       <div class="wheel-highlight"></div>
       <div class="wheel-col" id="wheel-day" role="spinbutton" tabindex="0" aria-label="Day" onscroll="onWheelScroll(this)"></div>
       <div class="wheel-col" id="wheel-month" role="spinbutton" tabindex="0" aria-label="Month" onscroll="onWheelScroll(this)"></div>

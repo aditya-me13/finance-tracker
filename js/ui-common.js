@@ -67,11 +67,27 @@ auth.onAuthStateChanged(async user=>{
 /* ── Date Wheel Picker ────────────────────────────────────── */
 const MONTH_NAMES=['January','February','March','April','May','June','July','August','September','October','November','December'];
 const WHEEL_ITEM_H=36;
-const fmtDMY=iso=>{if(!iso)return'Select date';const[y,m,d]=iso.split('-');return`${d}.${m}.${y}`;};
+const DAY_SHORT=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+const DAY_LONG=['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+const isoAddDays=(iso,n)=>{const d=new Date(iso+'T00:00:00');d.setDate(d.getDate()+n);return dateToStr(d);};
+// Relative label for nearby dates ("Today", "Yesterday", "Tomorrow"), else ''
+const relDayLabel=iso=>{const t=today();if(iso===t)return'Today';if(iso===isoAddDays(t,-1))return'Yesterday';if(iso===isoAddDays(t,1))return'Tomorrow';return'';};
+// Compact field display with weekday, e.g. "Mon, 23 Nov" (year added when not the current year)
+const fmtDMY=iso=>{
+  if(!iso)return'Select date';
+  const d=new Date(iso+'T00:00:00');
+  const yr=d.getFullYear()!==new Date().getFullYear()?` '${String(d.getFullYear()).slice(-2)}`:'';
+  return`${DAY_SHORT[d.getDay()]}, ${d.getDate()} ${MONTH_NAMES[d.getMonth()].slice(0,3)}${yr}`;
+};
 function setDateVal(id,iso){
   const el=document.getElementById(id);if(el)el.value=iso||'';
   const disp=document.getElementById(id+'-disp');
-  if(disp)disp.textContent=fmtDMY(iso);
+  if(disp){
+    disp.textContent=fmtDMY(iso);
+    const rel=iso?relDayLabel(iso):'';
+    const d=iso?new Date(iso+'T00:00:00'):null;
+    disp.parentElement.title=d?`${DAY_LONG[d.getDay()]}, ${d.getDate()} ${MONTH_NAMES[d.getMonth()]} ${d.getFullYear()}${rel?' · '+rel:''}`:'';
+  }
 }
 function daysInMonth(year,monthIdx){return new Date(year,monthIdx+1,0).getDate();}
 function buildWheelCol(el,items,selIdx){
@@ -95,6 +111,7 @@ function wheelMove(el,idx){
   el._kbIdx=idx;el._kbT=Date.now();
   if(el.id==='wheel-month'||el.id==='wheel-year')setTimeout(syncDayWheel,0);
   el.scrollTo({top:idx*WHEEL_ITEM_H,behavior:window.matchMedia('(prefers-reduced-motion: reduce)').matches?'auto':'smooth'});
+  if(el.id==='wheel-day')updateDwPreview();
 }
 document.addEventListener('keydown',e=>{
   const el=e.target;
@@ -111,6 +128,8 @@ document.addEventListener('keydown',e=>{
     const i=cols.indexOf(el)+(e.key==='ArrowRight'?1:-1);
     if(cols[i])cols[i].focus();
   }else if(e.key==='Enter'){e.preventDefault();confirmDatePicker();}
+  else if(e.key==='t'||e.key==='T'){e.preventDefault();setWheelsTo(today());}
+  else if(e.key==='['||e.key===']'){e.preventDefault();shiftWeek(e.key===']'?1:-1);}
 });
 // Make every date field a real keyboard-reachable button
 document.querySelectorAll('.date-trigger').forEach(t=>{
@@ -129,45 +148,103 @@ function onWheelScroll(el){
     const idx=wheelIndex(el);
     markSelected(el,idx);
     if(el.id==='wheel-month'||el.id==='wheel-year')syncDayWheel();
+    else updateDwPreview();
   },120);
+}
+// Day wheel items carry their weekday ("23 Mon"); the value is always index+1
+function buildDayWheel(year,monthIdx,day){
+  const dc=daysInMonth(year,monthIdx);
+  const items=Array.from({length:dc},(_,i)=>`${pad(i+1)} ${DAY_SHORT[new Date(year,monthIdx,i+1).getDay()]}`);
+  buildWheelCol(document.getElementById('wheel-day'),items,Math.min(day,dc)-1);
 }
 function syncDayWheel(){
   const dEl=document.getElementById('wheel-day'),mEl=document.getElementById('wheel-month'),yEl=document.getElementById('wheel-year');
   const monthIdx=wheelIndex(mEl),year=Number(yEl._items[wheelIndex(yEl)]);
-  const curDay=Number(dEl._items[wheelIndex(dEl)]);
-  const dc=daysInMonth(year,monthIdx);
-  if(dEl._items.length!==dc||curDay>dc){
-    const newDay=Math.min(curDay,dc);
-    buildWheelCol(dEl,Array.from({length:dc},(_,i)=>String(i+1).padStart(2,'0')),newDay-1);
-  }
+  const curDay=wheelIndex(dEl)+1;
+  // Rebuild whenever month/year moves: day count and weekday labels both change
+  if(dEl._y!==year||dEl._m!==monthIdx){buildDayWheel(year,monthIdx,curDay);dEl._y=year;dEl._m=monthIdx;}
+  updateDwPreview();
 }
+function getWheelISO(){
+  const dEl=document.getElementById('wheel-day'),mEl=document.getElementById('wheel-month'),yEl=document.getElementById('wheel-year');
+  if(!dEl._items||!mEl._items||!yEl._items)return null;
+  const year=Number(yEl._items[wheelIndex(yEl)]),monthIdx=wheelIndex(mEl);
+  const day=Math.min(wheelIndex(dEl)+1,daysInMonth(year,monthIdx));
+  return`${year}-${pad(monthIdx+1)}-${pad(day)}`;
+}
+// Big "Monday, 23 November 2026 · Today" header + highlight the matching quick-pick chip
+function updateDwPreview(){
+  const iso=getWheelISO();if(!iso)return;
+  const d=new Date(iso+'T00:00:00'),rel=relDayLabel(iso);
+  const p=document.getElementById('dw-preview');
+  // Keep the Mon–Sun strip on the selected date's week: jump only when the date falls outside it
+  if(!_dwEnd||iso>_dwEnd||iso<isoAddDays(_dwEnd,-6)){_dwEnd=sundayOf(iso);renderDwQuick();}
+  // Header describes the week shown, e.g. "17th Monday to 23rd Sunday", with the picked day below
+  const s=new Date(isoAddDays(_dwEnd,-6)+'T00:00:00'),e=new Date(_dwEnd+'T00:00:00');
+  const nth=x=>`${x.getDate()}${ordSuffix(x.getDate())}`;
+  const mon=x=>MONTH_NAMES[x.getMonth()];
+  const span=s.getMonth()===e.getMonth()?`${mon(e)} ${e.getFullYear()}`
+    :s.getFullYear()===e.getFullYear()?`${mon(s).slice(0,3)} – ${mon(e).slice(0,3)} ${e.getFullYear()}`
+    :`${mon(s).slice(0,3)} ${s.getFullYear()} – ${mon(e).slice(0,3)} ${e.getFullYear()}`;
+  if(p)p.innerHTML=`<div class="dw-dow">${nth(s)} Mon to ${nth(e)} Sun</div><div class="dw-full">${span} · <b>${DAY_SHORT[d.getDay()]} ${d.getDate()}</b>${rel?` <span class="dw-rel">${rel}</span>`:''}</div>`;
+  document.querySelectorAll('#dw-quick .dw-q').forEach(b=>b.classList.toggle('sel',b.dataset.iso===iso));
+}
+// Sunday that ends the Monday-first week containing iso
+const sundayOf=iso=>{const wd=new Date(iso+'T00:00:00').getDay();return isoAddDays(iso,(7-wd)%7);};
+// Quick picks: a Monday–Sunday strip ending on _dwEnd; one tap selects and closes
+let _dwEnd=null;
+function renderDwQuick(){
+  const wrap=document.getElementById('dw-quick');if(!wrap||!_dwEnd)return;
+  const t=today(),y=isoAddDays(t,-1);
+  wrap.innerHTML=Array.from({length:7},(_,i)=>{
+    const iso=isoAddDays(_dwEnd,i-6),d=new Date(iso+'T00:00:00');
+    const top=iso===t?'Today':iso===y?'Yest':DAY_SHORT[d.getDay()];
+    // Show the month on the first chip and wherever a new month starts, so a shifted week is easy to read
+    const mon=(i===0||d.getDate()===1)?`<i>${MONTH_NAMES[d.getMonth()].slice(0,3)}</i>`:'<i>&nbsp;</i>';
+    return`<button type="button" class="dw-q" data-iso="${iso}" onclick="pickQuickDate('${iso}')" aria-label="${DAY_LONG[d.getDay()]} ${d.getDate()} ${MONTH_NAMES[d.getMonth()]}">${mon}<span>${top}</span><b>${d.getDate()}</b></button>`;
+  }).join('');
+}
+// ‹ › buttons: slide the whole strip (and the selected date) by one week
+function shiftWeek(n){
+  const iso=getWheelISO();if(!iso)return;
+  _dwEnd=isoAddDays(_dwEnd||today(),7*n);renderDwQuick();
+  setWheelsTo(isoAddDays(iso,7*n));
+}
+function pickQuickDate(iso){applyPickedDate(iso);}
 let _dateTargetId=null;
+function setWheelsTo(iso){
+  const base=new Date(iso+'T00:00:00');
+  const year=base.getFullYear(),monthIdx=base.getMonth(),day=base.getDate();
+  const yEl=document.getElementById('wheel-year'),dEl=document.getElementById('wheel-day');
+  let years=yEl._items;
+  if(!years||!years.includes(String(year))){years=[];for(let y=year-7;y<=year+3;y++)years.push(String(y));}
+  buildDayWheel(year,monthIdx,day);dEl._y=year;dEl._m=monthIdx;
+  buildWheelCol(document.getElementById('wheel-month'),MONTH_NAMES,monthIdx);
+  buildWheelCol(yEl,years,years.indexOf(String(year)));
+  updateDwPreview();
+}
 function openDatePicker(targetId){
   _dateTargetId=targetId;
   const cur=document.getElementById(targetId).value;
-  const base=cur?new Date(cur+'T00:00:00'):new Date();
-  const year=base.getFullYear(),monthIdx=base.getMonth(),day=base.getDate();
-  const dc=daysInMonth(year,monthIdx);
-  const years=[];for(let y=year-7;y<=year+3;y++)years.push(String(y));
   openModal('modal-datewheel');
+  _dwEnd=sundayOf(cur||today());renderDwQuick(); // the Mon–Sun week of the shown date
   requestAnimationFrame(()=>{
-    buildWheelCol(document.getElementById('wheel-day'),Array.from({length:dc},(_,i)=>String(i+1).padStart(2,'0')),Math.min(day,dc)-1);
-    buildWheelCol(document.getElementById('wheel-month'),MONTH_NAMES,monthIdx);
-    buildWheelCol(document.getElementById('wheel-year'),years,years.indexOf(String(year)));
+    document.getElementById('wheel-year')._items=null; // fresh year range around the shown date
+    setWheelsTo(cur||today());
     document.getElementById('wheel-day').focus();
   });
 }
-function confirmDatePicker(){
-  syncDayWheel(); // e.g. month changed to Feb just before confirming: clamp the day first
-  const dEl=document.getElementById('wheel-day'),mEl=document.getElementById('wheel-month'),yEl=document.getElementById('wheel-year');
-  const day=dEl._items[wheelIndex(dEl)],monthIdx=wheelIndex(mEl),year=yEl._items[wheelIndex(yEl)];
-  const iso=`${year}-${pad(monthIdx+1)}-${day}`;
+function applyPickedDate(iso){
   if(_dateTargetId){
     setDateVal(_dateTargetId,iso);
     if(_dateTargetId==='rng-from'||_dateTargetId==='rng-to')applyCustomRange();
     if(_dateTargetId==='txn-filter-from'||_dateTargetId==='txn-filter-to')applyTxnFilter();
   }
   closeModal('modal-datewheel');
+}
+function confirmDatePicker(){
+  syncDayWheel(); // e.g. month changed to Feb just before confirming: clamp the day first
+  const iso=getWheelISO();if(iso)applyPickedDate(iso);
 }
 
 /* ── Delete Confirmation ──────────────────────────────────── */

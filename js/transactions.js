@@ -1,6 +1,42 @@
 /* ── Dropdowns ────────────────────────────────────────────── */
+/* ── Remember the last entry's setup (per user, this device) ──
+   Account type + instrument + category + date of the last saved expense/income/transfer,
+   so the next entry starts pre-filled with the exact same configuration. */
+const lastEntryKey=()=>currentUid?'ft_last_entry_'+currentUid:null;
+function getLastEntry(ctx){try{const k=lastEntryKey();if(!k)return null;return(JSON.parse(localStorage.getItem(k)||'{}'))[ctx]||null;}catch(e){return null;}}
+function rememberLastEntry(ctx,cfg){
+  try{const k=lastEntryKey();if(!k)return;const all=JSON.parse(localStorage.getItem(k)||'{}');all[ctx]={...cfg,savedOn:today()};localStorage.setItem(k,JSON.stringify(all));}catch(e){}
+}
+const hasOpt=(sel,v)=>v!=null&&v!==''&&[...sel.options].some(o=>o.value===v);
+// After an <select> is rebuilt: keep the user's current pick, else fall back to the remembered one
+function keepInstSel(s,prev,ctx,acType){
+  if(hasOpt(s,prev)){s.value=prev;return;}
+  const last=getLastEntry(ctx);
+  if(last&&last.acType===acType&&hasOpt(s,last.inst))s.value=last.inst;
+}
+// Called once on boot (before rebuildAll) to pre-fill all three forms
+function restoreLastEntries(){
+  const e=getLastEntry('expense'),i=getLastEntry('income'),t=getLastEntry('transfer');
+  // A remembered date is only reused on the same day it was saved — otherwise start on today
+  const dateOk=c=>c&&c.date&&c.savedOn===today();
+  if(e){
+    if(['bank','cc','cash'].includes(e.acType))document.getElementById('e-actype').value=e.acType;
+    if(e.category&&state.categories.expense.includes(e.category))selExpCat=e.category;
+    if(dateOk(e))setDateVal('e-date',e.date);
+  }
+  if(i){
+    if(['bank','cc','cash'].includes(i.acType))document.getElementById('i-actype').value=i.acType;
+    if(i.category&&state.categories.income.includes(i.category))selIncCat=i.category;
+    if(dateOk(i))setDateVal('i-date',i.date);
+  }
+  if(t&&dateOk(t))setDateVal('t-date',t.date);
+}
 function fillExpInst(){
   const t=document.getElementById('e-actype').value,s=document.getElementById('e-inst');
+  const prev=s.dataset.ty===t?s.value:null;s.dataset.ty=t;
+  _fillExpInst(t,s);keepInstSel(s,prev,'expense',t);
+}
+function _fillExpInst(t,s){
   s.innerHTML='';
   if(t==='bank'){if(!state.banks.length){s.innerHTML='<option value="">No banks added</option>';return;}state.banks.forEach(b=>s.innerHTML+=`<option value="${b.id}">${esc(b.name)}</option>`);}
   else if(t==='cc'){if(!state.cards.length){s.innerHTML='<option value="">No cards added</option>';return;}state.cards.forEach(c=>s.innerHTML+=`<option value="${c.id}">${esc(c.name)}</option>`);}
@@ -8,6 +44,10 @@ function fillExpInst(){
 }
 function fillIncInst(){
   const t=document.getElementById('i-actype').value,s=document.getElementById('i-inst');
+  const prev=s.dataset.ty===t?s.value:null;s.dataset.ty=t;
+  _fillIncInst(t,s);keepInstSel(s,prev,'income',t);
+}
+function _fillIncInst(t,s){
   s.innerHTML='';
   if(t==='bank'){if(!state.banks.length)s.innerHTML='<option value="">No banks added</option>';else state.banks.forEach(b=>s.innerHTML+=`<option value="${b.id}">${esc(b.name)}</option>`);}
   else if(t==='cc'){if(!state.cards.length)s.innerHTML='<option value="">No cards added</option>';else state.cards.forEach(c=>s.innerHTML+=`<option value="${c.id}">${esc(c.name)}</option>`);}
@@ -20,9 +60,13 @@ function fillTransferOpts(){
   html+='<option value="cash">Cash</option>';
   state.cards.forEach(c=>html+=`<option value="cc:${c.id}">${esc(c.name)} (CC Bill)</option>`);
   state.investments.accounts.forEach(a=>html+=`<option value="inv:${a.id}">${esc(a.name)} (Investment)</option>`);
-  document.getElementById('t-from').innerHTML=html;
-  document.getElementById('t-to').innerHTML=html;
-  if(document.getElementById('t-to').options.length>1)document.getElementById('t-to').selectedIndex=1;
+  const f=document.getElementById('t-from'),to=document.getElementById('t-to');
+  const last=getLastEntry('transfer')||{};
+  const pf=f.value||last.from,pt=to.value||last.to;
+  f.innerHTML=html;to.innerHTML=html;
+  if(hasOpt(f,pf))f.value=pf;
+  if(hasOpt(to,pt))to.value=pt;
+  else if(to.options.length>1)to.selectedIndex=f.selectedIndex===1?0:1;
 }
 
 
@@ -288,6 +332,7 @@ function submitExpense(){
     const freq=document.getElementById('e-recur-freq').value;
     createRecurringFromEntry({type:'expense',amount:amt,acType,acId,category:selExpCat,desc,myShare,shared:isSplit,sharedMode:isSplit?expSplitMode:undefined,tags,frequency:freq,anchorDate:date});
   }
+  rememberLastEntry('expense',{acType:document.getElementById('e-actype').value,inst:document.getElementById('e-inst').value,category:selExpCat,date});
   saveState();
   document.getElementById('e-amt').value='';document.getElementById('e-desc').value='';
   resetSplitPanel();resetRecurToggle('expense');resetTagInputs();
@@ -309,6 +354,7 @@ function submitIncome(){
     const freq=document.getElementById('i-recur-freq').value;
     createRecurringFromEntry({type:'income',amount:amt,destType:dt,destId,category:selIncCat,desc,tags,frequency:freq,anchorDate:date});
   }
+  rememberLastEntry('income',{acType:dt,inst:di,category:selIncCat,date});
   saveState();document.getElementById('i-amt').value='';document.getElementById('i-desc').value='';
   resetRecurToggle('income');resetTagInputs();
   rebuildAll();toast(dt==='cc'?'Income recorded — card due reduced':'Income recorded');
@@ -321,6 +367,7 @@ function submitTransfer(){
   if(!date){toast('Select a date');return;}
   if(from===to){toast('From and To must differ');return;}
   state.transactions.push({id:uid(),date,type:'transfer',amount:amt,fromKey:from,toKey:to,note});
+  rememberLastEntry('transfer',{from,to,date});
   saveState();document.getElementById('t-amt').value='';document.getElementById('t-note').value='';
   rebuildAll();toast('Transfer recorded');
 }

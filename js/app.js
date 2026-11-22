@@ -75,7 +75,8 @@ applyTheme(localStorage.getItem('ft-theme')||(window.matchMedia('(prefers-color-
 /* ── Boot (runs once per successful sign-in) ─────────────── */
 function boot(){
   const t=today();
-  ['e-date','i-date','t-date'].forEach(id=>document.getElementById(id).value=t);
+  ['e-date','i-date','t-date'].forEach(id=>setDateVal(id,t));
+  restoreLastEntries(); // pre-fill account/instrument/category/date from the last saved entry
   const[y,m]=t.split('-');
   document.getElementById('rng-from').value=`${y}-${m}-01`;
   document.getElementById('rng-to').value=t;

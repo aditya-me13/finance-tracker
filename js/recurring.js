@@ -187,11 +187,14 @@ function openRecurringEdit(id){
   const r=(state.recurring||[]).find(x=>x.id===id);if(!r)return;
   const isExp=r.type==='expense',isShared=isExp&&r.shared;
   document.getElementById('re-id').value=id;
-  document.getElementById('re-meta').textContent=`${r.category} · ${recurFreqLabel(r)}${r.active?'':' · Paused'}`;
+  document.getElementById('re-meta').textContent=`${r.type==='income'?'Income':'Expense'} · ${recurFreqLabel(r)}${r.active?'':' · Paused'}`;
   document.getElementById('re-amt-label').textContent=isShared?'Total Bill (INR)':'Amount (INR)';
   document.getElementById('re-amt').value=r.amount;
   document.getElementById('re-share-wrap').classList.toggle('hidden',!isShared);
   document.getElementById('re-share').value=isShared?(r.myShare!==undefined?r.myShare:r.amount):'';
+  const cats=state.categories[r.type==='income'?'income':'expense']||[];
+  const opts=cats.includes(r.category)?cats:[r.category,...cats]; // keep a category that was since removed
+  document.getElementById('re-cat').innerHTML=opts.map(c=>`<option value="${esc(c)}"${c===r.category?' selected':''}>${esc(c)}</option>`).join('');
   document.getElementById('re-desc').value=r.desc||'';
   document.getElementById('re-desc').placeholder=r.category;
   setDateVal('re-date',nextRecurDate(r,r.lastGeneratedDate||r.startDate));
@@ -213,8 +216,10 @@ function saveRecurringEdit(){
   if(!next){fieldError('re-date','Select the next payment date');return;}
   if(next<=today()){fieldError('re-date','Pick a date after today');return;}
   const desc=document.getElementById('re-desc').value.trim();
+  const cat=document.getElementById('re-cat').value;
+  if(!cat){fieldError('re-cat','Select a category');return;}
 
-  r.amount=amt;
+  r.amount=amt;r.category=cat;
   if(r.type==='expense')r.myShare=share;
   r.desc=desc;r.name=desc||r.category;
   // Re-anchor the schedule on the chosen date: monthly keeps that day of the month, weekly that weekday

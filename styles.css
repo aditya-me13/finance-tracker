@@ -150,14 +150,20 @@ html.dark{filter:invert(1) hue-rotate(180deg)}
 .inv-tbl{width:100%;border-collapse:collapse;font-size:.78rem;min-width:680px}
 .inv-tbl th{font-size:.6rem;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:#a8a29e;text-align:left;padding:8px 10px;border-bottom:1px solid #ebe9e6;white-space:nowrap;background:#faf9f7}
 .inv-tbl td{padding:8px 10px;border-bottom:1px solid #f4f3f0;vertical-align:top;color:#292524;white-space:nowrap}
-.inv-tbl tbody tr:nth-child(even) td{background:#f5f5f4}
+.inv-tbl tbody tr.alt td{background:#f5f5f4}
+/* Month divider in the holdings table */
+.inv-tbl tr.inv-month-sep td{padding:10px 10px 4px;border-top:2px solid #6366f1;border-bottom:none;background:#fff}
+.inv-tbl tr.inv-month-sep:first-child td{border-top:none;padding-top:6px}
+.inv-tbl tr.inv-month-sep span{position:sticky;left:10px;display:inline-flex;align-items:baseline;gap:8px;font-size:.66rem;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:#4f46e5}
+.inv-tbl tr.inv-month-sep i{font-style:normal;font-weight:500;letter-spacing:0;text-transform:none;color:#a8a29e}
+.inv-tbl tbody tr.inv-month-sep:hover td,.inv-tbl tbody tr.inv-month-sep td:first-child{background:#fff}
 .inv-tbl tbody tr:hover td{background:#ecebe9}
 .inv-tbl tfoot td{font-weight:600;border-top:1px solid #ebe9e6;border-bottom:none;background:#faf9f7}
 .inv-tbl .r{text-align:right}
 .inv-tbl .num{font-family:'DM Mono',monospace}
 .inv-tbl th:first-child,.inv-tbl td:first-child{position:sticky;left:0;z-index:1;background:#fff}
 .inv-tbl thead th:first-child,.inv-tbl tfoot td:first-child{background:#faf9f7}
-.inv-tbl tbody tr:nth-child(even) td:first-child{background:#f5f5f4}
+.inv-tbl tbody tr.alt td:first-child{background:#f5f5f4}
 .inv-tbl tbody tr:hover td:first-child{background:#ecebe9}
 .inv-hold-cell{min-width:180px;max-width:260px;white-space:normal}
 .inv-hold-name{font-weight:600;font-size:.82rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}

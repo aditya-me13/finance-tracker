@@ -866,16 +866,25 @@ const holdTypeBadge=h=>{
 const fmtUnits=n=>Number(n||0).toLocaleString('en-IN',{maximumFractionDigits:3});
 function invHoldingsTableHtml(accHoldings){
   if(!accHoldings.length)return`<div style="font-size:.78rem;color:#c4bfba;padding:10px 4px">No holdings yet</div>`;
-  const rows=accHoldings.map(h=>({h,m:holdMetrics(h)})).sort((x,y)=>y.m.currentValue-x.m.currentValue);
+  // Newest purchase first (SIPs use their latest installment date); undated holdings go last,
+  // ties broken by current value
+  const rows=accHoldings.map(h=>({h,m:holdMetrics(h)})).sort((x,y)=>(y.h.date||'').localeCompare(x.h.date||'')||y.m.currentValue-x.m.currentValue);
   const inv=rows.reduce((s,r)=>s+r.m.invested,0),cur=rows.reduce((s,r)=>s+r.m.currentValue,0),g=cur-inv,gp=inv>0?g/inv*100:0;
   const gcol=v=>v>=0?'#166534':'#ef4444',sgn=v=>v>=0?'+':'';
+  let _stripe=0;
   const icon=(d)=>`<svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="${d}"/></svg>`;
   return`<div class="inv-tbl-wrap"><table class="inv-tbl">
     <thead><tr><th>Holding</th><th class="r">Units</th><th class="r">Avg buy</th><th class="r">Current price</th><th class="r">Invested</th><th class="r">Current value</th><th class="r">Gain / Loss</th><th class="r" aria-label="Actions"></th></tr></thead>
-    <tbody>${rows.map(({h,m})=>{
+    <tbody>${rows.map(({h,m},i)=>{
+      // Coloured divider whenever the purchase month changes; stripes restart within each month
+      const mk=h.date?h.date.slice(0,7):'';
+      const newMonth=i===0||mk!==(rows[i-1].h.date||'').slice(0,7);
+      if(newMonth)_stripe=0;else _stripe++;
+      const n=rows.filter(r=>(r.h.date||'').slice(0,7)===mk).length;
+      const sep=newMonth?`<tr class="inv-month-sep"><td colspan="8"><span>${mk?`${MONTH_NAMES[Number(mk.slice(5,7))-1]} ${mk.slice(0,4)}`:'No purchase date'}<i>${n} holding${n===1?'':'s'}</i></span></td></tr>`:'';
       const code=h.symbol?esc(h.symbol):h.schemeCode?'#'+esc(h.schemeCode):'';
       const when=h.date?`${h.sipSeries?`SIP · ${h.durationMonths||'?'} mo · latest`:'Bought'} ${fmtDate(h.date)}`:'';
-      return`<tr>
+      return`${sep}<tr${_stripe%2?' class="alt"':''}>
         <td class="inv-hold-cell"><div class="inv-hold-name" title="${esc(h.name)}">${esc(h.name)}</div>
           <div class="inv-sub">${holdTypeBadge(h)}${code?`<span>${code}</span>`:''}${when?`<span>${when}</span>`:''}</div></td>
         <td class="r num">${fmtUnits(h.units)}</td>

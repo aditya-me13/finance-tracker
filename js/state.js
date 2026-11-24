@@ -60,8 +60,15 @@ function _flushCloud(){
 }
 document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='hidden')_flushCloud();});
 window.addEventListener('pagehide',_flushCloud);
+/* createdAt orders same-day transactions in the log (newest on top). Any transaction pushed
+   without one gets stamped here, so every creation path is covered. */
+function stampCreatedAt(){
+  let n=Date.now();
+  state.transactions.forEach(t=>{if(!t.createdAt)t.createdAt=n++;});
+}
 function saveState(){
   if(typeof resetSplitAllocMemo==='function')resetSplitAllocMemo();
+  stampCreatedAt();
   if(!currentUid)return;
   try{localStorage.setItem(cacheKey(),JSON.stringify(state));localStorage.setItem(tsKey(),String(Date.now()));}catch(e){}
   clearTimeout(_saveTimer);
@@ -117,6 +124,9 @@ function normalizeState(){
   if(!state.loans)state.loans=[];
   if(!state.recurring)state.recurring=[];
   state.recurring.forEach(r=>{if(r.active===undefined)r.active=true;if(!r.tags)r.tags=[];});
+  if(state.monthStartDay===undefined)state.monthStartDay=1;
+  // Older entries have no createdAt: use their array position (they were appended in the order added)
+  state.transactions.forEach((t,i)=>{if(!t.createdAt)t.createdAt=i+1;});
   state.transactions.forEach(t=>{
     if(typeof t.amount==='string')t.amount=Number(t.amount)||0;
     if(t.type==='expense'&&(t.myShare===undefined||t.myShare===null||t.myShare===''))t.myShare=Number(t.amount)||0;
@@ -133,6 +143,15 @@ function normalizeState(){
       h.avgPriceFixed=true;
     }
   });
+  // SIP installments fall on the next trading day when the market is closed. Re-derive the dates of
+  // existing series (they are not hand-editable) so older entries and new holiday data both apply.
+  if(typeof sipInstallmentDate==='function'){
+    const byId=new Map(state.transactions.map(t=>[t.id,t]));
+    state.investments.holdings.forEach(h=>{
+      if(!h.sipSeries||!h.date||!Array.isArray(h.seriesTxnIds))return;
+      h.seriesTxnIds.forEach(id=>{const t=byId.get(id);if(t&&t.sipMonth>0)t.date=sipInstallmentDate(h.date,t.sipMonth-1);});
+    });
+  }
   state.cards.forEach(c=>{
     if(!c.autoDebit)c.autoDebit={enabled:false,bankId:'',day:0,mode:'total',fixedAmount:0,lastRunDate:''};
   });
@@ -147,6 +166,7 @@ let selExpTags=[],selIncTags=[];
 let invSummaryMode='cash';
 let CH={};  // chart instances keyed by id
 let cumulativeCatSelection=[];
+let invAccUIState={};  // per investment account: {tab:'holdings'|'calendar', mk:'YYYY-MM', cal:'month'|'pattern'}
 
 /* Analytics range state */
 let anRange={mode:'this_month',from:null,to:null};

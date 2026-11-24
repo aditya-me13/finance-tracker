@@ -3,14 +3,16 @@ function destroyChart(key){if(CH[key]){CH[key].destroy();delete CH[key];}}
 const baseOpts=(extra={})=>({responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},...extra.plugins},...extra});
 
 function renderBarChart(mk,exps){
-  const[y,m]=mk.split('-').map(Number),days=new Date(y,m,0).getDate();
-  const data=Array(days).fill(0);
-  exps.forEach(e=>{const d=parseInt(e.date.split('-')[2],10);if(d>=1&&d<=days)data[d-1]+=shareAmount(e);});
+  const{from,to}=mkRange(mk),dates=[];
+  for(const c=new Date(from+'T00:00:00'),end=new Date(to+'T00:00:00');c<=end;c.setDate(c.getDate()+1))dates.push(dateToStr(c));
+  const idx={};dates.forEach((d,i)=>idx[d]=i);
+  const data=Array(dates.length).fill(0);
+  exps.forEach(e=>{if(idx[e.date]!==undefined)data[idx[e.date]]+=shareAmount(e);});
   document.getElementById('bar-label').textContent=mkLabel(mk);
   destroyChart('bar');
   CH.bar=new Chart(document.getElementById('chart-bar').getContext('2d'),{
     type:'bar',
-    data:{labels:Array.from({length:days},(_,i)=>String(i+1)),datasets:[{data,backgroundColor:'#e7e5e4',borderRadius:3,hoverBackgroundColor:'#a8a29e'}]},
+    data:{labels:dates.map(d=>String(Number(d.slice(8,10)))),datasets:[{data,backgroundColor:'#e7e5e4',borderRadius:3,hoverBackgroundColor:'#a8a29e'}]},
     options:{...baseOpts({plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>' '+fmt(c.raw)}}}}),
       scales:{x:{grid:{display:false},ticks:{font:{family:'DM Mono',size:9},color:'#c4bfba',maxTicksLimit:10}},
         y:{grid:{color:'#f4f3f0'},ticks:{font:{family:'DM Mono',size:9},color:'#c4bfba',callback:v=>v>=1000?`₹${(v/1000).toFixed(0)}k`:`₹${v}`}}}}
@@ -51,7 +53,7 @@ function buildDonut(key,canvasId,legId,labels,data,bgs,fgs,emptyMsg){
 }
 
 function renderQuickCharts(){
-  const exps=curViewTxns().filter(t=>t.type==='expense'&&!t.splitSettle);
+  const exps=curViewATxns().filter(t=>t.type==='expense'&&!t.splitSettle);
   if(viewMode==='fy')renderBarChartFY(viewFY,exps);else renderBarChart(viewMK,exps);
   const et={};exps.forEach(e=>{et[e.category]=(et[e.category]||0)+shareAmount(e);});
   const el=Object.keys(et),ed=el.map(l=>et[l]);
@@ -76,17 +78,17 @@ function renderQuickCharts(){
 
 /* ── Analytics Date Range ─────────────────────────────────── */
 function getRangeDates(){
-  const now=new Date(),y=now.getFullYear(),m=now.getMonth();
+  const y=new Date().getFullYear(),mk=curMK(),cur=mkRange(mk);
   let from,to;
   switch(anRange.mode){
-    case'this_month':from=dateToStr(new Date(y,m,1));to=dateToStr(new Date(y,m+1,0));break;
-    case'last_month':from=dateToStr(new Date(y,m-1,1));to=dateToStr(new Date(y,m,0));break;
-    case'3_months':from=dateToStr(new Date(y,m-2,1));to=dateToStr(new Date(y,m+1,0));break;
-    case'6_months':from=dateToStr(new Date(y,m-5,1));to=dateToStr(new Date(y,m+1,0));break;
+    case'this_month':({from,to}=cur);break;
+    case'last_month':({from,to}=mkRange(shiftMK(mk,-1)));break;
+    case'3_months':from=mkRange(shiftMK(mk,-2)).from;to=cur.to;break;
+    case'6_months':from=mkRange(shiftMK(mk,-5)).from;to=cur.to;break;
     case'this_year':from=`${y}-01-01`;to=`${y}-12-31`;break;
     case'this_fy':{const fy=curFY();from=`${fy}-04-01`;to=`${Number(fy)+1}-03-31`;break;}
-    case'custom':from=anRange.from||dateToStr(new Date(y,m,1));to=anRange.to||dateToStr(new Date(y,m+1,0));break;
-    default:from=dateToStr(new Date(y,m,1));to=dateToStr(new Date(y,m+1,0));
+    case'custom':from=anRange.from||cur.from;to=anRange.to||cur.to;break;
+    default:({from,to}=cur);
   }
   return{from,to};
 }
@@ -119,7 +121,7 @@ function updateRangeDisplay(){
 function renderAnalytics(){
   updateRangeDisplay();
   const{from,to}=getRangeDates();
-  const allTxns=txnsInRange(from,to);
+  const allTxns=aTxnsInRange(from,to);
   const exps=allTxns.filter(t=>t.type==='expense'&&!t.splitSettle);
   const incs=allTxns.filter(t=>t.type==='income'&&!t.splitSettle);
   const totalSpent=exps.reduce((s,t)=>s+realAmount(t),0);
@@ -216,17 +218,19 @@ function renderAnIncDonut(incs){
 }
 
 function renderCashflowChart(from,to,surplus){
+  const all=analyticsTxns(),byMK={};
+  all.forEach(t=>{const k=mkOf(t.date);(byMK[k]=byMK[k]||[]).push(t);});
   const mkSet=new Set();
-  state.transactions.filter(t=>t.date>=from&&t.date<=to).forEach(t=>mkSet.add(mkOf(t.date)));
+  all.filter(t=>t.date>=from&&t.date<=to).forEach(t=>mkSet.add(mkOf(t.date)));
   const months=Array.from(mkSet).sort();
-  const incData=months.map(mk=>txnsForMK(mk).filter(t=>t.type==='income'&&!t.splitSettle).reduce((s,t)=>s+Number(t.amount),0));
-  const expData=months.map(mk=>txnsForMK(mk).filter(t=>t.type==='expense'&&!t.splitSettle).reduce((s,t)=>s+Number(t.amount),0));
+  const incData=months.map(mk=>(byMK[mk]||[]).filter(t=>t.type==='income'&&!t.splitSettle).reduce((s,t)=>s+Number(t.amount),0));
+  const expData=months.map(mk=>(byMK[mk]||[]).filter(t=>t.type==='expense'&&!t.splitSettle).reduce((s,t)=>s+Number(t.amount),0));
   const empty=document.getElementById('an-cashflow-empty');
   const surEl=document.getElementById('cashflow-surplus');
   surEl.textContent=`Net: ${fmt(surplus)}`;surEl.style.color=surplus>=0?'#166534':'#ef4444';
   if(!months.length){empty.classList.remove('hidden');destroyChart('cashflow');return;}
   empty.classList.add('hidden');
-  const shortLbl=k=>{const[y,m]=k.split('-');return new Date(+y,+m-1,1).toLocaleDateString('en-IN',{month:'short',year:'2-digit'});};
+  const shortLbl=mkShortLabel;
   destroyChart('cashflow');
   CH.cashflow=new Chart(document.getElementById('an-cashflow').getContext('2d'),{
     type:'bar',
@@ -243,8 +247,9 @@ function renderCashflowChart(from,to,surplus){
 }
 
 function renderHistChart(){
+  const all=analyticsTxns();
   const allMKs=new Set();
-  state.transactions.filter(t=>t.type==='expense').forEach(t=>allMKs.add(mkOf(t.date)));
+  all.filter(t=>t.type==='expense').forEach(t=>allMKs.add(mkOf(t.date)));
   const months=Array.from(allMKs).sort();
   const empty=document.getElementById('an-hist-empty');
   if(!months.length){empty.classList.remove('hidden');destroyChart('hist');return;}
@@ -253,8 +258,8 @@ function renderHistChart(){
   const showCash=document.getElementById('hf-cash').checked;
   const showCC=document.getElementById('hf-cc').checked;
   const showShared=document.getElementById('hf-shared')?.checked;
-  const mkExps=mk=>state.transactions.filter(t=>t.type==='expense'&&!t.splitSettle&&mkOf(t.date)===mk);
-  const shortLbl=k=>{const[y,m]=k.split('-');return new Date(+y,+m-1,1).toLocaleDateString('en-IN',{month:'short',year:'2-digit'});};
+  const mkExps=mk=>all.filter(t=>t.type==='expense'&&!t.splitSettle&&mkOf(t.date)===mk);
+  const shortLbl=mkShortLabel;
   const ds=[];
   if(showBank)ds.push({label:'Bank/UPI',data:months.map(mk=>mkExps(mk).filter(e=>e.acType==='bank').reduce((s,t)=>s+shareAmount(t),0)),backgroundColor:'rgba(59,130,246,.75)',borderColor:'#3b82f6',borderWidth:2,borderRadius:4,stack:'s'});
   if(showCash)ds.push({label:'Cash',data:months.map(mk=>mkExps(mk).filter(e=>e.acType==='cash').reduce((s,t)=>s+shareAmount(t),0)),backgroundColor:'rgba(34,197,94,.75)',borderColor:'#22c55e',borderWidth:2,borderRadius:4,stack:'s'});
@@ -327,8 +332,7 @@ function renderNetWorthChart(){
   if(months.length<1){empty.classList.remove('hidden');destroyChart('nw');return;}
   empty.classList.add('hidden');
   const nwData=months.map(mk=>{
-    const[y,m]=mk.split('-').map(Number);
-    const endDate=dateToStr(new Date(y,m,0));
+    const endDate=mkRange(mk).to;
     const bk={};state.banks.forEach(b=>bk[b.id]=Number(b.startBalance)||0);
     let ca=Number(state.cash.startBalance)||0;
     const cd={};state.cards.forEach(c=>cd[c.id]=Number(c.startDue)||0);
@@ -349,7 +353,7 @@ function renderNetWorthChart(){
     });
     return state.banks.filter(b=>b.includeInNetWorth!==false).reduce((s,b)=>s+(bk[b.id]||0),0)+ca-Object.values(cd).reduce((s,v)=>s+v,0);
   });
-  const shortLbl=k=>{const[y,m]=k.split('-');return new Date(+y,+m-1,1).toLocaleDateString('en-IN',{month:'short',year:'2-digit'});};
+  const shortLbl=mkShortLabel;
   const colors=nwData.map(v=>v>=0?'rgba(34,197,94,.7)':'rgba(239,68,68,.7)');
   destroyChart('nw');
   CH.nw=new Chart(document.getElementById('an-networth').getContext('2d'),{

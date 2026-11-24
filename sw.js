@@ -1,4 +1,4 @@
-const CACHE_NAME='finance-tracker-v4';
+const CACHE_NAME='finance-tracker-v8';
 const APP_SHELL=[
   './',
   './index.html',
@@ -6,6 +6,7 @@ const APP_SHELL=[
   './manifest.json',
   './js/state.js',
   './js/helpers.js',
+  './js/market-days.js',
   './js/ui-common.js',
   './js/balances.js',
   './js/sidebar.js',

@@ -476,13 +476,10 @@ async function _saveInvHoldingImpl(){
     Object.assign(h,{accountId,type,date,name,units:isSip?sipAmount:unitsFinal,buyPrice:isSip?sipMonths:buyPriceToSave,nav,symbol,schemeCode,monthlyAmount:isSip?sipAmount:undefined,durationMonths:isSip?sipMonths:undefined,buyPriceMode:isSip?undefined:buyMode,sourceKey});
     if(isSip){
       const liveNav=sipNav;
-      const start=new Date(date+'T00:00:00');
       const series=[];
       let totalUnits=0;
       for(let i=0;i<sipMonths;i++){
-        const d=new Date(start);
-        d.setMonth(d.getMonth()-i);
-        const txnDate=dateToStr(d);
+        const txnDate=sipInstallmentDate(date,i); // next trading day if the market is closed
         const invested=sipAmount;
         const unitsBought=invested/liveNav;
         totalUnits+=unitsBought;
@@ -502,14 +499,11 @@ async function _saveInvHoldingImpl(){
     if(newAmount>directAvail){toast(`Insufficient cash — only ${fmt(directAvail)} available in this account${fundMode==='bank'?' / bank account':''}.`);return;}
     if(isSip){
       const liveNav=sipNav;
-      const start=new Date(date+'T00:00:00');
       const hid=uid();
       const series=[];
       let totalUnits=0;
       for(let i=0;i<sipMonths;i++){
-        const d=new Date(start);
-        d.setMonth(d.getMonth()-i);
-        const txnDate=dateToStr(d);
+        const txnDate=sipInstallmentDate(date,i); // next trading day if the market is closed
         const invested=sipAmount;
         const unitsBought=invested/liveNav;
         totalUnits+=unitsBought;
@@ -663,28 +657,60 @@ async function fetchStockPrice(symbol,date=''){
   if(!price)throw new Error('No price returned');
   return price;
 }
+/* Which lookup a holding uses for its live price: 'mf' (AMFI NAV), 'stock' (NSE proxy) or '' (manual price) */
+const holdPriceSource=h=>(h.type==='mf'||h.type==='sip')?(h.schemeCode?'mf':''):isExchangeTraded(h.type)?(h.symbol?'stock':''):'';
 async function refreshAllPrices(){
   const holdings=state.investments.holdings;
   if(!holdings.length){toast('No holdings to refresh');return;}
   const btn=document.getElementById('refresh-prices-btn');
   if(btn){btn.disabled=true;btn.textContent='Refreshing…';}
-  let ok=0,fail=0;
+  let ok=0,fail=0,manual=0;
   try{
-    // Resolve in small parallel batches instead of one request at a time
+    // Resolve in small parallel batches instead of one request at a time.
+    // Each holding records when its price was last fetched, or why the fetch failed.
     const lookup=async h=>{
+      const src=holdPriceSource(h);
+      if(!src){manual++;return;}
       try{
-        let price=null;
-        if(h.type==='mf'&&h.schemeCode)price=await fetchMFNav(h.schemeCode);
-        else if(isExchangeTraded(h.type)&&h.symbol)price=await fetchStockPrice(h.symbol);
-        if(price){h.nav=price;ok++;}else fail++;
-      }catch(e){fail++;}
+        const price=src==='mf'?await fetchMFNav(h.schemeCode):await fetchStockPrice(h.symbol);
+        h.nav=price;h.priceUpdatedAt=Date.now();delete h.priceError;ok++;
+      }catch(e){h.priceError=(e&&e.message)||'Lookup failed';h.priceErrorAt=Date.now();fail++;}
     };
     for(let i=0;i<holdings.length;i+=4)await Promise.all(holdings.slice(i,i+4).map(lookup));
+    state.investments.lastPriceRefresh={at:Date.now(),ok,fail,manual};
     saveState();rebuildAll();
   }finally{
     if(btn){btn.disabled=false;btn.textContent='↻ Refresh Prices';}
   }
-  toast(fail?`Updated ${ok} price(s), ${fail} failed (missing symbol/scheme or lookup error)`:`Updated ${ok} price(s)`,3200);
+  toast(`Updated ${ok} price(s)`+(fail?`, ${fail} failed`:'')+(manual?`, ${manual} manual`:'')+(fail?' — see the list above the table':''),3600);
+}
+/* "3:42 pm" for today, else "24 Nov, 3:42 pm" */
+function fmtStamp(ms){
+  const d=new Date(ms),t=d.toLocaleTimeString('en-IN',{hour:'numeric',minute:'2-digit'});
+  return dateToStr(d)===today()?t:`${d.getDate()} ${MONTH_NAMES[d.getMonth()].slice(0,3)}, ${t}`;
+}
+function priceStatusHtml(h){
+  if(!holdPriceSource(h))return`<span class="px-st px-manual" title="No ${(h.type==='mf'||h.type==='sip')?'AMFI scheme code':'NSE symbol'} — edit the holding to add one, or the price stays as entered">manual</span>`;
+  if(h.priceError)return`<span class="px-st px-fail" title="${esc(h.priceError)}${h.priceUpdatedAt?' · last good price '+fmtStamp(h.priceUpdatedAt):''}">failed${h.priceUpdatedAt?' · '+fmtStamp(h.priceUpdatedAt):''}</span>`;
+  if(h.priceUpdatedAt)return`<span class="px-st px-ok" title="Price fetched ${fmtStamp(h.priceUpdatedAt)}">${fmtStamp(h.priceUpdatedAt)}</span>`;
+  return`<span class="px-st px-manual" title="Click Refresh Prices to fetch">not fetched</span>`;
+}
+/* Banner under the page header: when prices were last refreshed, and which holdings failed */
+function renderInvPriceStatus(){
+  const el=document.getElementById('inv-price-status');if(!el)return;
+  const holdings=state.investments.holdings||[],last=state.investments.lastPriceRefresh;
+  if(!holdings.length){el.innerHTML='';return;}
+  const failed=holdings.filter(h=>holdPriceSource(h)&&h.priceError);
+  const manual=holdings.filter(h=>!holdPriceSource(h));
+  const okN=holdings.filter(h=>holdPriceSource(h)&&!h.priceError&&h.priceUpdatedAt).length;
+  const head=last?`Prices last refreshed <b>${fmtStamp(last.at)}</b>`:'Prices not refreshed yet';
+  const counts=[`<span class="px-st px-ok">${okN} up to date</span>`];
+  if(failed.length)counts.push(`<span class="px-st px-fail">${failed.length} failed</span>`);
+  if(manual.length)counts.push(`<span class="px-st px-manual">${manual.length} manual</span>`);
+  el.innerHTML=`<div class="inv-px-bar${failed.length?' has-fail':''}">
+    <div class="inv-px-head"><span>${head}</span><span class="inv-px-counts">${counts.join('')}</span></div>
+    ${failed.length?`<div class="inv-px-fails">${failed.map(h=>`<div><b>${esc(h.name)}</b> <span class="muted">${esc(h.symbol||('#'+h.schemeCode))}</span> — ${esc(h.priceError)}</div>`).join('')}</div>`:''}
+  </div>`;
 }
 
 function renderInvestments(){
@@ -704,19 +730,34 @@ function renderInvestments(){
     invBuckets[key].profit+=m.gain;
   });
   const bucketReturnPct=v=>v.invested>0?(v.profit/v.invested)*100:0;
+  const sgn=v=>v>=0?'+':'';
+  const gcol=v=>v>=0?'#166534':'#ef4444';
   document.getElementById('inv-stat-tiles').innerHTML=[
+    {label:'Invested',val:fmt(totInvested),color:'#1c1917',sub:`${holdings.length} holding(s)`},
+    {label:'Current Value',val:fmt(totCurrent),color:'#1c1917',sub:'At last fetched prices'},
+    {label:'Gain / Loss',val:`${sgn(totGain)}${fmt(totGain)}`,color:gc,sub:`${sgn(totGainPct)}${totGainPct.toFixed(2)}% overall return`},
     {label:'Available Cash',val:fmt(bal.totInvCash),color:'#1d4ed8',sub:'Transferred, not yet invested'},
-    {label:'Invested Value',val:fmt(totInvested),color:'#1c1917',sub:`${holdings.length} holding(s)`,breakdown:[['Stocks (Equity)',fmt(invBuckets.Stock.invested)],['ETFs',fmt(invBuckets.ETF.invested)],['Mutual Funds',fmt(invBuckets.MF.invested)]]},
-    {label:'Current Value',val:fmt(totCurrent),color:'#1c1917',sub:`${holdings.length} holding(s)`,breakdown:[['Stocks (Equity)',fmt(invBuckets.Stock.current)],['ETFs',fmt(invBuckets.ETF.current)],['Mutual Funds',fmt(invBuckets.MF.current)]]},
-    {label:'Total Gain / Loss',val:fmt(totGain),color:gc,sub:totGain>=0?'Unrealized profit':'Unrealized loss',breakdown:[['Stocks (Equity)',`${invBuckets.Stock.profit>=0?'+':''}${fmt(invBuckets.Stock.profit)}`],['ETFs',`${invBuckets.ETF.profit>=0?'+':''}${fmt(invBuckets.ETF.profit)}`],['Mutual Funds',`${invBuckets.MF.profit>=0?'+':''}${fmt(invBuckets.MF.profit)}`]]},
-    {label:'Overall Return',val:`${totGainPct>=0?'+':''}${totGainPct.toFixed(2)}%`,color:gc,sub:'Since purchase',breakdown:[['Stocks (Equity)',`${bucketReturnPct(invBuckets.Stock)>=0?'+':''}${bucketReturnPct(invBuckets.Stock).toFixed(2)}%`],['ETFs',`${bucketReturnPct(invBuckets.ETF)>=0?'+':''}${bucketReturnPct(invBuckets.ETF).toFixed(2)}%`],['Mutual Funds',`${bucketReturnPct(invBuckets.MF)>=0?'+':''}${bucketReturnPct(invBuckets.MF).toFixed(2)}%`]]},
-  ].map(({label,val,color,sub,breakdown})=>`
+  ].map(({label,val,color,sub})=>`
     <div class="stat-tile">
       <div class="slabel">${label}</div>
       <div class="val" style="color:${color}">${val}</div>
       <div class="delta" style="color:#a8a29e">${sub}</div>
-      ${breakdown?`<div class="stat-breakdown">${breakdown.map(([name,value])=>`<div class="row"><span>${esc(name)}</span><span class="num">${value}</span></div>`).join('')}</div>`:''}
     </div>`).join('');
+  // One small table instead of repeating the Stock/ETF/MF breakdown inside every tile
+  const typeRows=[['Stocks (Equity)',invBuckets.Stock],['ETFs',invBuckets.ETF],['Mutual Funds',invBuckets.MF]].filter(([,v])=>v.invested||v.current);
+  const typeEl=document.getElementById('inv-type-table');
+  if(typeEl)typeEl.innerHTML=!typeRows.length?'':`
+    <div class="card" style="padding:0;margin-bottom:18px"><div class="inv-tbl-wrap"><table class="inv-tbl">
+      <thead><tr><th>By asset type</th><th class="r">Invested</th><th class="r">Current value</th><th class="r">Gain / Loss</th><th class="r">Return</th><th class="r">Share of portfolio</th></tr></thead>
+      <tbody>${typeRows.map(([n,v])=>{const r=bucketReturnPct(v);return`<tr>
+        <td><b>${n}</b></td><td class="r num">${fmt(v.invested)}</td><td class="r num">${fmt(v.current)}</td>
+        <td class="r num" style="color:${gcol(v.profit)}">${sgn(v.profit)}${fmt(v.profit)}</td>
+        <td class="r num" style="color:${gcol(r)}">${sgn(r)}${r.toFixed(2)}%</td>
+        <td class="r num">${totCurrent>0?((v.current/totCurrent)*100).toFixed(1):'0.0'}%</td></tr>`;}).join('')}</tbody>
+      <tfoot><tr><td>Total</td><td class="r num">${fmt(totInvested)}</td><td class="r num">${fmt(totCurrent)}</td>
+        <td class="r num" style="color:${gc}">${sgn(totGain)}${fmt(totGain)}</td><td class="r num" style="color:${gc}">${sgn(totGainPct)}${totGainPct.toFixed(2)}%</td><td class="r num">100%</td></tr></tfoot>
+    </table></div></div>`;
+  renderInvPriceStatus();
 
   const profitData=[
     {label:`MF ${invBuckets.MF.profit<0?'Loss':'Profit'}`,bg:'#dcfce7',fg:'#16a34a',value:Math.abs(invBuckets.MF.profit),raw:invBuckets.MF.profit},
@@ -779,32 +820,7 @@ function renderInvestments(){
     const gainSum=curSum-invSum, gainPctSum=invSum>0?(gainSum/invSum)*100:0;
     const color=IDOTS[i%IDOTS.length], gc2=gainSum>=0?'#166534':'#ef4444';
     const availCash=bal.iv[a.id]||0;
-    const rows=!accHoldings.length?
-      `<div style="font-size:.78rem;color:#c4bfba;padding:10px 4px">No holdings yet</div>`:
-      accHoldings.map(h=>{
-        const m=holdMetrics(h),hgc=m.gain>=0?'#166534':'#ef4444';
-        const lookupTag=h.type==='mf'?(h.schemeCode?`<span class="badge-sm" style="background:#f0fdf4;color:#166534" title="AMFI scheme code">#${h.schemeCode}</span>`:''):(h.symbol?`<span class="badge-sm" style="background:#eff6ff;color:#1d4ed8" title="NSE symbol">${esc(h.symbol)}</span>`:'');
-        return`<div class="hold-card">
-          <div class="hold-card-top">
-            <span class="badge-sm" style="background:${h.type==='mf'?'#ede9fe':h.type==='etf'?'#fef3c7':'#dbeafe'};color:${h.type==='mf'?'#5b21b6':h.type==='etf'?'#92400e':'#1e40af'}">${h.type==='mf'?'MF':h.type==='etf'?'ETF':'Stock'}</span>
-            <span class="hold-name" title="${esc(h.name)}">${esc(h.name)}</span>
-            ${lookupTag}
-            <span class="hold-gain num" style="color:${hgc}">${m.gain>=0?'+':''}${m.gainPct.toFixed(1)}%</span>
-          </div>
-          <div class="hold-meta">
-            ${h.date?`<span>${h.sipSeries?'SIP from':'Bought'}<b>${fmtDate(h.date)}</b></span>`:''}
-            <span>Units<b>${h.units}</b></span>
-            <span>Buy<b>${fmt(h.buyPrice)}</b></span>
-            <span>NAV<b>${fmt(h.nav)}</b></span>
-            <span>Value<b style="color:#57534e">${fmt(m.currentValue)}</b></span>
-          </div>
-          <div class="hold-actions">
-            ${h.units>0?`<button class="btn-i" onclick="openInvSellModal('${h.id}')" title="Sell" onmouseover="this.style.color='#166534'" onmouseout="this.style.color='#c4bfba'"><svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M17 7L7 17M7 17h10M7 17V7"/></svg></button>`:''}
-            <button class="btn-i" onclick="openInvHoldModal(null,'${h.id}')" title="Edit"><svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg></button>
-            <button class="btn-i" onclick="confirmDeleteInvHolding('${h.id}')" title="Delete" onmouseover="this.style.color='#ef4444'" onmouseout="this.style.color='#c4bfba'"><svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg></button>
-          </div>
-        </div>`;
-      }).join('');
+    const ui=invAccUI(a.id);
     return`<div class="card">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:11px;flex-wrap:wrap;gap:8px">
         <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;min-width:0">
@@ -822,7 +838,11 @@ function renderInvestments(){
           <button class="btn-i" onclick="confirmDeleteInvAccount('${a.id}')" title="Delete" onmouseover="this.style.color='#ef4444'" onmouseout="this.style.color='#c4bfba'"><svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg></button>
         </div>
       </div>
-      <div>${rows}</div>
+      <div class="tg inv-tabs" role="tablist">
+        <button type="button" role="tab" aria-selected="${ui.tab==='holdings'}" class="tp${ui.tab==='holdings'?' active':''}" onclick="setInvAccTab('${a.id}','holdings')">Holdings</button>
+        <button type="button" role="tab" aria-selected="${ui.tab==='calendar'}" class="tp${ui.tab==='calendar'?' active':''}" onclick="setInvAccTab('${a.id}','calendar')">Purchase Calendar</button>
+      </div>
+      <div id="inv-acc-body-${a.id}">${ui.tab==='calendar'?invCalendarHtml(a.id):invHoldingsTableHtml(accHoldings)}</div>
       <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap">
         <button class="sb-add" style="width:auto;height:auto;padding:5px 10px;border-radius:7px;display:inline-flex;gap:5px;align-items:center;border-style:dashed" onclick="quickTransferIn('${a.id}')">
           <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.5"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/></svg>
@@ -837,3 +857,139 @@ function renderInvestments(){
   }).join('');
 }
 
+
+/* ── Holdings table ───────────────────────────────────────── */
+const holdTypeBadge=h=>{
+  const t=h.type==='sip'?['SIP','#dcfce7','#166534']:h.type==='mf'?['MF','#ede9fe','#5b21b6']:h.type==='etf'?['ETF','#fef3c7','#92400e']:['Stock','#dbeafe','#1e40af'];
+  return`<span class="badge-sm" style="background:${t[1]};color:${t[2]}">${t[0]}</span>`;
+};
+const fmtUnits=n=>Number(n||0).toLocaleString('en-IN',{maximumFractionDigits:3});
+function invHoldingsTableHtml(accHoldings){
+  if(!accHoldings.length)return`<div style="font-size:.78rem;color:#c4bfba;padding:10px 4px">No holdings yet</div>`;
+  const rows=accHoldings.map(h=>({h,m:holdMetrics(h)})).sort((x,y)=>y.m.currentValue-x.m.currentValue);
+  const inv=rows.reduce((s,r)=>s+r.m.invested,0),cur=rows.reduce((s,r)=>s+r.m.currentValue,0),g=cur-inv,gp=inv>0?g/inv*100:0;
+  const gcol=v=>v>=0?'#166534':'#ef4444',sgn=v=>v>=0?'+':'';
+  const icon=(d)=>`<svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="${d}"/></svg>`;
+  return`<div class="inv-tbl-wrap"><table class="inv-tbl">
+    <thead><tr><th>Holding</th><th class="r">Units</th><th class="r">Avg buy</th><th class="r">Current price</th><th class="r">Invested</th><th class="r">Current value</th><th class="r">Gain / Loss</th><th class="r" aria-label="Actions"></th></tr></thead>
+    <tbody>${rows.map(({h,m})=>{
+      const code=h.symbol?esc(h.symbol):h.schemeCode?'#'+esc(h.schemeCode):'';
+      const when=h.date?`${h.sipSeries?`SIP · ${h.durationMonths||'?'} mo · latest`:'Bought'} ${fmtDate(h.date)}`:'';
+      return`<tr>
+        <td class="inv-hold-cell"><div class="inv-hold-name" title="${esc(h.name)}">${esc(h.name)}</div>
+          <div class="inv-sub">${holdTypeBadge(h)}${code?`<span>${code}</span>`:''}${when?`<span>${when}</span>`:''}</div></td>
+        <td class="r num">${fmtUnits(h.units)}</td>
+        <td class="r num">${fmt(h.buyPrice)}</td>
+        <td class="r num">${fmt(h.nav||h.buyPrice)}<div class="inv-sub r">${priceStatusHtml(h)}</div></td>
+        <td class="r num">${fmt(m.invested)}</td>
+        <td class="r num"><b>${fmt(m.currentValue)}</b></td>
+        <td class="r num" style="color:${gcol(m.gain)}">${sgn(m.gain)}${fmt(m.gain)}<div class="inv-sub r" style="color:${gcol(m.gain)}">${sgn(m.gainPct)}${m.gainPct.toFixed(2)}%</div></td>
+        <td class="r inv-act">
+          ${h.units>0?`<button class="btn-i" onclick="openInvSellModal('${h.id}')" title="Sell">${icon('M17 7L7 17M7 17h10M7 17V7')}</button>`:''}
+          <button class="btn-i" onclick="openInvHoldModal(null,'${h.id}')" title="Edit">${icon('M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z')}</button>
+          <button class="btn-i" onclick="confirmDeleteInvHolding('${h.id}')" title="Delete">${icon('M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16')}</button>
+        </td></tr>`;}).join('')}</tbody>
+    <tfoot><tr><td>Total · ${rows.length} holding${rows.length===1?'':'s'}</td><td></td><td></td><td></td>
+      <td class="r num">${fmt(inv)}</td><td class="r num">${fmt(cur)}</td>
+      <td class="r num" style="color:${gcol(g)}">${sgn(g)}${fmt(g)}<div class="inv-sub r" style="color:${gcol(g)}">${sgn(gp)}${gp.toFixed(2)}%</div></td><td></td></tr></tfoot>
+  </table></div>`;
+}
+
+/* ── Purchase calendar (per account) ──────────────────────────
+   'month'   : a Mon–Sun month grid of the account's buys and sells
+   'pattern' : days 1–31 across all months, to see which day each SIP / stock buy usually lands on */
+function invAccUI(id){
+  if(!invAccUIState[id])invAccUIState[id]={tab:'holdings',mk:today().slice(0,7),cal:'month'};
+  return invAccUIState[id];
+}
+function rerenderInvAccBody(id){
+  const el=document.getElementById('inv-acc-body-'+id);if(!el)return;
+  const ui=invAccUI(id);
+  el.innerHTML=ui.tab==='calendar'?invCalendarHtml(id):invHoldingsTableHtml(state.investments.holdings.filter(h=>h.accountId===id));
+}
+function setInvAccTab(id,tab){
+  invAccUI(id).tab=tab;
+  const el=document.getElementById('inv-acc-body-'+id);
+  el?.previousElementSibling?.querySelectorAll('.tp').forEach((b,i)=>{const on=(i===0)===(tab==='holdings');b.classList.toggle('active',on);b.setAttribute('aria-selected',on);});
+  rerenderInvAccBody(id);
+}
+function setInvCalMode(id,mode){invAccUI(id).cal=mode;rerenderInvAccBody(id);}
+function shiftInvCalMonth(id,n){
+  const ui=invAccUI(id);
+  ui.mk=n===0?today().slice(0,7):(()=>{const[y,m]=ui.mk.split('-').map(Number);const d=new Date(y,m-1+n,1);return`${d.getFullYear()}-${pad(d.getMonth()+1)}`;})();
+  rerenderInvAccBody(id);
+}
+/* Kind of an invest/divest entry: 'mf' (incl. SIP), 'stock', 'etf' or 'sell' */
+function invTxnKind(t,holdById){
+  if(t.type==='divest')return'sell';
+  const h=holdById[t.holdingId];
+  const ty=h?h.type:(t.schemeCode?'mf':'stock');
+  return ty==='sip'||ty==='mf'?'mf':ty==='etf'?'etf':'stock';
+}
+const INV_KIND={mf:{label:'Mutual Fund',cls:'k-mf'},stock:{label:'Direct Equity',cls:'k-stock'},etf:{label:'ETF',cls:'k-etf'},sell:{label:'Sold',cls:'k-sell'}};
+function invCalendarHtml(id){
+  const ui=invAccUI(id);
+  const holdById={};state.investments.holdings.forEach(h=>holdById[h.id]=h);
+  const txns=state.transactions.filter(t=>(t.type==='invest'||t.type==='divest')&&t.accountId===id);
+  const legend=`<div class="ical-legend">${['mf','stock','etf','sell'].map(k=>`<span><i class="ical-dot ${INV_KIND[k].cls}"></i>${INV_KIND[k].label}</span>`).join('')}<span><i class="ical-dot k-off"></i>Market closed</span></div>`;
+  const modeBtns=`<div class="tg ical-modes">
+    <button type="button" class="tp${ui.cal==='month'?' active':''}" onclick="setInvCalMode('${id}','month')">Month</button>
+    <button type="button" class="tp${ui.cal==='pattern'?' active':''}" onclick="setInvCalMode('${id}','pattern')">Day-of-month pattern</button></div>`;
+  if(!txns.length)return`${modeBtns}<div style="font-size:.78rem;color:#c4bfba;padding:14px 4px">No purchases recorded for this account yet</div>`;
+  const chip=(t,showDate)=>{
+    const k=invTxnKind(t,holdById);
+    return`<div class="ical-chip ${INV_KIND[k].cls}" title="${INV_KIND[k].label}: ${esc(t.name||'Holding')} · ${fmt(t.amount)}${showDate?' · '+fmtDate(t.date):''}">${esc(t.name||'Holding')}</div>`;
+  };
+  const head=['Mon','Tue','Wed','Thu','Fri','Sat','Sun'].map(d=>`<div class="ical-hd">${d}</div>`).join('');
+
+  if(ui.cal==='pattern'){
+    // Group every buy by day-of-month: one row per holding per day, with how many months it happened
+    const byDay={};
+    txns.filter(t=>t.type==='invest').forEach(t=>{
+      const d=Number(t.date.slice(8,10)),key=t.holdingId||t.name;
+      byDay[d]=byDay[d]||{};
+      const e=byDay[d][key]=byDay[d][key]||{t,count:0,total:0};
+      e.count++;e.total+=Number(t.amount)||0;
+    });
+    const cells=Array.from({length:31},(_,i)=>{
+      const items=Object.values(byDay[i+1]||{}).sort((a,b)=>b.total-a.total);
+      const tot=items.reduce((s,e)=>s+e.total,0);
+      return`<div class="ical-cell${items.length?' has':''}"><div class="ical-day"><span>${i+1}</span>${tot?`<span class="ical-amt">${fmtShort(tot)}</span>`:''}</div>
+        ${items.slice(0,3).map(e=>{const k=invTxnKind(e.t,holdById);return`<div class="ical-chip ${INV_KIND[k].cls}" title="${esc(e.t.name||'Holding')} — bought on day ${i+1} in ${e.count} month(s), ${fmt(e.total)} in all">${esc(e.t.name||'Holding')}${e.count>1?` ×${e.count}`:''}</div>`;}).join('')}
+        ${items.length>3?`<div class="ical-more">+${items.length-3} more</div>`:''}</div>`;
+    }).join('');
+    return`${modeBtns}<p class="ical-note">Every purchase in this account, grouped by the day of the month it was made (×N = number of months). SIPs moved by a market holiday show up on the next trading day.</p>
+      <div class="ical-grid ical-pattern">${cells}</div>${legend}`;
+  }
+
+  const[y,m]=ui.mk.split('-').map(Number);
+  const first=new Date(y,m-1,1),dim=new Date(y,m,0).getDate(),lead=(first.getDay()+6)%7;
+  const inMonth=txns.filter(t=>t.date.slice(0,7)===ui.mk).sort((a,b)=>a.date.localeCompare(b.date));
+  const byDate={};inMonth.forEach(t=>(byDate[t.date]=byDate[t.date]||[]).push(t));
+  const td=today();
+  let cells='';
+  for(let i=0;i<lead;i++)cells+='<div class="ical-cell blank"></div>';
+  for(let d=1;d<=dim;d++){
+    const iso=`${ui.mk}-${pad(d)}`,list=byDate[iso]||[],off=marketClosedReason(iso);
+    const tot=list.filter(t=>t.type==='invest').reduce((s,t)=>s+(Number(t.amount)||0),0);
+    cells+=`<div class="ical-cell${list.length?' has':''}${off?' off':''}${iso===td?' today':''}" title="${fmtDMY(iso)}${off?' · market closed'+(off!=='Saturday'&&off!=='Sunday'?' ('+esc(off)+')':''):''}">
+      <div class="ical-day"><span>${d}</span>${tot?`<span class="ical-amt">${fmtShort(tot)}</span>`:''}</div>
+      ${list.slice(0,3).map(t=>chip(t)).join('')}${list.length>3?`<div class="ical-more">+${list.length-3} more</div>`:''}</div>`;
+  }
+  const buys=inMonth.filter(t=>t.type==='invest');
+  const sum=k=>buys.filter(t=>invTxnKind(t,holdById)===k).reduce((s,t)=>s+(Number(t.amount)||0),0);
+  const summary=buys.length?`<b>${fmt(buys.reduce((s,t)=>s+(Number(t.amount)||0),0))}</b> invested in ${buys.length} purchase${buys.length===1?'':'s'} · MF ${fmt(sum('mf'))} · Equity ${fmt(sum('stock'))}${sum('etf')?` · ETF ${fmt(sum('etf'))}`:''}`:'No purchases this month';
+  const list=inMonth.length?`<table class="inv-tbl ical-list"><thead><tr><th>Date</th><th>Holding</th><th>Type</th><th class="r">Units</th><th class="r">Amount</th></tr></thead><tbody>${inMonth.map(t=>{const k=invTxnKind(t,holdById);return`<tr><td>${fmtDMY(t.date)}</td><td>${esc(t.name||'Holding')}</td><td><i class="ical-dot ${INV_KIND[k].cls}"></i>${INV_KIND[k].label}</td><td class="r num">${t.units?fmtUnits(t.units):'—'}</td><td class="r num">${fmt(t.amount)}</td></tr>`;}).join('')}</tbody></table>`:'';
+  return`${modeBtns}
+    <div class="ical-nav">
+      <button type="button" class="btn-i" onclick="shiftInvCalMonth('${id}',-1)" aria-label="Previous month">‹</button>
+      <b>${MONTH_NAMES[m-1]} ${y}</b>
+      <button type="button" class="btn-i" onclick="shiftInvCalMonth('${id}',1)" aria-label="Next month">›</button>
+      ${ui.mk!==td.slice(0,7)?`<button type="button" class="ical-today" onclick="shiftInvCalMonth('${id}',0)">This month</button>`:''}
+    </div>
+    <div class="ical-grid">${head}${cells}</div>
+    <div class="ical-summary">${summary}</div>${legend}
+    ${list?`<div class="inv-tbl-wrap" style="margin-top:8px">${list}</div>`:''}`;
+}
+/* ₹12.5k style amount for tight calendar cells */
+const fmtShort=v=>v>=100000?`₹${(v/100000).toFixed(v>=1e6?0:1)}L`:v>=1000?`₹${(v/1000).toFixed(v>=1e4?0:1)}k`:`₹${Math.round(v)}`;

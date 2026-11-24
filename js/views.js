@@ -86,6 +86,24 @@ function txnsForMK(mk){return state.transactions.filter(t=>mkOf(t.date)===mk);}
 function txnsForFY(fy){const{from,to}=fyRange(fy);return state.transactions.filter(t=>t.date>=from&&t.date<=to);}
 function txnsInRange(from,to){return state.transactions.filter(t=>t.date>=from&&t.date<=to);}
 function curViewTxns(){return viewMode==='fy'?txnsForFY(viewFY):txnsForMK(viewMK);}
+/* Analytics variants: spread expenses are split into monthly parts (see expandSpread) */
+function analyticsTxns(){return expandSpread(state.transactions);}
+function aTxnsForMK(mk){return analyticsTxns().filter(t=>mkOf(t.date)===mk);}
+function aTxnsInRange(from,to){return analyticsTxns().filter(t=>t.date>=from&&t.date<=to);}
+function curViewATxns(){
+  if(viewMode==='fy'){const{from,to}=fyRange(viewFY);return aTxnsInRange(from,to);}
+  return aTxnsForMK(viewMK);
+}
+
+/* Log order: newest day first; within a day expenses on top, then transfers, then income,
+   and within each group the most recently added first */
+const TXN_TYPE_RANK={expense:0,invest:1,transfer:2,divest:3,income:4};
+function cmpTxnLog(a,b){
+  return b.date.localeCompare(a.date)
+    ||(TXN_TYPE_RANK[a.type]??2)-(TXN_TYPE_RANK[b.type]??2)
+    ||(Number(b.createdAt)||0)-(Number(a.createdAt)||0)
+    ||b.id.localeCompare(a.id);
+}
 
 /* Category + date-range filter for the transaction log */
 function fillTxnFilterCatOpts(){
@@ -177,7 +195,7 @@ function renderTxnLog(){
   const label=document.getElementById('log-month-label');
   let txns;
   if(filterActive){
-    txns=state.transactions.filter(txnMatchesFilter).slice().sort((a,b)=>b.date.localeCompare(a.date)||b.id.localeCompare(a.id));
+    txns=state.transactions.filter(txnMatchesFilter).slice().sort(cmpTxnLog);
     const catSel=document.getElementById('txn-filter-cat');
     const catText=txnFilter.category?catSel.options[catSel.selectedIndex].textContent:'All Categories';
     const rangeText=(txnFilter.from||txnFilter.to)?`${txnFilter.from?fmtDate(txnFilter.from):'…'} – ${txnFilter.to?fmtDate(txnFilter.to):'…'}`:'All time';
@@ -194,7 +212,7 @@ function renderTxnLog(){
     document.getElementById('txn-filter-summary-text').textContent=`${txns.length} transaction(s) found`+(parts.length?' · '+parts.join(' · '):'');
     summaryEl.classList.remove('hidden');
   }else{
-    txns=curViewTxns().slice().sort((a,b)=>b.date.localeCompare(a.date)||b.id.localeCompare(a.id));
+    txns=curViewTxns().slice().sort(cmpTxnLog);
     label.textContent=viewMode==='fy'?fyLabel(viewFY):mkLabel(viewMK);
     summaryEl.classList.add('hidden');
     bulkSelectedIds.clear();
@@ -218,7 +236,8 @@ function renderTxnLog(){
       ${dayExps?`<span class="num" style="font-size:.7rem;color:#a8a29e">${fmt(dayExps)}</span>`:''}
     </div>`;
     list.appendChild(hdr);
-    grouped[date].forEach(t=>list.appendChild(buildRow(t,true,filterActive)));
+    // Zebra stripes restart under each date header
+    grouped[date].forEach((t,i)=>{const r=buildRow(t,true,filterActive);if(i%2)r.classList.add('alt');list.appendChild(r);});
   });
 }
 
@@ -243,6 +262,8 @@ function buildRow(t,canDel,selectable){
       if(al>0.004)splitNote+=` <span style="color:#166534">(${fmt(al)} settled)</span>`;
     }
     if(t.splitSettle)splitNote=` &middot; <span style="color:#7c3aed;font-weight:600">Split settlement — you paid</span>${t.settled?' <span style="color:#a8a29e">(settled)</span>':''}`;
+    const sn=spreadN(t);
+    if(sn>1)splitNote+=` &middot; <span style="color:#0e7490;font-weight:600" title="Budgets &amp; analytics count ${fmt(shareAmount(t)/sn)} in each of ${sn} months">spread over ${sn} months</span>`;
     subLabel=acLabel(t.acType,t.acId)+splitNote+(t.desc?' &middot; '+esc(t.desc):'');
     amtStr='&minus;'+fmt(displayAmt);amtCol='#ef4444';
   }else if(t.type==='income'){

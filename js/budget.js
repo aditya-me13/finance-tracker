@@ -1,6 +1,6 @@
 /* ── Budget ───────────────────────────────────────────────── */
 function renderBudget(){
-  const mk=curMK(),exps=txnsForMK(mk).filter(t=>t.type==='expense'&&!t.splitSettle);
+  const mk=curMK(),exps=aTxnsForMK(mk).filter(t=>t.type==='expense'&&!t.splitSettle);
   const spent=exps.reduce((s,t)=>s+shareAmount(t),0);
   const bud=Number(state.monthlyBudget)||0,pct=bud>0?Math.min((spent/bud)*100,100):0;
   const warn=bud>0&&spent>=bud*.8,over=bud>0&&spent>=bud;
@@ -40,6 +40,9 @@ function renderBudget(){
 
 function openBudgetModal(){
   document.getElementById('inp-bud').value=state.monthlyBudget||'';
+  const ms=document.getElementById('inp-month-start');
+  ms.innerHTML=Array.from({length:28},(_,i)=>`<option value="${i+1}">${i+1}${ordSuffix(i+1)}${i===0?' (calendar month)':''}</option>`).join('');
+  ms.value=String(monthStartDay());
   const list=document.getElementById('cat-bud-modal-list');list.innerHTML='';
   state.categories.expense.forEach(cat=>{
     const existing=state.categoryBudgets[cat]||'',ci=state.categories.expense.indexOf(cat),col=cpal(ci>=0?ci:0);
@@ -58,7 +61,14 @@ function saveBudgets(){
     const cat=inp.dataset.cat,val=Number(inp.value)||0;
     if(val>0)state.categoryBudgets[cat]=val;else delete state.categoryBudgets[cat];
   });
-  saveState();renderBudget();closeModal('modal-bud');toast('Budgets saved');
+  const ms=Number(document.getElementById('inp-month-start').value)||1,msChanged=ms!==monthStartDay();
+  state.monthStartDay=ms;
+  saveState();closeModal('modal-bud');
+  if(msChanged){
+    // Month keys mean different date ranges now: jump the month view back to the current cycle
+    const sel=document.getElementById('month-sel');if(sel)sel.value='';
+    rebuildAll();toast('Saved — months now start on the '+ms+ordSuffix(ms));
+  }else{renderBudget();toast('Budgets saved');}
 }
 
 /* ── Weekly ───────────────────────────────────────────────── */

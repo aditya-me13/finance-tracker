@@ -208,6 +208,10 @@
                 <p style="font-size:.71rem;color:#a8a29e;margin-top:6px;line-height:1.4">This entry is logged now; future occurrences will be auto-logged from the Recurring list.</p>
               </div>
             </div>
+            <div style="margin-bottom:9px"><div class="slabel" style="margin-bottom:4px">Spread Cost Over</div>
+              <select id="e-spread" class="pl"><option value="1">No — this month only</option><option value="2">2 months</option><option value="3">3 months (quarterly)</option><option value="4">4 months</option><option value="6">6 months (half-yearly)</option><option value="12">12 months (yearly)</option></select>
+              <p style="font-size:.71rem;color:#a8a29e;margin-top:4px;line-height:1.4">For quarterly maintenance, yearly subscriptions, etc. Budgets &amp; analytics count an equal part in each month; your account is still charged the full amount on the date above.</p>
+            </div>
             <div style="margin-bottom:11px"><div class="slabel" style="margin-bottom:4px">Description (optional)</div>
               <div class="fw"><input id="e-desc" class="fi" type="text" placeholder="e.g. Lunch at cafe"/></div>
             </div>
@@ -564,7 +568,9 @@
     </div>
 
     <!-- Summary Stat Tiles -->
+    <div id="inv-price-status"></div>
     <div id="inv-stat-tiles" class="stat-grid"></div>
+    <div id="inv-type-table"></div>
 
     <!-- Allocation -->
     <div style="margin-bottom:14px">
@@ -848,6 +854,11 @@
       <div class="fw" style="max-width:220px"><div class="fp">₹</div><input id="inp-bud" class="fi" type="number" min="0" step="100" placeholder="e.g. 50000"/></div>
       <p style="font-size:.72rem;color:#a8a29e;margin-top:4px">Category caps are independent of this total.</p>
     </div>
+    <div style="margin-bottom:14px">
+      <div class="slabel" style="margin-bottom:6px">Month Starts On</div>
+      <select id="inp-month-start" class="pl" style="max-width:220px"></select>
+      <p style="font-size:.72rem;color:#a8a29e;margin-top:4px">Budgets, the month view and monthly analytics run from this day to the day before it next month (e.g. 23rd → 23 Nov – 22 Dec). Handy if you are paid mid-month.</p>
+    </div>
     <div style="height:1px;background:#f0eeec;margin-bottom:14px"></div>
     <div class="slabel" style="margin-bottom:8px">Category-Wise Monthly Caps</div>
     <div id="cat-bud-modal-list" style="display:flex;flex-direction:column;gap:2px;max-height:300px;overflow-y:auto"></div>
@@ -1081,6 +1092,7 @@
       <div id="et-share-wrap" class="hidden"><div class="slabel" style="margin-bottom:4px">My Share (INR)</div>
         <div class="fw"><div class="fp">₹</div><input id="et-share" class="fi" type="number" min="0" step="0.01" placeholder="0.00"/></div></div>
       <div id="et-cat-wrap"><div class="slabel" style="margin-bottom:4px">Category</div><select id="et-cat" class="pl"></select></div>
+      <div id="et-spread-wrap" class="hidden"><div class="slabel" style="margin-bottom:4px">Spread Cost Over</div><select id="et-spread" class="pl"><option value="1">No — this month only</option><option value="2">2 months</option><option value="3">3 months (quarterly)</option><option value="4">4 months</option><option value="6">6 months (half-yearly)</option><option value="12">12 months (yearly)</option></select></div>
       <div id="et-acc-wrap" style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
         <div><div class="slabel" style="margin-bottom:4px">Account Type</div>
           <select id="et-actype" class="pl" onchange="fillEditInst()"><option value="bank">Bank Account</option><option value="cc">Credit Card</option><option value="cash">Cash</option></select></div>
@@ -1143,6 +1155,7 @@
 
 <script src="js/state.js"></script>
 <script src="js/helpers.js"></script>
+<script src="js/market-days.js"></script>
 <script src="js/ui-common.js"></script>
 <script src="js/balances.js"></script>
 <script src="js/sidebar.js"></script>

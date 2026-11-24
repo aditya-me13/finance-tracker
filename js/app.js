@@ -23,6 +23,7 @@ function importData(ev){
       try{normalizeState();}catch(err){state=live;throw err;}
       state=live;
     }catch{toast('Import failed: invalid file');return;}
+    prepConfirm('Replace all data?','Replace data','warn');
     document.getElementById('confirm-body').textContent=
       `Replace ALL current data with this file (${imp.transactions.length} transactions, ${imp.banks.length} banks, ${imp.cards.length} cards)? A backup of your current data will be downloaded first.`;
     document.getElementById('confirm-ok-btn').onclick=()=>{
@@ -34,6 +35,99 @@ function importData(ev){
   });
   ev.target.value='';
 }
+
+/* ── Top-bar "Data & account" menu ────────────────────────── */
+function closeAcctMenu(focusBtn){
+  const l=document.getElementById('acct-menu-list');if(!l||l.classList.contains('hidden'))return false;
+  l.classList.add('hidden');const b=document.getElementById('acct-menu-btn');b.setAttribute('aria-expanded','false');
+  if(focusBtn)b.focus();return true;
+}
+function toggleAcctMenu(){
+  const l=document.getElementById('acct-menu-list');
+  if(!l.classList.contains('hidden')){closeAcctMenu();return;}
+  l.classList.remove('hidden');document.getElementById('acct-menu-btn').setAttribute('aria-expanded','true');
+  const first=l.querySelector('.menu-item');if(first)first.focus();
+}
+document.addEventListener('click',e=>{if(!e.target.closest('#acct-menu'))closeAcctMenu();});
+document.addEventListener('keydown',e=>{
+  const l=document.getElementById('acct-menu-list');if(!l||l.classList.contains('hidden'))return;
+  if(e.key==='Escape'){e.preventDefault();e.stopImmediatePropagation();closeAcctMenu(true);return;}
+  if(e.key==='ArrowDown'||e.key==='ArrowUp'){
+    e.preventDefault();const items=[...l.querySelectorAll('.menu-item')],i=items.indexOf(document.activeElement);
+    items[(i+(e.key==='ArrowDown'?1:-1)+items.length)%items.length].focus();
+  }
+  if(e.key==='Tab')closeAcctMenu();
+},true);
+
+/* Scrolling the page over a focused number field must not change the amount */
+document.addEventListener('wheel',e=>{
+  const a=document.activeElement;
+  if(a&&a.type==='number'&&e.target===a)a.blur();
+},{passive:true});
+
+/* ── Sidebar: collapse (title button / Ctrl+B) and drag-to-resize, both remembered ── */
+const SB_MIN=200,SB_MAX=480,SB_DEFAULT=264;
+function _shell(){return document.querySelector('.shell');}
+function setSidebarWidth(px,save=true){
+  const w=Math.round(Math.min(SB_MAX,Math.max(SB_MIN,px)));
+  _shell().style.setProperty('--sb-w',w+'px');
+  const h=document.getElementById('sb-resizer');if(h){h.setAttribute('aria-valuenow',w);h.setAttribute('aria-valuemin',SB_MIN);h.setAttribute('aria-valuemax',SB_MAX);}
+  if(save)try{localStorage.setItem('ft-sb-w',String(w));}catch(e){}
+  return w;
+}
+function setSidebarCollapsed(collapsed,save=true){
+  _shell().classList.toggle('sb-collapsed',collapsed);
+  const sb=document.getElementById('sidebar');sb.inert=collapsed; // hidden sidebar is skipped by Tab and screen readers
+  const b=document.getElementById('sb-toggle');
+  b.setAttribute('aria-expanded',String(!collapsed));
+  b.title=(collapsed?'Show':'Hide')+' sidebar (Ctrl+B)';
+  if(save)try{localStorage.setItem('ft-sb-collapsed',collapsed?'1':'0');}catch(e){}
+}
+function toggleSidebar(){setSidebarCollapsed(!_shell().classList.contains('sb-collapsed'));}
+(()=>{
+  let w=SB_DEFAULT,c=false;
+  try{w=Number(localStorage.getItem('ft-sb-w'))||SB_DEFAULT;c=localStorage.getItem('ft-sb-collapsed')==='1';}catch(e){}
+  setSidebarWidth(w,false);setSidebarCollapsed(c,false);
+  const h=document.getElementById('sb-resizer');if(!h)return;
+  h.addEventListener('pointerdown',e=>{
+    if(e.button!==0)return;e.preventDefault();
+    h.setPointerCapture(e.pointerId);_shell().classList.add('sb-resizing');
+    const move=ev=>setSidebarWidth(ev.clientX,false);
+    const up=ev=>{
+      h.releasePointerCapture(ev.pointerId);_shell().classList.remove('sb-resizing');
+      h.removeEventListener('pointermove',move);h.removeEventListener('pointerup',up);h.removeEventListener('pointercancel',up);
+      setSidebarWidth(ev.clientX);
+    };
+    h.addEventListener('pointermove',move);h.addEventListener('pointerup',up);h.addEventListener('pointercancel',up);
+  });
+  h.addEventListener('dblclick',()=>setSidebarWidth(SB_DEFAULT));
+  h.addEventListener('keydown',e=>{
+    const cur=parseInt(getComputedStyle(_shell()).getPropertyValue('--sb-w'))||SB_DEFAULT,step=e.shiftKey?48:16;
+    if(e.key==='ArrowLeft'){e.preventDefault();setSidebarWidth(cur-step);}
+    else if(e.key==='ArrowRight'){e.preventDefault();setSidebarWidth(cur+step);}
+    else if(e.key==='Home'){e.preventDefault();setSidebarWidth(SB_MIN);}
+    else if(e.key==='End'){e.preventDefault();setSidebarWidth(SB_MAX);}
+    else if(e.key==='Enter'){e.preventDefault();toggleSidebar();}
+  });
+})();
+
+/* Stat tiles: shrink a figure (never below 0.85rem) until it fits its tile, instead of truncating it */
+function fitStatValues(root=document){
+  root.querySelectorAll('.stat-tile .val').forEach(v=>{
+    if(v.offsetParent===null)return;
+    if(v.dataset.fs===undefined)v.dataset.fs=v.style.fontSize; // keep any size set by the renderer
+    v.style.fontSize=v.dataset.fs;
+    const max=parseFloat(getComputedStyle(v).fontSize),min=13.6;
+    let size=max;
+    while(v.scrollWidth>v.clientWidth+0.5&&size>min){size-=0.5;v.style.fontSize=size+'px';}
+  });
+}
+(()=>{
+  let raf=0;const later=()=>{cancelAnimationFrame(raf);raf=requestAnimationFrame(()=>fitStatValues());};
+  const grids=document.querySelectorAll('.stat-grid');
+  const mo=new MutationObserver(later);grids.forEach(g=>mo.observe(g,{childList:true,subtree:true,characterData:true}));
+  if(window.ResizeObserver){const ro=new ResizeObserver(later);grids.forEach(g=>ro.observe(g));}
+})();
 
 /* ── Rebuild All ──────────────────────────────────────────── */
 function rebuildAll(){

@@ -4,24 +4,35 @@ function renderDueThisMonthWidget(bal){
   if(!sec||!body)return;
   const items=[];
   state.cards.forEach(c=>{
-    const ds=getDueDateStatus(c);
-    if(ds&&(ds.status==='urgent'||ds.status==='soon'||ds.status==='overdue'))
-      items.push({kind:'Credit Card',name:c.name,label:ds.label,status:ds.status,amount:bal.cd[c.id]||0,due:ds.due});
+    const di=getCardDueInfo(c,bal),ds=di.ds;
+    if(di.overdue>0){
+      items.push({kind:'Credit Card',name:c.name,label:`Overdue by ${di.overdueDays}d (was due ${fmtDate(di.lastDue)})`,status:'overdue',amount:di.overdue,due:new Date(di.lastDue+'T00:00:00')});
+      return;
+    }
+    if(di.outstanding<=0.004)return; // nothing owed on this card
+    if(ds&&(ds.status==='urgent'||ds.status==='soon')){
+      const auto=c.autoDebit&&c.autoDebit.enabled&&state.banks.some(b=>b.id===c.autoDebit.bankId);
+      const label=auto?`Auto-debit ${ds.diffDays===0?'today':`in ${ds.diffDays}d`}`:ds.label;
+      items.push({kind:'Credit Card',name:c.name,label,status:auto?'soon':ds.status,amount:di.outstanding,due:ds.due});
+    }
   });
   state.loans.forEach(l=>{
     const ds=getDueDateStatus(l);
     if(ds&&(ds.status==='urgent'||ds.status==='soon'||ds.status==='overdue'))
       items.push({kind:'Loan EMI',name:l.name,label:ds.label,status:ds.status,amount:l.emiAmount,due:ds.due});
   });
+  const startToday=new Date(today()+'T00:00:00');
   (state.recurring||[]).forEach(r=>{
-    if(!r.active)return;
+    const remind=recurRemindDays(r);
+    if(!r.active||remind<=0)return;
     const nextDueStr=nextRecurDate(r,r.lastGeneratedDate||r.startDate);
     const nextDue=new Date(nextDueStr+'T00:00:00');
-    const diffDays=Math.ceil((nextDue-new Date())/(1000*60*60*24));
-    if(diffDays<=5){
+    const diffDays=Math.round((nextDue-startToday)/86400000);
+    if(diffDays<=remind){
       const status=diffDays<0?'overdue':diffDays===0?'urgent':'soon';
       const amt=r.type==='expense'?(r.myShare!==undefined?r.myShare:r.amount):r.amount;
-      items.push({kind:'Recurring',name:r.name,label:`Auto-logs ${fmtDate(nextDueStr)}`,status,amount:amt,due:nextDue});
+      const when=diffDays<=0?'today':diffDays===1?'tomorrow':`in ${diffDays}d`;
+      items.push({kind:'Recurring',name:r.name,label:`${r.type==='income'?'Expected':'Scheduled'} ${when} · ${fmtDate(nextDueStr)}`,status,amount:amt,due:nextDue});
     }
   });
   if(!items.length){sec.style.display='none';return;}
@@ -35,10 +46,28 @@ function renderDueThisMonthWidget(bal){
           <span style="font-weight:600;font-size:.78rem">${esc(it.name)}</span>
           <span class="badge-sm" style="background:rgba(0,0,0,.06);color:inherit">${it.kind}</span>
         </div>
-        <div style="font-size:.71rem;opacity:.85">${it.label}${it.amount?` &middot; ${fmt(it.amount)}`:''}</div>
+        <div style="font-size:.72rem;opacity:.85">${it.label}${it.amount?` &middot; ${fmt(it.amount)}`:''}</div>
       </div>
     </div>`).join('');
 }
+
+/* ── Sidebar accordions ─────────────────────────────────────── */
+function _sbFolds(){try{return JSON.parse(localStorage.getItem('ft-sb-fold')||'{}');}catch(e){return{};}}
+function applySbFold(key,folded){
+  const sec=document.querySelector(`.sb-sec[data-fold="${key}"]`);if(!sec)return;
+  sec.classList.toggle('folded',folded);
+  const b=document.getElementById('sbf-'+key);if(b){b.setAttribute('aria-expanded',String(!folded));b.title=folded?'Expand':'Collapse';}
+}
+function toggleSbFold(key){
+  const f=_sbFolds();f[key]=!f[key];
+  try{localStorage.setItem('ft-sb-fold',JSON.stringify(f));}catch(e){}
+  applySbFold(key,f[key]);
+}
+function setFoldSum(key,text,tone){
+  const el=document.getElementById('sbsum-'+key);if(!el)return;
+  el.textContent=text||'';el.title=text||'';el.className='sb-fold-sum num'+(tone?' '+tone:'');
+}
+(()=>{const f=_sbFolds();Object.keys(f).forEach(k=>applySbFold(k,!!f[k]));})();
 
 function renderSidebar(){
   const bal=computeBal();
@@ -63,17 +92,25 @@ function renderSidebar(){
 
   renderDueThisMonthWidget(bal);
 
+  const bankTotal=state.banks.reduce((s,b)=>s+(bal.bk[b.id]||0),0);
+  setFoldSum('banks',state.banks.length?fmt(bankTotal):'',bankTotal<0?'neg':'');
+  setFoldSum('cash',fmt(bal.ca),bal.ca<0?'neg':'');
+  const cardDue=state.cards.reduce((s,c)=>s+(bal.cd[c.id]||0),0);
+  const anyOverdue=state.cards.some(c=>getCardDueInfo(c,bal).overdue>0);
+  setFoldSum('cards',state.cards.length?fmt(cardDue):'',cardDue>0?'neg':'');
+  const cs=document.getElementById('sbsum-cards');if(cs)cs.title=anyOverdue?'Outstanding — a card bill is overdue':'Outstanding across cards (nothing overdue)';
+
   const sbB=document.getElementById('sb-banks');
-  sbB.innerHTML=!state.banks.length?'<div style="font-size:.74rem;color:#c4bfba;padding:3px 8px">No accounts yet</div>':
+  sbB.innerHTML=!state.banks.length?'<div style="font-size:.78rem;color:var(--text-muted);padding:3px 8px">No accounts yet</div>':
     state.banks.map((b,i)=>{const v=bal.bk[b.id]||0;const excluded=b.includeInNetWorth===false;return`<div class="sb-item" style="align-items:center;gap:6px">
       <span class="sb-dot" style="background:${BDOTS[i%BDOTS.length]};margin-top:0;flex-shrink:0"></span>
       <span class="sb-name" style="flex:${excluded?'0 1 auto':'1'}" title="${esc(b.name)}">${esc(b.name)}</span>
-      ${excluded?'<span class="badge-sm" style="background:#f4f3f0;color:#a8a29e;flex-shrink:0" title="Not counted in Net Worth or Liquid Cash">Excluded</span>':''}
+      ${excluded?'<span class="badge-sm" style="background:#f4f3f0;color:var(--text-muted);flex-shrink:0" title="Not counted in Net Worth or Liquid Cash">Excluded</span>':''}
       <span class="sb-amt${v<0?' neg':''}" style="${excluded?'flex:1;text-align:right':''}">${fmt(v)}</span>
       <button class="btn-i" onclick="openEditModal('bank','${b.id}')" title="Edit" style="padding:2px;flex-shrink:0">
         <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
       </button>
-      <button class="btn-i" onclick="confirmDeleteAccount('bank','${b.id}')" title="Delete" style="padding:2px;flex-shrink:0" onmouseover="this.style.color='#ef4444'" onmouseout="this.style.color='#c4bfba'">
+      <button class="btn-i danger" onclick="confirmDeleteAccount('bank','${b.id}')" title="Delete" style="padding:2px;flex-shrink:0">
         <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
       </button>
     </div>`;}).join('');
@@ -88,27 +125,32 @@ function renderSidebar(){
   </div>`;
 
   const sbC=document.getElementById('sb-cards');
-  sbC.innerHTML=!state.cards.length?'<div style="font-size:.74rem;color:#c4bfba;padding:3px 8px">No cards yet</div>':
+  sbC.innerHTML=!state.cards.length?'<div style="font-size:.78rem;color:var(--text-muted);padding:3px 8px">No cards yet</div>':
     state.cards.map((c,i)=>{
       const due=bal.cd[c.id]||0,lim=Number(c.limit)||0;
-      const avail=lim>0?lim-due:null,pct=lim>0?Math.min((due/lim)*100,100):0;
-      const cls=pct>80?'po':pct>50?'pw':'ps';
-      const ds=getDueDateStatus(c);
+      const avail=lim>0?lim-due:null,pct=lim>0?Math.max(0,Math.min((due/lim)*100,100)):0;
+      const di=getCardDueInfo(c,bal),ds=di.ds,isOverdue=di.overdue>0;
       const ad=c.autoDebit,ab=ad&&ad.enabled?state.banks.find(b=>b.id===ad.bankId):null;
-      const badgeCls={ok:'due-ok',soon:'due-soon',urgent:'due-urgent',overdue:'due-overdue'}[ds?.status||'ok'];
-      return`<div class="sb-item" style="flex-direction:column;align-items:flex-start;gap:5px">
-        <div style="display:flex;align-items:center;gap:8px;width:100%">
-          <span class="sb-dot" style="background:${CDOTS[i%CDOTS.length]};flex-shrink:0"></span>
-          <span class="sb-name" style="flex:1" title="${esc(c.name)}">${esc(c.name)}</span>
-          <span class="sb-amt${due>0?' neg':''}">${fmt(due)}</span>
-          <button class="btn-i" onclick="openEditModal('cc','${c.id}')" title="Edit" style="padding:2px;flex-shrink:0"><svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg></button>
-          <button class="btn-i" onclick="confirmDeleteAccount('cc','${c.id}')" title="Delete" style="padding:2px;flex-shrink:0" onmouseover="this.style.color='#ef4444'" onmouseout="this.style.color='#c4bfba'"><svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg></button>
+      // One short status, plain text; colour only when it needs attention
+      let st='',stCls='',stTip='';
+      if(isOverdue){st=`Overdue ${di.overdueDays}d`;stCls='bad';stTip=`${fmt(di.overdue)} unpaid from the bill due ${fmtDate(di.lastDue)}`;}
+      else if(due<=0.004&&ds){st='No dues';}
+      else if(ad&&ad.enabled&&ab){st='Auto Debit On';stTip=`Auto-debit on the ${ad.day}${ordSuffix(ad.day)} from ${ab.name}`;}
+      else if(ds){st=ds.label;stCls=ds.status==='urgent'?'bad':ds.status==='soon'?'warn':'';}
+      const rupees=n=>'₹'+Math.round(n).toLocaleString('en-IN');
+      const barCls=pct>80?'bad':pct>50?'warn':'';
+      return`<div class="sb-item cc-row">
+        <div class="cc-top">
+          <span class="sb-dot" style="background:${CDOTS[i%CDOTS.length]};margin-top:0"></span>
+          <span class="sb-name" title="${esc(c.name)}">${esc(c.name)}</span>
+          <span class="sb-amt${due>0?' neg':''}" title="Outstanding">${fmt(due)}</span>
+          <button class="btn-i" onclick="openEditModal('cc','${c.id}')" title="Edit card"><svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg></button>
+          <button class="btn-i danger" onclick="confirmDeleteAccount('cc','${c.id}')" title="Delete card"><svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg></button>
         </div>
-        ${ad&&ad.enabled&&ab?`<div style="padding-left:15px"><span class="due-badge due-ok">Auto-debit on ${ad.day}${ordSuffix(ad.day)} from ${esc(ab.name)}</span></div>`
-          :ds?`<div style="padding-left:15px"><span class="due-badge ${badgeCls}">${ds.label}</span></div>`:''}
-        ${avail!==null?`<div style="padding-left:15px;width:100%">
-          <div class="pt" style="height:3px"><div class="pf ${cls}" style="width:${pct}%"></div></div>
-          <div style="font-size:.65rem;color:#c4bfba;margin-top:2px">${fmt(avail)} available</div>
+        ${avail!==null?`<div class="cc-bar" title="${Math.round(pct)}% of ${rupees(lim)} limit used"><i class="${barCls}" style="width:${pct}%"></i></div>`:''}
+        ${avail!==null||st?`<div class="cc-meta">
+          <span>${avail!==null?`<b class="num">${rupees(avail)}</b> available`:''}</span>
+          ${st?`<span class="cc-st ${stCls}"${stTip?` title="${esc(stTip)}"`:''}>${st}</span>`:''}
         </div>`:''}
       </div>`;
     }).join('');
@@ -125,13 +167,14 @@ function renderSplitwiseWidget(){
   sec.style.display='block';
   const netLabel=net>0.004?`You're owed ${fmt(net)}`:net<-0.004?`You owe ${fmt(-net)}`:'All settled up';
   const netColor=net>0.004?'#166534':net<-0.004?'#ef4444':'#78716c';
+  setFoldSum('split',net>0.004?'+'+fmt(net):net<-0.004?'−'+fmt(-net):'Settled',net>0.004?'pos':net<-0.004?'neg':'');
   body.innerHTML=`
     <div style="padding:3px 8px 2px">
-      <div class="num" style="font-size:.92rem;font-weight:600;color:${netColor}">${netLabel}</div>
-      <div style="font-size:.67rem;color:#a8a29e;margin-top:2px">Fronted: ${fmt(fronted)} &middot; Owed: ${fmt(owed)}</div>
+      <div class="num" style="font-size:.93rem;font-weight:600;color:${netColor}">${netLabel}</div>
+      <div style="font-size:.68rem;color:var(--text-muted);margin-top:2px">Fronted: ${fmt(fronted)} &middot; Owed: ${fmt(owed)}</div>
       <div style="display:flex;gap:6px;margin-top:8px">
-        <button class="btn-g" style="flex:1;padding:6px 0;font-size:.76rem" onclick="openSplitPayModal()">Record Payment</button>
-        <button class="btn-g" style="flex:1;padding:6px 0;font-size:.76rem" onclick="openSettleModal()">Settle Up</button>
+        <button class="btn-g" style="flex:1;padding:6px 0;font-size:.78rem" onclick="openSplitPayModal()">Record Payment</button>
+        <button class="btn-g" style="flex:1;padding:6px 0;font-size:.78rem" onclick="openSettleModal()">Settle Up</button>
       </div>
     </div>`;
 }
@@ -172,9 +215,9 @@ function openSplitPayModal(){
 }
 function confirmSplitPay(){
   const amt=parseFloat(document.getElementById('sp-amt').value);
-  if(!amt||amt<=0){toast('Enter an amount');return;}
+  if(!amt||amt<=0){fieldError('sp-amt','Enter an amount');return;}
   const date=document.getElementById('sp-date').value;
-  if(!date){toast('Select a date');return;}
+  if(!date){fieldError('sp-date','Select a date');return;}
   const accKey=document.getElementById('sp-acc').value;
   const isCash=accKey==='cash';
   const bankId=isCash?null:accKey.split(':')[1];
@@ -197,14 +240,14 @@ function openSettleModal(){
   if(pending<=0.004){toast("Nothing to settle — you're all square");return;}
   const netColor=net>=0?'#166534':'#ef4444';
   document.getElementById('settle-summary').innerHTML=`
-    <div style="display:flex;justify-content:space-between;font-size:.8rem;margin-bottom:5px"><span>You fronted for others</span><span class="num" style="color:#166534">+${fmt(fronted)}</span></div>
-    <div style="display:flex;justify-content:space-between;font-size:.8rem;margin-bottom:5px"><span>You owe others</span><span class="num" style="color:#ef4444">&minus;${fmt(owed)}</span></div>
-    ${paid>0.004?`<div style="display:flex;justify-content:space-between;font-size:.8rem;margin-bottom:5px"><span>Payments you made</span><span class="num" style="color:#166534">+${fmt(paid)}</span></div>`:''}
-    ${received>0.004?`<div style="display:flex;justify-content:space-between;font-size:.8rem;margin-bottom:5px"><span>Payments you received</span><span class="num" style="color:#ef4444">&minus;${fmt(received)}</span></div>`:''}
+    <div style="display:flex;justify-content:space-between;font-size:.82rem;margin-bottom:5px"><span>You fronted for others</span><span class="num" style="color:#166534">+${fmt(fronted)}</span></div>
+    <div style="display:flex;justify-content:space-between;font-size:.82rem;margin-bottom:5px"><span>You owe others</span><span class="num" style="color:#ef4444">&minus;${fmt(owed)}</span></div>
+    ${paid>0.004?`<div style="display:flex;justify-content:space-between;font-size:.82rem;margin-bottom:5px"><span>Payments you made</span><span class="num" style="color:#166534">+${fmt(paid)}</span></div>`:''}
+    ${received>0.004?`<div style="display:flex;justify-content:space-between;font-size:.82rem;margin-bottom:5px"><span>Payments you received</span><span class="num" style="color:#ef4444">&minus;${fmt(received)}</span></div>`:''}
     <div style="margin-bottom:3px"></div>
     <div style="height:1px;background:#e7e5e4;margin-bottom:8px"></div>
-    <div style="display:flex;justify-content:space-between;font-weight:600;font-size:.9rem"><span>Net</span><span class="num" style="color:${netColor}">${net>=0?'+':'-'}${fmt(Math.abs(net))}</span></div>
-    <p style="font-size:.72rem;color:#a8a29e;margin-top:6px">${net>0.004?"You're owed money overall — this will record it as income.":net<-0.004?'You owe money overall — this will record it as an expense.':"You're exactly settled — no money needs to move."}</p>`;
+    <div style="display:flex;justify-content:space-between;font-weight:600;font-size:.93rem"><span>Net</span><span class="num" style="color:${netColor}">${net>=0?'+':'-'}${fmt(Math.abs(net))}</span></div>
+    <p style="font-size:.72rem;color:var(--text-muted);margin-top:6px">${net>0.004?"You're owed money overall — this will record it as income.":net<-0.004?'You owe money overall — this will record it as an expense.':"You're exactly settled — no money needs to move."}</p>`;
   setDateVal('settle-date',today());
   fillSettleAccOpts();
   document.getElementById('settle-hint').textContent=Math.abs(net)>0.004
@@ -217,7 +260,7 @@ function confirmSettle(){
   const{net,pending}=computeSplitwiseBalance();
   if(pending<=0.004){toast('Nothing to settle');closeModal('modal-settle');return;}
   const date=document.getElementById('settle-date').value;
-  if(!date){toast('Select a settlement date');return;}
+  if(!date){fieldError('settle-date','Select a settlement date');return;}
   const accKey=document.getElementById('settle-acc').value;
   const isCash=accKey==='cash';
   const bankId=isCash?null:accKey.split(':')[1];
@@ -319,7 +362,7 @@ function saveAccount(){
   const type=document.getElementById('ac-type').value;
   const isEdit=!!_editAcId;
   const name=document.getElementById('ac-name').value.trim();
-  if(type!=='cash'&&!name){toast('Enter a name');return;}
+  if(type!=='cash'&&!name){fieldError('ac-name','Enter a name');return;}
 
   if(type==='bank'){
     const bal=Number(document.getElementById('ac-bal').value)||0;
@@ -340,9 +383,9 @@ function saveAccount(){
     const adMode=document.getElementById('ac-ad-mode').value==='fixed'?'fixed':'total';
     const adFixed=Number(document.getElementById('ac-ad-fixed').value)||0;
     if(adOn){
-      if(!state.banks.some(b=>b.id===adBank)){toast('Choose a bank account for auto-debit');return;}
-      if(adDay<1||adDay>31){toast('Enter an auto-debit day between 1 and 31');return;}
-      if(adMode==='fixed'&&adFixed<=0){toast('Enter a fixed auto-debit amount');return;}
+      if(!state.banks.some(b=>b.id===adBank)){fieldError('ac-ad-bank','Choose a bank account for auto-debit');return;}
+      if(adDay<1||adDay>31){fieldError('ac-ad-day','Enter an auto-debit day between 1 and 31');return;}
+      if(adMode==='fixed'&&adFixed<=0){fieldError('ac-ad-fixed','Enter a fixed auto-debit amount');return;}
     }
     // Only reset lastRunDate when the schedule actually changes, so editing the
     // card name doesn't re-trigger a debit. A new schedule starts from today.
@@ -354,7 +397,7 @@ function saveAccount(){
       const ci=state.cards.findIndex(x=>x.id===_editAcId);
       if(ci>=0)state.cards[ci]={...state.cards[ci],...obj};
     } else {
-      state.cards.push({id:uid(),...obj});
+      state.cards.push({id:uid(),...obj,createdAt:today()});
     }
   } else if(type==='cash'){
     state.cash.startBalance=Number(document.getElementById('ac-bal').value)||0;
@@ -372,6 +415,7 @@ function confirmDeleteAccount(type, id){
   else if(type==='cc'){const c=state.cards.find(x=>x.id===id);name=c?c.name:'card';}
   const key=type==='bank'?'bank:'+id:'cc:'+id;
   const used=state.transactions.filter(t=>t.acId===id||t.destId===id||t.fromKey===key||t.toKey===key||t.sourceKey===key||t.destKey===key).length;
+  prepConfirm(type==='cc'?'Delete credit card?':'Delete bank account?',type==='cc'?'Delete card':'Delete account');
   document.getElementById('confirm-body').textContent=used
     ?`Delete "${name}"? ${used} transaction${used>1?'s':''} use this account. They stay in the log, but their amounts will no longer count in any balance. You can undo this right after.`
     :`Delete "${name}"? You can undo this right after.`;

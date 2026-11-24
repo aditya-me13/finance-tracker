@@ -1,4 +1,4 @@
-const CACHE_NAME='finance-tracker-v10';
+const CACHE_NAME='finance-tracker-v22';
 const APP_SHELL=[
   './',
   './index.html',
@@ -28,10 +28,24 @@ const APP_SHELL=[
   './icons/icon-512-maskable.png',
 ];
 
+/* Versioned third-party libraries the page needs to start. Their URLs are pinned to a
+   version, so cache-first is safe. Firestore/Auth API traffic is never cached. */
+const CDN_HOSTS=['cdn.jsdelivr.net','www.gstatic.com','fonts.googleapis.com','fonts.gstatic.com'];
+const CDN_ASSETS=[
+  'https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js',
+  'https://www.gstatic.com/firebasejs/12.15.0/firebase-app-compat.js',
+  'https://www.gstatic.com/firebasejs/12.15.0/firebase-auth-compat.js',
+  'https://www.gstatic.com/firebasejs/12.15.0/firebase-firestore-compat.js',
+];
+
 self.addEventListener('install',e=>{
   e.waitUntil(
     caches.open(CACHE_NAME)
-      .then(cache=>cache.addAll(APP_SHELL))
+      .then(cache=>Promise.all([
+        cache.addAll(APP_SHELL),
+        // no-cors: these are loaded by plain <script> tags, so the page accepts opaque copies
+        ...CDN_ASSETS.map(u=>fetch(new Request(u,{mode:'no-cors'})).then(r=>cache.put(u,r)).catch(()=>{}))
+      ]))
       .then(()=>self.skipWaiting())
       .catch(err=>console.warn('SW precache failed',err)) // don't block install if one asset fails
   );
@@ -45,12 +59,21 @@ self.addEventListener('activate',e=>{
   );
 });
 
-/* Stale-while-revalidate for same-origin GET requests only.
-   Firebase/Firestore/Chart.js CDN calls pass straight through to the network
+/* Same-origin GETs: stale-while-revalidate.
+   CDN libraries and fonts: cache-first (versioned URLs), so the installed app starts offline.
+   Everything else (Firestore, Auth, stock-price proxy) passes straight through to the network
    (the app already has its own localStorage fallback for offline data). */
 self.addEventListener('fetch',e=>{
   const url=new URL(e.request.url);
-  if(e.request.method!=='GET'||url.origin!==self.location.origin)return;
+  if(e.request.method!=='GET')return;
+  if(CDN_HOSTS.includes(url.hostname)&&(url.hostname!=='www.gstatic.com'||url.pathname.startsWith('/firebasejs/'))){
+    e.respondWith(caches.match(e.request,{ignoreVary:true}).then(hit=>hit||fetch(e.request).then(resp=>{
+      if(resp&&(resp.ok||resp.type==='opaque')){const copy=resp.clone();caches.open(CACHE_NAME).then(c=>c.put(e.request,copy));}
+      return resp;
+    })));
+    return;
+  }
+  if(url.origin!==self.location.origin)return;
   e.respondWith(
     caches.match(e.request).then(cached=>{
       const network=fetch(e.request).then(resp=>{

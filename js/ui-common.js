@@ -10,9 +10,6 @@ function doResetPassword(){
   if(!email){showAuthErr('Enter your email above, then click "Forgot password?"');return;}
   auth.sendPasswordResetEmail(email).then(()=>{document.getElementById('auth-err').style.display='none';toast('Password reset email sent',3500);}).catch(e=>showAuthErr(authMsg(e)));
 }
-document.addEventListener('keydown',e=>{
-  if(e.key==='Enter'&&(e.target.id==='auth-email'||e.target.id==='auth-pass'))doSignIn();
-});
 function showAuthErr(msg){
   const el=document.getElementById('auth-err');
   el.textContent=msg;el.style.display='block';
@@ -50,6 +47,7 @@ auth.onAuthStateChanged(async user=>{
   }
   if(user){
     currentUid=user.uid;
+    const me=document.getElementById('acct-menu-email');if(me)me.textContent=user.email||'';
     document.getElementById('auth-gate').classList.add('hidden');
     document.querySelector('.shell').style.display='grid';
     const shell=document.querySelector('.shell');
@@ -265,6 +263,7 @@ function confirmDelete(id){
   if(t.type==='expense')desc=`${t.category} — ${fmt(t.amount)} on ${fmtDate(t.date)}`;
   else if(t.type==='income')desc=`${t.category} income — ${fmt(t.amount)} on ${fmtDate(t.date)}`;
   else desc=`Transfer of ${fmt(t.amount)} on ${fmtDate(t.date)}`;
+  prepConfirm('Delete transaction?','Delete');
   document.getElementById('confirm-body').textContent=`Delete "${desc}"? You can undo this right after.`;
   document.getElementById('confirm-ok-btn').onclick=()=>{
     if(_pendingDeleteId){

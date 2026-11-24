@@ -94,8 +94,8 @@ function openEditTxn(id){
   shareWrap.classList.toggle('hidden',!(isExp&&t.shared));
   document.getElementById('et-share').value=isExp&&t.shared?(t.myShare??t.amount):'';
   document.getElementById('et-cat-wrap').classList.toggle('hidden',isTr);
-  document.getElementById('et-spread-wrap').classList.toggle('hidden',!isExp);
-  if(isExp){
+  document.getElementById('et-spread-wrap').classList.toggle('hidden',!(isExp||isInc));
+  if(isExp||isInc){
     const sp=document.getElementById('et-spread'),n=String(spreadN(t));
     if(!Array.from(sp.options).some(o=>o.value===n))sp.insertAdjacentHTML('beforeend',`<option value="${n}">${n} months</option>`);
     sp.value=n;
@@ -130,36 +130,36 @@ function saveEditTxn(){
   if(!t){closeModal('modal-txn-edit');return;}
   const amt=Number(document.getElementById('et-amt').value),date=document.getElementById('et-date').value;
   const desc=document.getElementById('et-desc').value.trim();
-  if(!amt||amt<=0){toast('Enter a valid amount');return;}
-  if(!date){toast('Select a date');return;}
+  if(!amt||amt<=0){fieldError('et-amt','Enter a valid amount');return;}
+  if(!date){fieldError('et-date','Select a date');return;}
   const accOk=(type,id)=>type==='cash'||(type==='bank'&&state.banks.some(b=>b.id===id))||(type==='cc'&&state.cards.some(c=>c.id===id));
   if(t.type==='transfer'){
     const from=document.getElementById('et-from').value,to=document.getElementById('et-to').value;
-    if(!from||!to||from===to){toast('From and To must differ');return;}
+    if(!from||!to||from===to){fieldError('et-to','From and To must differ');return;}
     Object.assign(t,{amount:amt,date,fromKey:from,toKey:to,note:desc});
   }else{
     const category=document.getElementById('et-cat').value;
-    if(!category){toast('Select a category');return;}
+    if(!category){fieldError('et-cat','Select a category');return;}
     if(t.type==='expense'){
       const owed=t.acType==='shared';
       if(t.shared){
         const share=Number(document.getElementById('et-share').value);
-        if(!(share>0)){toast('Enter your share amount');return;}
-        if(share>amt){toast('Your share cannot exceed the total bill amount');return;}
+        if(!(share>0)){fieldError('et-share','Enter your share amount');return;}
+        if(share>amt){fieldError('et-share','Your share cannot exceed the total bill amount');return;}
         t.myShare=share;
       }else t.myShare=amt;
       if(!owed){
         const type=document.getElementById('et-actype').value,inst=type==='cash'?'cash':document.getElementById('et-inst').value;
-        if(!accOk(type,inst)){toast('No account selected');return;}
+        if(!accOk(type,inst)){fieldError('et-inst','No account selected');return;}
         t.acType=type;t.acId=inst;
       }
-      const sp=Number(document.getElementById('et-spread').value)||1;
-      if(sp>1)t.spreadMonths=sp;else delete t.spreadMonths;
     }else{
       const type=document.getElementById('et-actype').value,inst=type==='cash'?'cash':document.getElementById('et-inst').value;
-      if(!accOk(type,inst)){toast('No account selected');return;}
+      if(!accOk(type,inst)){fieldError('et-inst','No account selected');return;}
       t.destType=type;t.destId=inst;
     }
+    const sp=Number(document.getElementById('et-spread').value)||1;
+    if(sp>1)t.spreadMonths=sp;else delete t.spreadMonths;
     if(t.loanId){
       const loan=state.loans.find(l=>l.id===t.loanId);
       if(loan)loan.outstanding=Math.max(0,(Number(loan.outstanding)||0)+(Number(t.amount)||0)-amt);
@@ -189,8 +189,8 @@ function renderChips(ctx){
 }
 function saveCategory(){
   const ctx=document.getElementById('cat-ctx').value,name=document.getElementById('inp-cat').value.trim();
-  if(!name){toast('Enter a name');return;}
-  if(state.categories[ctx].map(c=>c.toLowerCase()).includes(name.toLowerCase())){toast('Already exists');return;}
+  if(!name){fieldError('inp-cat','Enter a name');return;}
+  if(state.categories[ctx].map(c=>c.toLowerCase()).includes(name.toLowerCase())){fieldError('inp-cat','Already exists');return;}
   state.categories[ctx].push(name);saveState();renderChips(ctx);fillTxnFilterCatOpts();closeModal('modal-cat');toast('Category added');
 }
 
@@ -220,7 +220,7 @@ function renderCumulativeCategoryWidget(){
   const scopeText=viewMode==='fy'?'Current FY total':'Current month total';
   wrap.innerHTML=`
     <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:10px">
-      <span style="font-weight:600;font-size:.88rem">Cumulative Category Spend</span>
+      <span style="font-weight:600;font-size:.875rem">Cumulative Category Spend</span>
       <span class="slabel">${scopeLabel}</span>
     </div>
     <div style="margin-bottom:10px">
@@ -228,12 +228,12 @@ function renderCumulativeCategoryWidget(){
       <div id="cumulative-cat-list" style="display:flex;flex-wrap:wrap;gap:6px"></div>
     </div>
     <div style="display:flex;justify-content:space-between;align-items:baseline">
-      <span style="font-size:.72rem;color:#a8a29e">${scopeText}</span>
-      <span class="num" id="cumulative-cat-total" style="font-size:.92rem;font-weight:600;color:#1c1917">${fmt(total)}</span>
+      <span style="font-size:.72rem;color:var(--text-muted)">${scopeText}</span>
+      <span class="num" id="cumulative-cat-total" style="font-size:.93rem;font-weight:600;color:#1c1917">${fmt(total)}</span>
     </div>`;
   const list=document.getElementById('cumulative-cat-list');
   if(!cats.length){
-    list.innerHTML='<div style="font-size:.78rem;color:#c4bfba">No expense categories available</div>';
+    list.innerHTML='<div style="font-size:.78rem;color:var(--text-muted)">No expense categories available</div>';
     return;
   }
   cats.forEach((cat,i)=>{
@@ -294,7 +294,7 @@ function onExpAmtInput(){
 function calcEqualShare(){
   const amt=Number(document.getElementById('e-amt').value)||0;
   const n=Number(document.getElementById('e-split-people').value)||4;
-  if(amt<=0||n<=0){toast('Enter the total bill amount and number of people first');return;}
+  if(amt<=0||n<=0){fieldError('e-split-people','Enter the total bill amount and number of people first');return;}
   const shareInp=document.getElementById('e-my-share');
   shareInp.value=(amt/n).toFixed(2);
   shareInp.dataset.touched='1';
@@ -314,15 +314,15 @@ function submitExpense(){
   const isSplit=document.getElementById('e-split-toggle').checked;
   const isRecur=document.getElementById('e-recur-toggle').checked;
   const spread=Number(document.getElementById('e-spread').value)||1,spreadField=spread>1?{spreadMonths:spread}:{};
-  if(!amt||amt<=0){toast('Enter a valid amount');return;}
-  if(!date){toast('Select a date');return;}
-  if(!selExpCat){toast('Select a category');return;}
+  if(!amt||amt<=0){fieldError('e-amt','Enter a valid amount');return;}
+  if(!date){fieldError('e-date','Select a date');return;}
+  if(!selExpCat){fieldError('e-chips','Select a category');return;}
 
   let myShare=amt;
   if(isSplit){
     myShare=Number(document.getElementById('e-my-share').value);
-    if(!(myShare>0)){toast('Enter your share amount');return;}
-    if(myShare>amt){toast('Your share cannot exceed the total bill amount');return;}
+    if(!(myShare>0)){fieldError('e-my-share','Enter your share amount');return;}
+    if(myShare>amt){fieldError('e-my-share','Your share cannot exceed the total bill amount');return;}
   }
 
   const tags=selExpTags.slice();
@@ -333,17 +333,17 @@ function submitExpense(){
   }else{
     acType=document.getElementById('e-actype').value;
     const ai=document.getElementById('e-inst').value;
-    if((acType==='bank'&&!state.banks.some(b=>b.id===ai))||(acType==='cc'&&!state.cards.some(c=>c.id===ai))){toast('No account selected');return;}
+    if((acType==='bank'&&!state.banks.some(b=>b.id===ai))||(acType==='cc'&&!state.cards.some(c=>c.id===ai))){fieldError('e-inst','No account selected');return;}
     acId=acType==='cash'?'cash':ai;
     state.transactions.push({id:uid(),date,type:'expense',amount:amt,acType,acId,category:selExpCat,desc,myShare,shared:isSplit,sharedMode:isSplit?'fronted':undefined,settled:isSplit?false:undefined,tags,...spreadField});
   }
   if(isRecur){
-    const freq=document.getElementById('e-recur-freq').value;
-    createRecurringFromEntry({type:'expense',amount:amt,acType,acId,category:selExpCat,desc,myShare,shared:isSplit,sharedMode:isSplit?expSplitMode:undefined,tags,frequency:freq,anchorDate:date});
+    const freq=document.getElementById('e-recur-freq').value,remindDays=Number(document.getElementById('e-recur-remind').value);
+    createRecurringFromEntry({type:'expense',amount:amt,acType,acId,category:selExpCat,desc,myShare,shared:isSplit,sharedMode:isSplit?expSplitMode:undefined,tags,frequency:freq,remindDays,anchorDate:date});
   }
   rememberLastEntry('expense',{acType:document.getElementById('e-actype').value,inst:document.getElementById('e-inst').value,category:selExpCat,date});
   saveState();
-  document.getElementById('e-amt').value='';document.getElementById('e-desc').value='';document.getElementById('e-spread').value='1';
+  document.getElementById('e-amt').value='';document.getElementById('e-desc').value='';document.getElementById('e-spread').value='1';updateMoreOptsSummary('expense');
   resetSplitPanel();resetRecurToggle('expense');resetTagInputs();
   rebuildAll();toast(isSplit?'Shared expense logged':'Expense logged');
 }
@@ -352,32 +352,51 @@ function submitIncome(){
   const dt=document.getElementById('i-actype').value,di=document.getElementById('i-inst').value;
   const desc=document.getElementById('i-desc').value.trim();
   const isRecur=document.getElementById('i-recur-toggle').checked;
-  if(!amt||amt<=0){toast('Enter a valid amount');return;}
-  if(!date){toast('Select a date');return;}
-  if(!selIncCat){toast('Select a source category');return;}
-  if((dt==='bank'&&!state.banks.some(b=>b.id===di))||(dt==='cc'&&!state.cards.some(c=>c.id===di))){toast('No account selected');return;}
+  const spread=Number(document.getElementById('i-spread').value)||1;
+  if(!amt||amt<=0){fieldError('i-amt','Enter a valid amount');return;}
+  if(!date){fieldError('i-date','Select a date');return;}
+  if(!selIncCat){fieldError('i-chips','Select a source category');return;}
+  if((dt==='bank'&&!state.banks.some(b=>b.id===di))||(dt==='cc'&&!state.cards.some(c=>c.id===di))){fieldError('i-inst','No account selected');return;}
   const destId=dt==='cash'?'cash':di;
   const tags=selIncTags.slice();
-  state.transactions.push({id:uid(),date,type:'income',amount:amt,destType:dt,destId,category:selIncCat,desc,tags});
+  state.transactions.push({id:uid(),date,type:'income',amount:amt,destType:dt,destId,category:selIncCat,desc,tags,...(spread>1?{spreadMonths:spread}:{})});
   if(isRecur){
-    const freq=document.getElementById('i-recur-freq').value;
-    createRecurringFromEntry({type:'income',amount:amt,destType:dt,destId,category:selIncCat,desc,tags,frequency:freq,anchorDate:date});
+    const freq=document.getElementById('i-recur-freq').value,remindDays=Number(document.getElementById('i-recur-remind').value);
+    createRecurringFromEntry({type:'income',amount:amt,destType:dt,destId,category:selIncCat,desc,tags,frequency:freq,remindDays,anchorDate:date});
   }
   rememberLastEntry('income',{acType:dt,inst:di,category:selIncCat,date});
-  saveState();document.getElementById('i-amt').value='';document.getElementById('i-desc').value='';
-  resetRecurToggle('income');resetTagInputs();
+  saveState();document.getElementById('i-amt').value='';document.getElementById('i-desc').value='';document.getElementById('i-spread').value='1';
+  resetRecurToggle('income');resetTagInputs();updateMoreOptsSummary('income');
   rebuildAll();toast(dt==='cc'?'Income recorded — card due reduced':'Income recorded');
 }
 function submitTransfer(){
   const amt=Number(document.getElementById('t-amt').value),date=document.getElementById('t-date').value;
   const from=document.getElementById('t-from').value,to=document.getElementById('t-to').value;
   const note=document.getElementById('t-note').value.trim();
-  if(!amt||amt<=0){toast('Enter a valid amount');return;}
-  if(!date){toast('Select a date');return;}
-  if(from===to){toast('From and To must differ');return;}
+  if(!amt||amt<=0){fieldError('t-amt','Enter a valid amount');return;}
+  if(!date){fieldError('t-date','Select a date');return;}
+  if(from===to){fieldError('t-to','From and To must differ');return;}
   state.transactions.push({id:uid(),date,type:'transfer',amount:amt,fromKey:from,toKey:to,note});
   rememberLastEntry('transfer',{from,to,date});
   saveState();document.getElementById('t-amt').value='';document.getElementById('t-note').value='';
   rebuildAll();toast('Transfer recorded');
 }
 
+
+/* "Additional options" accordion: the summary line shows what is set inside it (tags, repeat, spread)
+   so nothing hidden there gets forgotten while it is collapsed */
+function updateMoreOptsSummary(ctx){
+  const p=ctx==='expense'?'e':'i';
+  const el=document.getElementById(p+'-more-sum');if(!el)return;
+  const parts=[];
+  const tags=selTagsFor(ctx);
+  if(tags.length)parts.push(tags.length===1?'#'+tags[0]:`${tags.length} tags`);
+  if(document.getElementById(p+'-recur-toggle')?.checked){
+    const f=document.getElementById(p+'-recur-freq');
+    parts.push('Repeats '+(f?f.value:'monthly'));
+  }
+  const sp=Number(document.getElementById(p+'-spread')?.value)||1;
+  if(sp>1)parts.push(`Spread ${sp} months`);
+  el.textContent=parts.length?parts.join(' · '):'Tags · Repeat · Spread';
+  el.classList.toggle('set',parts.length>0);
+}

@@ -154,12 +154,15 @@ function normalizeState(){
   }
   state.cards.forEach(c=>{
     if(!c.autoDebit)c.autoDebit={enabled:false,bankId:'',day:0,mode:'total',fixedAmount:0,lastRunDate:''};
+    // Older cards have no creation date: start judging overdue from today (never flag past cycles we can't verify)
+    if(!c.createdAt)c.createdAt=today();
   });
 }
 
 /* UI state */
 let txnType='expense',selExpCat=null,selIncCat=null,viewMK=null,viewFY=null,viewMode='month',activeTab='log',activeView='dashboard';
 let txnFilter={category:'',from:'',to:'',tag:'',search:'',account:''};
+let txnTypesShown=(()=>{const d={expense:true,income:true,transfer:true,invest:true};try{return{...d,...JSON.parse(localStorage.getItem('ft-txn-types')||'{}')};}catch(e){return d;}})();
 let bulkSelectedIds=new Set();
 let bulkTagMode='add';
 let selExpTags=[],selIncTags=[];

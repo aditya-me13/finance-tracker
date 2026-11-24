@@ -25,7 +25,7 @@ function calcRenderButtons(){
     const btn=document.createElement('button');
     btn.type='button';
     btn.textContent=label;
-    const base='padding:9px 0;border-radius:8px;font-size:.85rem;font-weight:500;cursor:pointer;border:1.5px solid #e7e5e4;font-family:\'DM Mono\',monospace;transition:opacity .15s;';
+    const base='padding:9px 0;border-radius:8px;font-size:.875rem;font-weight:500;cursor:pointer;border:1.5px solid #e7e5e4;font-family:\'DM Mono\',monospace;transition:opacity .15s;';
     const theme=isEq?'background:#1c1917;color:#fff;border-color:#1c1917;'
       :isOp?'background:#faf9f7;color:#1d4ed8;'
       :isCtl?'background:#fff1f2;color:#be123c;'

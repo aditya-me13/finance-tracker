@@ -89,6 +89,44 @@ function cardDueAsOf(cardId,dateStr){
   return due;
 }
 
+/* Payments that reduced a card's outstanding in (afterStr, toStr]: income credited to the card
+   and transfers into it (manual bill payments and auto-debits). */
+function cardPaymentsBetween(cardId,afterStr,toStr){
+  let paid=0;
+  for(const t of state.transactions){
+    if(t.date<=afterStr||t.date>toStr)continue;
+    const a=Number(t.amount)||0;
+    if(t.type==='income'&&t.destType==='cc'&&t.destId===cardId)paid+=a;
+    else if(t.type==='transfer'&&t.toKey==='cc:'+cardId)paid+=a;
+  }
+  return paid;
+}
+/* Full due picture for a card.
+   The bill on a due date is the card's outstanding at the end of that day (the same rule
+   "Auto-debit: full outstanding" uses). It is overdue when, after the due date has passed,
+   payments made since then have not cleared it. New spends after the due date belong to
+   the next bill, so they never make a card overdue.
+   Returns { ds: upcoming due status | null, outstanding, overdue, overdueDays, lastDue } */
+function getCardDueInfo(c,bal){
+  const outstanding=((bal||computeBal()).cd[c.id])||0;
+  const ds=getDueDateStatus(c);
+  const out={ds,outstanding,overdue:0,overdueDays:0,lastDue:null};
+  const day=parseInt(c.dueDay,10);
+  if(!day)return out;
+  const t=today(),now=new Date();
+  const dueStr=(y,m)=>{const d=new Date(y,m,1);return dateToStr(new Date(d.getFullYear(),d.getMonth(),Math.min(day,daysInMonth(d.getFullYear(),d.getMonth()))));};
+  let last=dueStr(now.getFullYear(),now.getMonth());
+  if(last>=t)last=dueStr(now.getFullYear(),now.getMonth()-1); // most recent due date strictly before today
+  out.lastDue=last;
+  if(!c.createdAt||c.createdAt>=last)return out; // card added after that bill: nothing we can verify
+  const billed=cardDueAsOf(c.id,last);
+  const unpaid=billed-cardPaymentsBetween(c.id,last,t);
+  out.overdue=Math.max(0,Math.min(outstanding,unpaid));
+  if(out.overdue<=0.004)out.overdue=0;
+  else out.overdueDays=Math.round((new Date(t+'T00:00:00')-new Date(last+'T00:00:00'))/86400000);
+  return out;
+}
+
 /* ── Splitwise / Roommate Settlement ──────────────────────── */
 /* Payments recorded via "Record Payment" carry allocations [{id,amt}] against specific
    split entries, so an entry can be partly settled and the remainder carries forward. */

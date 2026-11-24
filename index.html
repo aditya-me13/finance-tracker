@@ -5,7 +5,6 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
 <title>Finance Tracker</title>
 <script>try{var m=localStorage.getItem('ft-theme')||(matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light');if(m==='dark')document.documentElement.classList.add('dark');}catch(e){}</script>
-<script src="https://cdn.tailwindcss.com"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet"/>
 <link rel="stylesheet" href="styles.css"/>
@@ -22,71 +21,95 @@
 
 <!-- TOPBAR -->
 <header class="topbar">
-  <div style="display:flex;align-items:center;gap:9px">
-    <div style="width:27px;height:27px;background:#1c1917;border-radius:7px;display:flex;align-items:center;justify-content:center">
+  <button type="button" class="brand-toggle" id="sb-toggle" onclick="toggleSidebar()" aria-controls="sidebar" aria-expanded="true" title="Hide sidebar (Ctrl+B)">
+    <span class="brand-logo" aria-hidden="true">
       <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="#fff" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 11h.01M12 11h.01M15 11h.01M4 19h16a2 2 0 002-2V7a2 2 0 00-2-2H4a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
-    </div>
-    <span style="font-weight:600;font-size:.88rem">Finance Tracker</span>
-  </div>
-  <div class="nav-tabs">
+    </span>
+    <span style="font-weight:600;font-size:.875rem">Finance Tracker</span>
+    <svg class="brand-chev" width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><path stroke-linecap="round" d="M9 4v16"/></svg>
+  </button>
+  <nav class="nav-tabs" aria-label="Main">
     <button class="nav-tab active" id="nav-dash" onclick="switchView('dashboard')">Dashboard</button>
     <button class="nav-tab" id="nav-invest" onclick="switchView('invest')">Investments</button>
     <button class="nav-tab" id="nav-analytics" onclick="switchView('analytics')">Analytics</button>
-  </div>
-  <div style="display:flex;align-items:center;gap:5px">
-    <button id="theme-toggle" class="theme-btn" onclick="toggleTheme()" title="Toggle dark mode" data-tip="Dark mode" aria-label="Toggle dark mode">
+  </nav>
+  <div style="display:flex;align-items:center;gap:8px">
+    <button id="theme-toggle" class="theme-btn" style="width:30px;height:30px" onclick="toggleTheme()" title="Toggle dark mode" data-tip="Dark mode" aria-label="Toggle dark mode">
       <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path id="theme-icon" stroke-linecap="round" stroke-linejoin="round" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.36 6.36l-.7-.7M6.34 6.34l-.7-.7m12.02 0l-.7.7M6.34 17.66l-.7.7M16 12a4 4 0 11-8 0 4 4 0 018 0z"/></svg>
     </button>
-    <label style="font-size:.78rem;font-weight:500;color:#78716c;padding:5px 9px;border-radius:7px;cursor:pointer;border:1.5px solid #e7e5e4">
-      Import <input type="file" accept=".json" class="hidden" onchange="importData(event)"/>
-    </label>
-    <button onclick="exportData()" style="font-size:.78rem;font-weight:500;background:#1c1917;color:#fff;border:none;padding:5px 11px;border-radius:7px;cursor:pointer;font-family:'DM Sans',sans-serif">Export</button>
-    <button onclick="doSignOut()" title="Log out" style="font-size:.78rem;font-weight:500;background:transparent;color:inherit;border:1px solid #d6d3d1;padding:5px 11px;border-radius:7px;cursor:pointer;font-family:'DM Sans',sans-serif">Logout</button>
+    <input type="file" id="import-file" accept=".json" class="hidden" onchange="importData(event)"/>
+    <div class="menu" id="acct-menu">
+      <button type="button" class="menu-btn" id="acct-menu-btn" aria-haspopup="menu" aria-expanded="false" aria-controls="acct-menu-list" onclick="toggleAcctMenu()">
+        Data &amp; account
+        <svg width="11" height="11" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"/></svg>
+      </button>
+      <div class="menu-list hidden" id="acct-menu-list" role="menu" aria-labelledby="acct-menu-btn">
+        <div id="acct-menu-email" style="font-size:.72rem;color:var(--text-muted);padding:6px 10px 4px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"></div>
+        <button type="button" class="menu-item" role="menuitem" onclick="closeAcctMenu();exportData()">
+          <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M7 10l5 5 5-5M12 15V3"/></svg>Export backup (.json)</button>
+        <button type="button" class="menu-item" role="menuitem" onclick="closeAcctMenu();document.getElementById('import-file').click()">
+          <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M17 8l-5-5-5 5M12 3v12"/></svg>Import from backup…</button>
+        <div class="menu-sep" role="separator"></div>
+        <button type="button" class="menu-item danger" role="menuitem" onclick="closeAcctMenu();doSignOut()">
+          <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/></svg>Log out</button>
+      </div>
+    </div>
   </div>
 </header>
 
 <!-- SIDEBAR -->
 <aside class="sidebar" id="sidebar">
   <div class="worth-banner">
-    <div class="slabel" style="color:#57534e;margin-bottom:5px">Liquid Cash Available</div>
+    <div class="slabel" style="color:#a8a29e;margin-bottom:5px">Liquid Cash Available</div>
     <div class="num" id="sb-liquid-focus" style="font-size:1.45rem;font-weight:600;color:#fff">₹0.00</div>
     <div style="display:flex;gap:12px;flex-wrap:wrap;margin-top:8px;line-height:1.3">
       <div style="min-width:0">
-        <div style="font-size:.58rem;color:#78716c;text-transform:uppercase;letter-spacing:.08em">Net Worth</div>
+        <div style="font-size:.68rem;color:#a8a29e;text-transform:uppercase;letter-spacing:.06em">Net Worth</div>
         <div class="num" id="sb-worth-secondary" style="font-size:.78rem;color:#f4f3f0">₹0.00</div>
       </div>
       <div style="min-width:0">
-        <div style="font-size:.58rem;color:#78716c;text-transform:uppercase;letter-spacing:.08em">Invested</div>
+        <div style="font-size:.68rem;color:#a8a29e;text-transform:uppercase;letter-spacing:.06em">Invested</div>
         <div class="num" id="sb-invest-secondary" style="font-size:.78rem;color:#f4f3f0">₹0.00</div>
       </div>
     </div>
-    <div style="font-size:.68rem;color:#57534e;margin-top:6px;line-height:1.5">Bank + Cash − CC Dues</div>
+    <div style="font-size:.72rem;color:#a8a29e;margin-top:6px;line-height:1.5">Liquid = Bank + Cash − CC Dues</div>
   </div>
 
-  <!-- CC Reminders -->
-  <!-- CC Reminders are now part of the unified "Due This Month" widget below -->
-
-  <div class="sb-sec">
-    <div class="sb-head"><span class="slabel">Bank Accounts</span>
-      <button class="sb-add" onclick="openAddModal('bank')"><svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.5"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/></svg></button>
+  <div class="sb-sec" data-fold="banks">
+    <div class="sb-head"><button type="button" class="sb-fold" id="sbf-banks" aria-expanded="true" aria-controls="sb-banks" onclick="toggleSbFold('banks')"><svg class="sb-fold-chev" width="10" height="10" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"/></svg><span class="slabel">Bank Accounts</span></button><span class="sb-fold-sum num" id="sbsum-banks"></span>
+      <button class="sb-add" onclick="openAddModal('bank')" aria-label="Add bank account" title="Add bank account"><svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.5"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/></svg></button>
     </div>
-    <div id="sb-banks"><div style="font-size:.74rem;color:#c4bfba;padding:3px 8px">No accounts yet</div></div>
+    <div id="sb-banks" data-fold-body><div style="font-size:.78rem;color:var(--text-muted);padding:3px 8px">No accounts yet</div></div>
   </div>
-  <div class="sb-sec">
-    <div class="sb-head"><span class="slabel">Cash</span></div>
-    <div id="sb-cash"></div>
+  <div class="sb-sec" data-fold="cash">
+    <div class="sb-head"><button type="button" class="sb-fold" id="sbf-cash" aria-expanded="true" aria-controls="sb-cash" onclick="toggleSbFold('cash')"><svg class="sb-fold-chev" width="10" height="10" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"/></svg><span class="slabel">Cash</span></button><span class="sb-fold-sum num" id="sbsum-cash"></span></div>
+    <div id="sb-cash" data-fold-body></div>
   </div>
-  <div class="sb-sec">
-    <div class="sb-head"><span class="slabel">Credit Cards</span>
-      <button class="sb-add" onclick="openAddModal('cc')"><svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.5"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/></svg></button>
+  <div class="sb-sec" data-fold="cards">
+    <div class="sb-head"><button type="button" class="sb-fold" id="sbf-cards" aria-expanded="true" aria-controls="sb-cards" onclick="toggleSbFold('cards')"><svg class="sb-fold-chev" width="10" height="10" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"/></svg><span class="slabel">Credit Cards</span></button><span class="sb-fold-sum num" id="sbsum-cards"></span>
+      <button class="sb-add" onclick="openAddModal('cc')" aria-label="Add credit card" title="Add credit card"><svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.5"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/></svg></button>
     </div>
-    <div id="sb-cards"><div style="font-size:.74rem;color:#c4bfba;padding:3px 8px">No cards yet</div></div>
+    <div id="sb-cards" data-fold-body><div style="font-size:.78rem;color:var(--text-muted);padding:3px 8px">No cards yet</div></div>
   </div>
 
   <!-- Splitwise / Roommate Settlement -->
-  <div class="sb-sec" id="sb-splitwise-sec" style="display:none">
-    <div class="sb-head"><span class="slabel">Splitwise Balance</span></div>
-    <div id="sb-splitwise-body"></div>
+  <div class="sb-sec" id="sb-splitwise-sec" data-fold="split" style="display:none">
+    <div class="sb-head"><button type="button" class="sb-fold" id="sbf-split" aria-expanded="true" aria-controls="sb-splitwise-body" onclick="toggleSbFold('split')"><svg class="sb-fold-chev" width="10" height="10" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"/></svg><span class="slabel">Splitwise Balance</span></button><span class="sb-fold-sum num" id="sbsum-split"></span></div>
+    <div id="sb-splitwise-body" data-fold-body></div>
+  </div>
+
+  <!-- Loans / EMIs -->
+  <div class="sb-sec" data-fold="loans">
+    <div class="sb-head"><button type="button" class="sb-fold" id="sbf-loans" aria-expanded="true" aria-controls="sb-loans" onclick="toggleSbFold('loans')"><svg class="sb-fold-chev" width="10" height="10" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"/></svg><span class="slabel">Loans / EMIs</span></button><span class="sb-fold-sum num" id="sbsum-loans"></span>
+      <button class="sb-add" onclick="openLoanModal()" aria-label="Add loan or EMI" title="Add loan or EMI"><svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.5"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/></svg></button>
+    </div>
+    <div id="sb-loans" data-fold-body><div style="font-size:.78rem;color:var(--text-muted);padding:3px 8px">No loans yet</div></div>
+  </div>
+
+  <!-- Recurring Transactions -->
+  <div class="sb-sec" id="sb-recurring-sec" data-fold="recurring" style="display:none">
+    <div class="sb-head"><button type="button" class="sb-fold" id="sbf-recurring" aria-expanded="true" aria-controls="sb-recurring-body" onclick="toggleSbFold('recurring')"><svg class="sb-fold-chev" width="10" height="10" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"/></svg><span class="slabel">Recurring</span></button><span class="sb-fold-sum num" id="sbsum-recurring"></span></div>
+    <div id="sb-recurring-body" data-fold-body></div>
   </div>
 
   <!-- Due This Month (unified: CC + Loans + Recurring) -->
@@ -95,32 +118,21 @@
     <div id="sb-duewidget-body"></div>
   </div>
 
-  <!-- Loans / EMIs -->
-  <div class="sb-sec">
-    <div class="sb-head"><span class="slabel">Loans / EMIs</span>
-      <button class="sb-add" onclick="openLoanModal()"><svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.5"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/></svg></button>
-    </div>
-    <div id="sb-loans"><div style="font-size:.74rem;color:#c4bfba;padding:3px 8px">No loans yet</div></div>
-  </div>
-
-  <!-- Recurring Transactions -->
-  <div class="sb-sec" id="sb-recurring-sec" style="display:none">
-    <div class="sb-head"><span class="slabel">Recurring</span></div>
-    <div id="sb-recurring-body"></div>
-  </div>
-
   <!-- Quick Calculator -->
   <div class="sb-sec" id="calc-box" tabindex="-1" onkeydown="calcKeyDown(event)" onclick="calcBoxFocus(event)" style="outline:none">
     <div class="sb-head"><span class="slabel">Quick Calculator</span>
-      <button onclick="calcClear()" style="font-size:.68rem;color:#a8a29e;background:none;border:none;cursor:pointer;font-family:'DM Sans',sans-serif" onmouseover="this.style.color='#1c1917'" onmouseout="this.style.color='#a8a29e'">Clear</button>
+      <button type="button" class="btn-link" style="font-size:.72rem;padding:2px 6px" onclick="calcClear()">Clear</button>
     </div>
-    <input id="calc-display" class="num" type="text" inputmode="decimal" readonly value="0"
+    <input id="calc-display" aria-label="Calculator result" class="num" type="text" inputmode="decimal" readonly value="0"
       onclick="calcCopy()" title="Click to copy the result"
       style="width:100%;border:1.5px solid #e7e5e4;border-radius:8px;padding:9px 10px;font-size:1rem;font-weight:600;text-align:right;cursor:pointer;background:#faf9f7;color:#1c1917;margin-bottom:7px;caret-color:transparent"/>
     <div id="calc-grid" style="display:grid;grid-template-columns:repeat(4,1fr);gap:5px"></div>
-    <p style="font-size:.62rem;color:#a8a29e;margin-top:7px;line-height:1.4">Click the calculator, then type digits/operators, <span class="num">Enter</span> for =, <span class="num">Esc</span> to clear. Click result to copy.</p>
+    <p style="font-size:.68rem;color:var(--text-muted);margin-top:7px;line-height:1.4">Click the calculator, then type digits/operators, <span class="num">Enter</span> for =, <span class="num">Esc</span> to clear. Click result to copy.</p>
   </div>
 </aside>
+
+<!-- Drag to resize the sidebar (double-click resets, arrow keys when focused) -->
+<div class="sb-resizer" id="sb-resizer" role="separator" aria-orientation="vertical" aria-controls="sidebar" aria-label="Resize sidebar" tabindex="0" title="Drag to resize · double-click to reset"></div>
 
 <!-- MAIN -->
 <main class="main">
@@ -145,151 +157,162 @@
             <button class="ttb" id="tt-transfer" onclick="setTxn('transfer')">Transfer</button>
           </div>
           <!-- EXPENSE -->
-          <div id="form-expense">
-            <div style="display:grid;grid-template-columns:1fr 152px;gap:8px;margin-bottom:9px">
-              <div style="min-width:0"><div class="slabel" style="margin-bottom:4px" id="e-amt-label">Amount (INR)</div>
+          <div id="form-expense" class="ef">
+            <div class="ef-row2">
+              <div class="ef-f"><label for="e-amt" class="slabel ef-l" id="e-amt-label">Amount (INR)</label>
                 <div class="fw"><div class="fp">₹</div><input id="e-amt" class="fi" type="number" min="0" step="0.01" placeholder="0.00" oninput="onExpAmtInput()"/></div>
               </div>
-              <div style="min-width:0"><div class="slabel" style="margin-bottom:4px">Date</div>
-                <div class="date-trigger" onclick="openDatePicker('e-date')"><span id="e-date-disp">Select date</span><svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg></div>
+              <div class="ef-f"><div class="slabel ef-l" id="lbl-2">Date</div>
+                <div aria-labelledby="lbl-2" class="date-trigger" onclick="openDatePicker('e-date')"><span id="e-date-disp">Select date</span><svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg></div>
                 <input id="e-date" type="hidden"/></div>
             </div>
+            <div id="e-acc-row" class="ef-grid2">
+              <div><label for="e-actype" class="slabel ef-l">Pay From</label>
+                <select id="e-actype" class="pl" onchange="fillExpInst()">
+                  <option value="bank">Bank Account</option><option value="cc">Credit Card</option><option value="cash">Cash</option>
+                </select>
+              </div>
+              <div><label for="e-inst" class="slabel ef-l">Account</label><select id="e-inst" class="pl"></select></div>
+            </div>
+            <div class="ef-field"><div class="slabel ef-l" id="lbl-5">Category</div><div role="group" aria-labelledby="lbl-5" id="e-chips" class="ef-chips"></div></div>
+            <div class="ef-field"><label for="e-desc" class="slabel ef-l">Description (optional)</label>
+              <div class="fw"><input id="e-desc" class="fi" type="text" placeholder="e.g. Lunch at cafe"/></div>
+            </div>
             <!-- Roommate Split -->
-            <div style="margin-bottom:9px">
-              <label style="display:flex;align-items:center;gap:7px;cursor:pointer;font-size:.8rem;color:#44403c">
-                <input type="checkbox" id="e-split-toggle" onchange="toggleSplitPanel()" style="accent-color:#1c1917"/>
-                Split with roommates
-              </label>
-              <div id="e-split-panel" class="hidden" style="margin-top:8px;padding:10px;background:#faf9f7;border:1px solid #f0eeec;border-radius:9px">
+            <div class="ef-field">
+              <label class="ef-check"><input type="checkbox" id="e-split-toggle" onchange="toggleSplitPanel()"/>Split with roommates</label>
+              <div id="e-split-panel" class="ef-panel hidden">
                 <div class="tg" style="margin-bottom:9px">
                   <button type="button" class="tp active" id="e-split-fronted-btn" onclick="setSplitMode('fronted')">I paid the bill</button>
                   <button type="button" class="tp" id="e-split-owed-btn" onclick="setSplitMode('owed')">Someone else paid</button>
                 </div>
                 <div style="display:grid;grid-template-columns:1fr 90px;gap:8px;align-items:end">
-                  <div><div class="slabel" style="margin-bottom:4px">My Share (₹)</div>
+                  <div><label for="e-my-share" class="slabel ef-l">My Share (₹)</label>
                     <div class="fw"><div class="fp">₹</div><input id="e-my-share" class="fi no-spin" oninput="this.dataset.touched='1'" type="number" min="0" step="0.01" placeholder="0.00"/></div>
                   </div>
-                  <div><div class="slabel" style="margin-bottom:4px">÷ People</div>
+                  <div><label for="e-split-people" class="slabel ef-l">÷ People</label>
                     <div class="fw"><input id="e-split-people" class="fi no-spin" type="number" min="2" step="1" placeholder="4" style="text-align:center"/></div>
                   </div>
                 </div>
-                <button type="button" onclick="calcEqualShare()" style="font-size:.71rem;color:#1d4ed8;background:none;border:none;cursor:pointer;margin-top:6px;padding:0;font-family:'DM Sans',sans-serif">Split equally →</button>
-                <p id="e-split-fronted-note" style="font-size:.71rem;color:#a8a29e;margin-top:6px;line-height:1.4">The full <b>Total Bill Amount</b> still leaves your account below — only "My Share" counts toward your category spend &amp; budgets.</p>
-                <p id="e-split-owed-note" class="hidden" style="font-size:.71rem;color:#a8a29e;margin-top:6px;line-height:1.4">Enter the <b>Total Bill Amount</b> someone else paid above, and your <b>My Share</b> below. Nothing is deducted from any account — settle it later via "Settle Up".</p>
+                <button type="button" class="ef-link" onclick="calcEqualShare()">Split equally →</button>
+                <p id="e-split-fronted-note" class="ef-hint">The full <b>Total Bill Amount</b> still leaves your account below — only "My Share" counts toward your category spend &amp; budgets.</p>
+                <p id="e-split-owed-note" class="ef-hint hidden">Enter the <b>Total Bill Amount</b> someone else paid above, and your <b>My Share</b> below. Nothing is deducted from any account — settle it later via "Settle Up".</p>
               </div>
             </div>
-            <div id="e-acc-row" style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:9px">
-              <div><div class="slabel" style="margin-bottom:4px">Account Type</div>
-                <select id="e-actype" class="pl" onchange="fillExpInst()">
-                  <option value="bank">Bank Account</option><option value="cc">Credit Card</option><option value="cash">Cash</option>
-                </select>
+            <details class="more-opts" id="e-more">
+              <summary><span class="more-title"><svg class="more-chev" width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/></svg>Additional options</span><span class="more-sum" id="e-more-sum">Tags · Repeat · Spread</span></summary>
+              <div class="more-body">
+                <div class="ef-field">
+                  <div class="slabel ef-l" id="lbl-9">Tags</div>
+                  <div role="group" aria-labelledby="lbl-9" id="e-tag-chips" class="ef-chips" style="margin-bottom:6px"></div>
+                  <div class="fw"><input id="e-tag-input" aria-label="Add tag" class="fi" type="text" placeholder="Type a tag and press Enter, e.g. Goa Trip" onkeydown="if(event.key==='Enter'){event.preventDefault();addTagFromInput('expense');}"/></div>
+                  <div id="e-tag-suggest" class="ef-chips" style="margin-top:6px"></div>
+                </div>
+                <div class="ef-field">
+                  <label class="ef-check"><input type="checkbox" id="e-recur-toggle" onchange="toggleRecurPanel('expense')"/>Repeat this automatically</label>
+                  <div id="e-recur-panel" class="ef-panel hidden">
+                    <label for="e-recur-freq" class="slabel ef-l">Frequency</label>
+                    <select id="e-recur-freq" class="pl" onchange="updateMoreOptsSummary('expense')">
+                      <option value="monthly">Monthly (same day each month)</option>
+                      <option value="weekly">Weekly (same weekday)</option>
+                      <option value="daily">Daily</option>
+                    </select>
+                    <label for="e-recur-remind" class="slabel ef-l" style="margin-top:9px">Remind Me</label>
+                    <select id="e-recur-remind" class="pl" onchange="updateMoreOptsSummary('expense')"><option value="0">Don't remind me</option><option value="1">1 day before</option><option value="2" selected>2 days before</option><option value="3">3 days before</option><option value="5">5 days before</option><option value="7">7 days before</option></select>
+                    <p class="ef-hint">Logged now, then automatically on schedule. Reminders show under "Due This Month" (not for daily rules).</p>
+                  </div>
+                </div>
+                <div class="ef-field">
+                  <label for="e-spread" class="slabel ef-l">Spread Cost Over</label>
+                  <select id="e-spread" class="pl" onchange="updateMoreOptsSummary('expense')"><option value="1">No — this month only</option><option value="2">2 months</option><option value="3">3 months (quarterly)</option><option value="4">4 months</option><option value="6">6 months (half-yearly)</option><option value="12">12 months (yearly)</option></select>
+                  <p class="ef-hint">For quarterly maintenance, yearly subscriptions, etc. Budgets &amp; analytics count an equal part in each month; your account is still charged the full amount on the date above.</p>
+                </div>
               </div>
-              <div><div class="slabel" style="margin-bottom:4px">Instrument</div><select id="e-inst" class="pl"></select></div>
-            </div>
-            <div style="margin-bottom:9px"><div class="slabel" style="margin-bottom:5px">Category</div><div id="e-chips" style="display:flex;flex-wrap:wrap;gap:5px"></div></div>
-            <div style="margin-bottom:9px">
-              <div class="slabel" style="margin-bottom:5px">Tags (optional)</div>
-              <div id="e-tag-chips" style="display:flex;flex-wrap:wrap;gap:5px;margin-bottom:6px"></div>
-              <div class="fw"><input id="e-tag-input" class="fi" type="text" placeholder="Type a tag and press Enter, e.g. Goa Trip" onkeydown="if(event.key==='Enter'){event.preventDefault();addTagFromInput('expense');}"/></div>
-              <div id="e-tag-suggest" style="display:flex;flex-wrap:wrap;gap:5px;margin-top:6px"></div>
-            </div>
-            <div style="margin-bottom:9px">
-              <label style="display:flex;align-items:center;gap:7px;cursor:pointer;font-size:.8rem;color:#44403c">
-                <input type="checkbox" id="e-recur-toggle" onchange="toggleRecurPanel('expense')" style="accent-color:#1c1917"/>
-                Repeat this automatically
-              </label>
-              <div id="e-recur-panel" class="hidden" style="margin-top:8px;padding:10px;background:#faf9f7;border:1px solid #f0eeec;border-radius:9px">
-                <div class="slabel" style="margin-bottom:4px">Frequency</div>
-                <select id="e-recur-freq" class="pl">
-                  <option value="monthly">Monthly (same day each month)</option>
-                  <option value="weekly">Weekly (same weekday)</option>
-                  <option value="daily">Daily</option>
-                </select>
-                <p style="font-size:.71rem;color:#a8a29e;margin-top:6px;line-height:1.4">This entry is logged now; future occurrences will be auto-logged from the Recurring list.</p>
-              </div>
-            </div>
-            <div style="margin-bottom:9px"><div class="slabel" style="margin-bottom:4px">Spread Cost Over</div>
-              <select id="e-spread" class="pl"><option value="1">No — this month only</option><option value="2">2 months</option><option value="3">3 months (quarterly)</option><option value="4">4 months</option><option value="6">6 months (half-yearly)</option><option value="12">12 months (yearly)</option></select>
-              <p style="font-size:.71rem;color:#a8a29e;margin-top:4px;line-height:1.4">For quarterly maintenance, yearly subscriptions, etc. Budgets &amp; analytics count an equal part in each month; your account is still charged the full amount on the date above.</p>
-            </div>
-            <div style="margin-bottom:11px"><div class="slabel" style="margin-bottom:4px">Description (optional)</div>
-              <div class="fw"><input id="e-desc" class="fi" type="text" placeholder="e.g. Lunch at cafe"/></div>
-            </div>
-            <button class="btn-p" style="width:100%" onclick="submitExpense()">Add Expense</button>
+            </details>
+            <button class="btn-p ef-submit" onclick="submitExpense()">Add Expense</button>
           </div>
           <!-- INCOME -->
-          <div id="form-income" class="hidden">
-            <div style="display:grid;grid-template-columns:1fr 152px;gap:8px;margin-bottom:9px">
-              <div style="min-width:0"><div class="slabel" style="margin-bottom:4px">Amount (INR)</div>
+          <div id="form-income" class="ef hidden">
+            <div class="ef-row2">
+              <div class="ef-f"><label for="i-amt" class="slabel ef-l">Amount (INR)</label>
                 <div class="fw"><div class="fp">₹</div><input id="i-amt" class="fi" type="number" min="0" step="0.01" placeholder="0.00"/></div>
               </div>
-              <div style="min-width:0"><div class="slabel" style="margin-bottom:4px">Date</div>
-                <div class="date-trigger" onclick="openDatePicker('i-date')"><span id="i-date-disp">Select date</span><svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg></div>
+              <div class="ef-f"><div class="slabel ef-l" id="lbl-13">Date</div>
+                <div aria-labelledby="lbl-13" class="date-trigger" onclick="openDatePicker('i-date')"><span id="i-date-disp">Select date</span><svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg></div>
                 <input id="i-date" type="hidden"/></div>
             </div>
-            <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:9px">
-              <div><div class="slabel" style="margin-bottom:4px">Credit To</div>
+            <div class="ef-grid2">
+              <div><label for="i-actype" class="slabel ef-l">Credit To</label>
                 <select id="i-actype" class="pl" onchange="fillIncInst()">
                   <option value="bank">Bank Account</option><option value="cash">Cash</option><option value="cc">Credit Card</option>
                 </select>
               </div>
-              <div><div class="slabel" style="margin-bottom:4px">Instrument</div><select id="i-inst" class="pl"></select></div>
+              <div><label for="i-inst" class="slabel ef-l">Account</label><select id="i-inst" class="pl"></select></div>
             </div>
-            <div id="i-cc-hint" class="info-box hidden" style="margin-bottom:9px;background:#f0fdf4;color:#166534">This reduces the card's outstanding due instead of adding to a bank/cash balance.</div>
-            <div style="margin-bottom:9px"><div class="slabel" style="margin-bottom:5px">Source / Category</div><div id="i-chips" style="display:flex;flex-wrap:wrap;gap:5px"></div></div>
-            <div style="margin-bottom:9px">
-              <div class="slabel" style="margin-bottom:5px">Tags (optional)</div>
-              <div id="i-tag-chips" style="display:flex;flex-wrap:wrap;gap:5px;margin-bottom:6px"></div>
-              <div class="fw"><input id="i-tag-input" class="fi" type="text" placeholder="Type a tag and press Enter" onkeydown="if(event.key==='Enter'){event.preventDefault();addTagFromInput('income');}"/></div>
-              <div id="i-tag-suggest" style="display:flex;flex-wrap:wrap;gap:5px;margin-top:6px"></div>
-            </div>
-            <div style="margin-bottom:9px">
-              <label style="display:flex;align-items:center;gap:7px;cursor:pointer;font-size:.8rem;color:#44403c">
-                <input type="checkbox" id="i-recur-toggle" onchange="toggleRecurPanel('income')" style="accent-color:#1c1917"/>
-                Repeat this automatically
-              </label>
-              <div id="i-recur-panel" class="hidden" style="margin-top:8px;padding:10px;background:#faf9f7;border:1px solid #f0eeec;border-radius:9px">
-                <div class="slabel" style="margin-bottom:4px">Frequency</div>
-                <select id="i-recur-freq" class="pl">
-                  <option value="monthly">Monthly (same day each month)</option>
-                  <option value="weekly">Weekly (same weekday)</option>
-                  <option value="daily">Daily</option>
-                </select>
-                <p style="font-size:.71rem;color:#a8a29e;margin-top:6px;line-height:1.4">This entry is logged now; future occurrences will be auto-logged from the Recurring list.</p>
-              </div>
-            </div>
-            <div style="margin-bottom:11px"><div class="slabel" style="margin-bottom:4px">Description (optional)</div>
+            <div id="i-cc-hint" class="info-box hidden" style="margin-bottom:10px;background:#f0fdf4;color:#166534">This reduces the card's outstanding due instead of adding to a bank/cash balance.</div>
+            <div class="ef-field"><div class="slabel ef-l" id="lbl-16">Source / Category</div><div role="group" aria-labelledby="lbl-16" id="i-chips" class="ef-chips"></div></div>
+            <div class="ef-field"><label for="i-desc" class="slabel ef-l">Description (optional)</label>
               <div class="fw"><input id="i-desc" class="fi" type="text" placeholder="e.g. Monthly salary"/></div>
             </div>
-            <button class="btn-p" style="width:100%;background:#166534" onclick="submitIncome()">Add Income</button>
+            <details class="more-opts" id="i-more">
+              <summary><span class="more-title"><svg class="more-chev" width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/></svg>Additional options</span><span class="more-sum" id="i-more-sum">Tags · Repeat · Spread</span></summary>
+              <div class="more-body">
+                <div class="ef-field">
+                  <div class="slabel ef-l" id="lbl-18">Tags</div>
+                  <div role="group" aria-labelledby="lbl-18" id="i-tag-chips" class="ef-chips" style="margin-bottom:6px"></div>
+                  <div class="fw"><input id="i-tag-input" aria-label="Add tag" class="fi" type="text" placeholder="Type a tag and press Enter" onkeydown="if(event.key==='Enter'){event.preventDefault();addTagFromInput('income');}"/></div>
+                  <div id="i-tag-suggest" class="ef-chips" style="margin-top:6px"></div>
+                </div>
+                <div class="ef-field">
+                  <label class="ef-check"><input type="checkbox" id="i-recur-toggle" onchange="toggleRecurPanel('income')"/>Repeat this automatically</label>
+                  <div id="i-recur-panel" class="ef-panel hidden">
+                    <label for="i-recur-freq" class="slabel ef-l">Frequency</label>
+                    <select id="i-recur-freq" class="pl" onchange="updateMoreOptsSummary('income')">
+                      <option value="monthly">Monthly (same day each month)</option>
+                      <option value="weekly">Weekly (same weekday)</option>
+                      <option value="daily">Daily</option>
+                    </select>
+                    <label for="i-recur-remind" class="slabel ef-l" style="margin-top:9px">Remind Me</label>
+                    <select id="i-recur-remind" class="pl" onchange="updateMoreOptsSummary('income')"><option value="0">Don't remind me</option><option value="1">1 day before</option><option value="2" selected>2 days before</option><option value="3">3 days before</option><option value="5">5 days before</option><option value="7">7 days before</option></select>
+                    <p class="ef-hint">Logged now, then automatically on schedule. Reminders show under "Due This Month" (not for daily rules).</p>
+                  </div>
+                </div>
+                <div class="ef-field">
+                  <label for="i-spread" class="slabel ef-l">Spread Income Over</label>
+                  <select id="i-spread" class="pl" onchange="updateMoreOptsSummary('income')"><option value="1">No — this month only</option><option value="2">2 months</option><option value="3">3 months (quarterly)</option><option value="4">4 months</option><option value="6">6 months (half-yearly)</option><option value="12">12 months (yearly)</option></select>
+                  <p class="ef-hint">For a quarterly project payment, annual bonus, etc. Analytics count an equal part in each month; the full amount is still credited on the date above.</p>
+                </div>
+              </div>
+            </details>
+            <button class="btn-p ef-submit" style="background:#166534" onclick="submitIncome()">Add Income</button>
           </div>
           <!-- TRANSFER -->
-          <div id="form-transfer" class="hidden">
-            <div style="display:grid;grid-template-columns:1fr 152px;gap:8px;margin-bottom:9px">
-              <div style="min-width:0"><div class="slabel" style="margin-bottom:4px">Amount (INR)</div>
+          <div id="form-transfer" class="ef hidden">
+            <div class="ef-row2">
+              <div class="ef-f"><label for="t-amt" class="slabel ef-l">Amount (INR)</label>
                 <div class="fw"><div class="fp">₹</div><input id="t-amt" class="fi" type="number" min="0" step="0.01" placeholder="0.00"/></div>
               </div>
-              <div style="min-width:0"><div class="slabel" style="margin-bottom:4px">Date</div>
-                <div class="date-trigger" onclick="openDatePicker('t-date')"><span id="t-date-disp">Select date</span><svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg></div>
+              <div class="ef-f"><div class="slabel ef-l" id="lbl-22">Date</div>
+                <div aria-labelledby="lbl-22" class="date-trigger" onclick="openDatePicker('t-date')"><span id="t-date-disp">Select date</span><svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg></div>
                 <input id="t-date" type="hidden"/></div>
             </div>
-            <div style="display:grid;grid-template-columns:1fr auto 1fr;gap:6px;align-items:end;margin-bottom:9px">
-              <div><div class="slabel" style="margin-bottom:4px">From</div><select id="t-from" class="pl" style="width:100%"></select></div>
-              <div style="padding-bottom:11px;color:#c4bfba"><svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M17 8l4 4m0 0l-4 4m4-4H3"/></svg></div>
-              <div><div class="slabel" style="margin-bottom:4px">To</div><select id="t-to" class="pl" style="width:100%"></select></div>
+            <div class="ef-field" style="display:grid;grid-template-columns:1fr auto 1fr;gap:6px;align-items:end">
+              <div><label for="t-from" class="slabel ef-l">From</label><select id="t-from" class="pl" style="width:100%"></select></div>
+              <div style="padding-bottom:11px;color:var(--text-muted)"><svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M17 8l4 4m0 0l-4 4m4-4H3"/></svg></div>
+              <div><label for="t-to" class="slabel ef-l">To</label><select id="t-to" class="pl" style="width:100%"></select></div>
             </div>
-            <div style="margin-bottom:9px"><div class="slabel" style="margin-bottom:4px">Note (optional)</div>
+            <div class="ef-field"><label for="t-note" class="slabel ef-l">Note (optional)</label>
               <div class="fw"><input id="t-note" class="fi" type="text" placeholder="e.g. ATM withdrawal"/></div>
             </div>
-            <div class="info-box" style="margin-bottom:11px">Transfers update balances only — excluded from charts and budget.</div>
-            <button class="btn-p" style="width:100%;background:#1d4ed8" onclick="submitTransfer()">Record Transfer</button>
+            <div class="info-box" style="margin-bottom:12px">Transfers update balances only — excluded from charts and budget.</div>
+            <button class="btn-p ef-submit" style="background:#1d4ed8" onclick="submitTransfer()">Record Transfer</button>
           </div>
         </div>
         <!-- Budget -->
         <div class="card">
           <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:9px">
-            <span style="font-weight:600;font-size:.88rem">Monthly Budget</span>
-            <button onclick="openBudgetModal()" style="font-size:.74rem;color:#a8a29e;background:none;border:none;cursor:pointer;font-family:'DM Sans',sans-serif" onmouseover="this.style.color='#1c1917'" onmouseout="this.style.color='#a8a29e'">Edit Budgets</button>
+            <span style="font-weight:600;font-size:.875rem">Monthly Budget</span>
+            <button type="button" class="btn-link" onclick="openBudgetModal()">Edit budgets</button>
           </div>
           <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:5px">
             <span style="font-size:.78rem;color:#78716c">Spent this month</span>
@@ -297,8 +320,8 @@
           </div>
           <div class="pt" style="margin-bottom:5px"><div id="b-bar" class="pf ps" style="width:0%"></div></div>
           <div style="display:flex;justify-content:space-between">
-            <span style="font-size:.72rem;color:#a8a29e" id="b-label">Overall: ₹0</span>
-            <span class="num" style="font-size:.72rem;color:#a8a29e" id="b-pct">0%</span>
+            <span style="font-size:.72rem;color:var(--text-muted)" id="b-label">Overall: ₹0</span>
+            <span class="num" style="font-size:.72rem;color:var(--text-muted)" id="b-pct">0%</span>
           </div>
         </div>
         <!-- Cumulative Category Spend -->
@@ -306,15 +329,15 @@
         <!-- Category Budget Cards -->
         <div class="card">
           <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:11px">
-            <span style="font-weight:600;font-size:.88rem">Category Budgets</span>
-            <button onclick="openBudgetModal()" style="font-size:.74rem;color:#a8a29e;background:none;border:none;cursor:pointer;font-family:'DM Sans',sans-serif" onmouseover="this.style.color='#1c1917'" onmouseout="this.style.color='#a8a29e'">Edit</button>
+            <span style="font-weight:600;font-size:.875rem">Category Budgets</span>
+            <button type="button" class="btn-link" onclick="openBudgetModal()" aria-label="Edit category budgets">Edit</button>
           </div>
           <div id="cat-bud-list" style="display:flex;flex-direction:column;gap:8px"></div>
         </div>
         <!-- Weekly -->
         <div class="card">
           <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:9px">
-            <span style="font-weight:600;font-size:.88rem">This Week</span>
+            <span style="font-weight:600;font-size:.875rem">This Week</span>
             <span class="slabel" id="week-range"></span>
           </div>
           <div id="weekly-rows" style="display:flex;flex-direction:column;gap:6px"></div>
@@ -329,8 +352,8 @@
               <button class="tp" id="vmode-fy" onclick="setViewMode('fy')">Financial Year</button>
             </div>
             <span class="slabel">Viewing:</span>
-            <select id="month-sel" onchange="onMonthChange()" class="pl" style="padding:6px 10px;font-size:.78rem;width:auto"></select>
-            <select id="fy-sel" onchange="onFYChange()" class="pl hidden" style="padding:6px 10px;font-size:.78rem;width:auto"></select>
+            <select id="month-sel" aria-label="Month" onchange="onMonthChange()" class="pl" style="padding:6px 10px;font-size:.78rem;width:auto"></select>
+            <select id="fy-sel" aria-label="Financial year" onchange="onFYChange()" class="pl hidden" style="padding:6px 10px;font-size:.78rem;width:auto"></select>
           </div>
           <div class="tg">
             <button class="tp active" id="tab-log" onclick="switchTab('log')">Transactions</button>
@@ -340,45 +363,57 @@
         <!-- Log -->
         <div class="card" id="view-log">
           <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:11px">
-            <span style="font-weight:600;font-size:.88rem">Transaction Log</span>
+            <span style="font-weight:600;font-size:.875rem">Transaction Log</span>
             <span class="slabel" id="log-month-label"></span>
           </div>
           <!-- Search + Category & Date Filter -->
           <div style="margin-bottom:11px">
             <div class="fw" style="margin-bottom:8px">
-              <div class="fp"><svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-4.35-4.35M17 11a6 6 0 11-12 0 6 6 0 0112 0z"/></svg></div>
-              <input id="txn-filter-search" class="fi" type="text" placeholder="Search description, category, amount, or tag…" oninput="applyTxnFilter()"/>
+              <div class="fp" aria-hidden="true"><svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-4.35-4.35M17 11a6 6 0 11-12 0 6 6 0 0112 0z"/></svg></div>
+              <input id="txn-filter-search" aria-label="Search transactions" class="fi" type="text" placeholder="Search description, category, amount, or tag…" oninput="applyTxnFilter()" onkeydown="if(event.key==='Escape'&&this.value){event.preventDefault();clearTxnSearch();}"/>
+              <button type="button" id="txn-search-clear" class="fw-clear hidden" onclick="clearTxnSearch()" title="Clear search" aria-label="Clear search"><svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg></button>
             </div>
-            <div style="display:flex;flex-wrap:wrap;gap:6px;align-items:center;padding:10px;background:#faf9f7;border-radius:9px;border:1px solid #f0eeec">
-              <select id="txn-filter-cat" class="pl" style="width:auto;padding:6px 9px;font-size:.78rem" onchange="applyTxnFilter()">
+            <div class="filter-row">
+            <div class="type-filter" role="group" aria-label="Show transaction types">
+              <span class="slabel">Show</span>
+              <label class="tf-chip tf-expense"><input type="checkbox" data-type="expense" checked onchange="onTxnTypeToggle()"/>Expense</label>
+              <label class="tf-chip tf-income"><input type="checkbox" data-type="income" checked onchange="onTxnTypeToggle()"/>Income</label>
+              <label class="tf-chip tf-transfer"><input type="checkbox" data-type="transfer" checked onchange="onTxnTypeToggle()"/>Transfer</label>
+              <label class="tf-chip tf-invest"><input type="checkbox" data-type="invest" checked onchange="onTxnTypeToggle()"/>Investment</label>
+            </div>
+            <button type="button" class="filters-toggle" id="adv-filters-btn" aria-expanded="false" aria-controls="adv-filters" onclick="toggleAdvFilters()">
+              <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.2"><path stroke-linecap="round" stroke-linejoin="round" d="M3 4h18l-7 8v6l-4 2v-8L3 4z"/></svg>Filters<span class="cnt" id="adv-filters-cnt"></span></button>
+            <button type="button" class="btn-link hidden" id="txn-clear-filter" onclick="clearTxnFilter()">Clear all</button>
+            </div>
+            <div id="adv-filters" class="adv-filters hidden">
+              <select id="txn-filter-cat" aria-label="Filter by category" class="pl" style="width:auto;padding:6px 9px;font-size:.78rem" onchange="applyTxnFilter()">
                 <option value="">All Categories</option>
               </select>
-              <select id="txn-filter-tag" class="pl" style="width:auto;padding:6px 9px;font-size:.78rem" onchange="applyTxnFilter()">
+              <select id="txn-filter-tag" aria-label="Filter by tag" class="pl" style="width:auto;padding:6px 9px;font-size:.78rem" onchange="applyTxnFilter()">
                 <option value="">All Tags</option>
               </select>
-              <select id="txn-filter-acc" class="pl" style="width:auto;padding:6px 9px;font-size:.78rem" onchange="applyTxnFilter()">
+              <select id="txn-filter-acc" aria-label="Filter by payment method" class="pl" style="width:auto;padding:6px 9px;font-size:.78rem" onchange="applyTxnFilter()">
                 <option value="">All Payment Methods</option>
               </select>
-              <div class="date-trigger" style="width:auto;padding:6px 9px;font-size:.78rem" onclick="openDatePicker('txn-filter-from')"><span id="txn-filter-from-disp">From</span></div>
+              <div class="date-trigger" aria-label="From date" style="width:auto;padding:6px 9px;font-size:.78rem" onclick="openDatePicker('txn-filter-from')"><span id="txn-filter-from-disp">From</span></div>
               <input id="txn-filter-from" type="hidden"/>
-              <span style="font-size:.75rem;color:#a8a29e">to</span>
-              <div class="date-trigger" style="width:auto;padding:6px 9px;font-size:.78rem" onclick="openDatePicker('txn-filter-to')"><span id="txn-filter-to-disp">To</span></div>
+              <span style="font-size:.78rem;color:var(--text-muted)">to</span>
+              <div class="date-trigger" aria-label="To date" style="width:auto;padding:6px 9px;font-size:.78rem" onclick="openDatePicker('txn-filter-to')"><span id="txn-filter-to-disp">To</span></div>
               <input id="txn-filter-to" type="hidden"/>
-              <button class="btn-g" style="padding:6px 11px;font-size:.78rem" onclick="clearTxnFilter()">Clear Filter</button>
             </div>
           </div>
-          <div id="txn-filter-summary" class="hidden" style="font-size:.75rem;color:#57534e;margin-bottom:9px;display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+          <div id="txn-filter-summary" class="hidden" style="font-size:.78rem;color:#57534e;margin-bottom:9px;display:flex;align-items:center;gap:12px;flex-wrap:wrap">
             <label style="display:flex;align-items:center;gap:5px;cursor:pointer;font-weight:500">
               <input type="checkbox" id="txn-select-all" onchange="toggleSelectAllFiltered()" style="accent-color:#1c1917"/> Select all
             </label>
             <span id="txn-filter-summary-text"></span>
           </div>
           <div id="txn-bulk-bar" class="hidden" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:9px;padding:9px 12px;background:#eff6ff;border:1px solid #bfdbfe;border-radius:9px">
-            <span id="txn-bulk-count" style="font-size:.8rem;font-weight:600;color:#1d4ed8"></span>
-            <button class="btn-g" style="padding:5px 10px;font-size:.76rem;background:#fff" onclick="openBulkRecatModal()">Recategorize</button>
-            <button class="btn-g" style="padding:5px 10px;font-size:.76rem;background:#fff" onclick="openBulkTagModal()">Tag</button>
-            <button class="btn-danger" style="padding:5px 10px;font-size:.76rem" onclick="bulkDeleteSelected()">Delete Selected</button>
-            <button style="margin-left:auto;font-size:.76rem;color:#1d4ed8;background:none;border:none;cursor:pointer;font-weight:500" onclick="clearBulkSelection()">Clear Selection</button>
+            <span id="txn-bulk-count" style="font-size:.82rem;font-weight:600;color:#1d4ed8"></span>
+            <button class="btn-g" style="padding:5px 10px;font-size:.78rem;background:#fff" onclick="openBulkRecatModal()">Recategorize</button>
+            <button class="btn-g" style="padding:5px 10px;font-size:.78rem;background:#fff" onclick="openBulkTagModal()">Tag</button>
+            <button class="btn-danger" style="padding:5px 10px;font-size:.78rem" onclick="bulkDeleteSelected()">Delete Selected</button>
+            <button style="margin-left:auto;font-size:.78rem;color:#1d4ed8;background:none;border:none;cursor:pointer;font-weight:500" onclick="clearBulkSelection()">Clear Selection</button>
           </div>
           <div id="txn-list"></div>
         </div>
@@ -386,19 +421,19 @@
         <div id="view-charts" style="display:none;flex-direction:column;gap:13px">
           <div class="card">
             <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
-              <span style="font-weight:600;font-size:.88rem">Daily Expenses</span>
+              <span style="font-weight:600;font-size:.875rem">Daily Expenses</span>
               <span class="slabel" id="bar-label"></span>
             </div>
             <div style="height:180px"><canvas id="chart-bar"></canvas></div>
           </div>
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:13px">
             <div class="card">
-              <span style="font-weight:600;font-size:.88rem;display:block;margin-bottom:10px">By Category</span>
+              <span style="font-weight:600;font-size:.875rem;display:block;margin-bottom:10px">By Category</span>
               <div style="width:150px;height:150px;margin:0 auto 10px"><canvas id="chart-donut"></canvas></div>
               <div id="donut-leg" style="display:flex;flex-direction:column;gap:4px"></div>
             </div>
             <div class="card">
-              <span style="font-weight:600;font-size:.88rem;display:block;margin-bottom:10px">By Account Type</span>
+              <span style="font-weight:600;font-size:.875rem;display:block;margin-bottom:10px">By Account Type</span>
               <div style="width:150px;height:150px;margin:0 auto 10px"><canvas id="chart-mode"></canvas></div>
               <div id="mode-leg" style="display:flex;flex-direction:column;gap:4px"></div>
             </div>
@@ -415,7 +450,7 @@
       <div style="display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:12px">
         <div>
           <h2 style="font-weight:600;font-size:1rem">Analytics &amp; Insights</h2>
-          <p style="font-size:.78rem;color:#a8a29e;margin-top:2px">Deep analysis of your financial behaviour</p>
+          <p style="font-size:.78rem;color:var(--text-muted);margin-top:2px">Deep analysis of your financial behaviour</p>
         </div>
         <!-- Date Range Controls -->
         <div style="display:flex;flex-direction:column;gap:8px;align-items:flex-end">
@@ -429,13 +464,13 @@
             <button class="range-btn" id="rng-custom" onclick="setRange('custom')">Custom</button>
           </div>
           <div id="custom-range-row" class="hidden" style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
-            <div class="date-trigger" style="padding:5px 9px;font-size:.78rem;width:auto" onclick="openDatePicker('rng-from')"><span id="rng-from-disp">Select date</span></div>
+            <div class="date-trigger" aria-label="Range start date" style="padding:5px 9px;font-size:.78rem;width:auto" onclick="openDatePicker('rng-from')"><span id="rng-from-disp">Select date</span></div>
             <input id="rng-from" type="hidden"/>
-            <span style="font-size:.78rem;color:#a8a29e">to</span>
-            <div class="date-trigger" style="padding:5px 9px;font-size:.78rem;width:auto" onclick="openDatePicker('rng-to')"><span id="rng-to-disp">Select date</span></div>
+            <span style="font-size:.78rem;color:var(--text-muted)">to</span>
+            <div class="date-trigger" aria-label="Range end date" style="padding:5px 9px;font-size:.78rem;width:auto" onclick="openDatePicker('rng-to')"><span id="rng-to-disp">Select date</span></div>
             <input id="rng-to" type="hidden"/>
           </div>
-          <div id="rng-display" style="font-size:.72rem;color:#a8a29e"></div>
+          <div id="rng-display" style="font-size:.72rem;color:var(--text-muted)"></div>
         </div>
       </div>
     </div>
@@ -445,7 +480,7 @@
 
     <!-- Section A: Budget vs Actuals -->
     <div style="margin-bottom:14px">
-      <div class="an-sec-title">A — Budget vs. Actual Spending</div>
+      <div class="an-sec-title">Budget vs. Actual Spending</div>
       <div class="card">
         <div style="position:relative;min-height:220px" id="an-bva-wrap">
           <canvas id="an-bva"></canvas>
@@ -456,10 +491,10 @@
 
     <!-- Section B: Cash Flow -->
     <div style="margin-bottom:14px">
-      <div class="an-sec-title">B — Cash Flow Breakdowns</div>
+      <div class="an-sec-title">Cash Flow Breakdowns</div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
         <div class="card">
-          <div style="font-weight:600;font-size:.88rem;margin-bottom:12px">Expense Breakdown</div>
+          <div style="font-weight:600;font-size:.875rem;margin-bottom:12px">Expense Breakdown</div>
           <div style="display:flex;gap:14px;align-items:flex-start;flex-wrap:wrap">
             <div style="width:160px;height:160px;flex-shrink:0;position:relative">
               <canvas id="an-exp-donut"></canvas>
@@ -469,7 +504,7 @@
           </div>
         </div>
         <div class="card">
-          <div style="font-weight:600;font-size:.88rem;margin-bottom:12px">Income Breakdown</div>
+          <div style="font-weight:600;font-size:.875rem;margin-bottom:12px">Income Breakdown</div>
           <div style="display:flex;gap:14px;align-items:flex-start;flex-wrap:wrap">
             <div style="width:160px;height:160px;flex-shrink:0;position:relative">
               <canvas id="an-inc-donut"></canvas>
@@ -483,11 +518,11 @@
 
     <!-- Section C: Income vs Expense Over Time -->
     <div style="margin-bottom:14px">
-      <div class="an-sec-title">C — Income vs. Expense Over Time</div>
+      <div class="an-sec-title">Income vs. Expense Over Time</div>
       <div class="card">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:8px">
-          <span style="font-weight:600;font-size:.88rem">Monthly Cash Flow</span>
-          <span id="cashflow-surplus" style="font-size:.8rem;font-weight:500"></span>
+          <span style="font-weight:600;font-size:.875rem">Monthly Cash Flow</span>
+          <span id="cashflow-surplus" style="font-size:.82rem;font-weight:500"></span>
         </div>
         <div style="height:220px;position:relative">
           <canvas id="an-cashflow"></canvas>
@@ -498,15 +533,15 @@
 
     <!-- Section D: Historical by Payment Mode -->
     <div style="margin-bottom:14px">
-      <div class="an-sec-title">D — Spending by Payment Mode</div>
+      <div class="an-sec-title">Spending by Payment Mode</div>
       <div class="card">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:8px">
-          <span style="font-weight:600;font-size:.88rem">Monthly Breakdown by Account Type</span>
+          <span style="font-weight:600;font-size:.875rem">Monthly Breakdown by Account Type</span>
           <div style="display:flex;gap:6px;flex-wrap:wrap">
-            <label style="display:flex;align-items:center;gap:4px;font-size:.77rem;cursor:pointer"><input type="checkbox" id="hf-bank" checked onchange="renderHistChart()"> <span style="color:#3b82f6">Bank/UPI</span></label>
-            <label style="display:flex;align-items:center;gap:4px;font-size:.77rem;cursor:pointer"><input type="checkbox" id="hf-cash" checked onchange="renderHistChart()"> <span style="color:#22c55e">Cash</span></label>
-            <label style="display:flex;align-items:center;gap:4px;font-size:.77rem;cursor:pointer"><input type="checkbox" id="hf-cc" checked onchange="renderHistChart()"> <span style="color:#f59e0b">Credit Card</span></label>
-            <label style="display:flex;align-items:center;gap:4px;font-size:.77rem;cursor:pointer"><input type="checkbox" id="hf-shared" checked onchange="renderHistChart()"> <span style="color:#7c3aed">Roommate Split</span></label>
+            <label style="display:flex;align-items:center;gap:4px;font-size:.78rem;cursor:pointer"><input type="checkbox" id="hf-bank" checked onchange="renderHistChart()"> <span style="color:#3b82f6">Bank/UPI</span></label>
+            <label style="display:flex;align-items:center;gap:4px;font-size:.78rem;cursor:pointer"><input type="checkbox" id="hf-cash" checked onchange="renderHistChart()"> <span style="color:#22c55e">Cash</span></label>
+            <label style="display:flex;align-items:center;gap:4px;font-size:.78rem;cursor:pointer"><input type="checkbox" id="hf-cc" checked onchange="renderHistChart()"> <span style="color:#f59e0b">Credit Card</span></label>
+            <label style="display:flex;align-items:center;gap:4px;font-size:.78rem;cursor:pointer"><input type="checkbox" id="hf-shared" checked onchange="renderHistChart()"> <span style="color:#7c3aed">Roommate Split</span></label>
           </div>
         </div>
         <div style="height:220px;position:relative">
@@ -518,17 +553,17 @@
 
     <!-- Section E: Daily Heatmap / Trend + Top Categories -->
     <div style="margin-bottom:14px">
-      <div class="an-sec-title">E — Daily Spending Trend &amp; Top Categories</div>
+      <div class="an-sec-title">Daily Spending Trend &amp; Top Categories</div>
       <div style="display:grid;grid-template-columns:3fr 2fr;gap:14px">
         <div class="card">
-          <div style="font-weight:600;font-size:.88rem;margin-bottom:12px">Daily Expense Trend</div>
+          <div style="font-weight:600;font-size:.875rem;margin-bottom:12px">Daily Expense Trend</div>
           <div style="height:200px;position:relative">
             <canvas id="an-trend"></canvas>
             <div id="an-trend-empty" class="chart-empty hidden">No data for this period</div>
           </div>
         </div>
         <div class="card">
-          <div style="font-weight:600;font-size:.88rem;margin-bottom:12px">Top Spending Categories</div>
+          <div style="font-weight:600;font-size:.875rem;margin-bottom:12px">Top Spending Categories</div>
           <div id="an-top-cats" style="display:flex;flex-direction:column;gap:9px"></div>
         </div>
       </div>
@@ -536,17 +571,17 @@
 
     <!-- Section F: Net Worth Trend -->
     <div style="margin-bottom:14px">
-      <div class="an-sec-title">F — Net Worth &amp; Savings Rate</div>
+      <div class="an-sec-title">Net Worth &amp; Savings Rate</div>
       <div style="display:grid;grid-template-columns:2fr 1fr;gap:14px">
         <div class="card">
-          <div style="font-weight:600;font-size:.88rem;margin-bottom:12px">Monthly Net Worth Trend</div>
+          <div style="font-weight:600;font-size:.875rem;margin-bottom:12px">Monthly Net Worth Trend</div>
           <div style="height:200px;position:relative">
             <canvas id="an-networth"></canvas>
             <div id="an-nw-empty" class="chart-empty hidden">Add transactions to see trend</div>
           </div>
         </div>
         <div class="card">
-          <div style="font-weight:600;font-size:.88rem;margin-bottom:14px">Savings Rate</div>
+          <div style="font-weight:600;font-size:.875rem;margin-bottom:14px">Savings Rate</div>
           <div id="an-savings-content" style="display:flex;flex-direction:column;gap:10px"></div>
         </div>
       </div>
@@ -558,7 +593,7 @@
     <div style="margin-bottom:18px;display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:12px">
       <div>
         <h2 style="font-weight:600;font-size:1rem">Investments</h2>
-        <p style="font-size:.78rem;color:#a8a29e;margin-top:2px">Demat accounts &amp; mutual funds — included in your net worth</p>
+        <p style="font-size:.78rem;color:var(--text-muted);margin-top:2px">Demat accounts &amp; mutual funds — included in your net worth</p>
       </div>
       <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;justify-content:flex-end">
         <div id="inv-top-summary" style="min-width:230px;max-width:310px"></div>
@@ -577,16 +612,16 @@
       <div class="an-sec-title">Portfolio Allocation</div>
       <div class="card">
         <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px">
-          <div class="card" style="padding:14px 14px 12px;min-width:0">
-            <span style="font-weight:600;font-size:.88rem;display:block;margin-bottom:10px">MF vs Stock vs ETF Profit Share</span>
+          <div class="alloc-pane">
+            <span style="font-weight:600;font-size:.875rem;display:block;margin-bottom:10px">MF vs Stock vs ETF Profit Share</span>
             <div style="width:150px;height:150px;margin:0 auto 10px;position:relative">
               <canvas id="inv-profit-donut"></canvas>
               <div id="inv-profit-empty" class="chart-empty hidden" style="position:absolute;inset:0">No profit data yet</div>
             </div>
             <div id="inv-profit-leg" style="display:flex;flex-direction:column;gap:5px;min-width:0"></div>
           </div>
-          <div class="card" style="padding:14px 14px 12px;min-width:0">
-            <span style="font-weight:600;font-size:.88rem;display:block;margin-bottom:10px">MF vs Stock vs ETF Allocation</span>
+          <div class="alloc-pane">
+            <span style="font-weight:600;font-size:.875rem;display:block;margin-bottom:10px">MF vs Stock vs ETF Allocation</span>
             <div style="width:150px;height:150px;margin:0 auto 10px;position:relative">
               <canvas id="inv-alloc-donut"></canvas>
               <div id="inv-alloc-empty" class="chart-empty hidden" style="position:absolute;inset:0">No holdings yet</div>
@@ -604,7 +639,7 @@
 </div>
 
 <!-- AUTH GATE -->
-<div id="auth-gate" class="mo">
+<div id="auth-gate" class="mo" role="dialog" aria-modal="true" aria-label="Sign in to Finance Tracker">
   <div class="mb narrow">
     <div style="display:flex;align-items:center;gap:9px;margin-bottom:18px">
       <div style="width:27px;height:27px;background:#1c1917;border-radius:7px;display:flex;align-items:center;justify-content:center">
@@ -612,15 +647,17 @@
       </div>
       <span style="font-weight:600;font-size:.93rem">Finance Tracker</span>
     </div>
-    <div style="display:flex;flex-direction:column;gap:10px">
-      <div class="fw"><input id="auth-email" class="fi" type="email" placeholder="Email" autocomplete="username"/></div>
-      <div class="fw"><input id="auth-pass" class="fi" type="password" placeholder="Password" autocomplete="current-password"/></div>
-      <div id="auth-err" style="font-size:.76rem;color:#be123c;display:none"></div>
-      <button class="btn-p" style="width:100%" id="auth-signin-btn" onclick="doSignIn()">Sign In</button>
-      <button class="btn-g" style="width:100%" id="auth-signup-btn" onclick="doSignUp()">Create Account</button>
-      <button type="button" onclick="doResetPassword()" style="background:none;border:none;color:#1d4ed8;font-size:.74rem;cursor:pointer;font-family:'DM Sans',sans-serif">Forgot password?</button>
-      <p style="font-size:.71rem;color:#a8a29e;text-align:center;margin-top:2px">Your data syncs privately to your own Firebase project.</p>
-    </div>
+    <form style="display:flex;flex-direction:column;gap:10px" onsubmit="event.preventDefault();doSignIn()" novalidate>
+      <div><label class="slabel" for="auth-email" style="margin-bottom:4px">Email</label>
+        <div class="fw"><input id="auth-email" class="fi" type="email" placeholder="you@example.com" autocomplete="username" required/></div></div>
+      <div><label class="slabel" for="auth-pass" style="margin-bottom:4px">Password</label>
+        <div class="fw"><input id="auth-pass" class="fi" type="password" autocomplete="current-password" required/></div></div>
+      <div id="auth-err" role="alert" style="font-size:.78rem;color:#be123c;display:none"></div>
+      <button type="submit" class="btn-p" style="width:100%" id="auth-signin-btn">Sign in</button>
+      <button type="button" class="btn-g" style="width:100%" id="auth-signup-btn" onclick="doSignUp()">Create account</button>
+      <button type="button" class="btn-link info" style="font-size:.78rem;align-self:center" onclick="doResetPassword()">Forgot password?</button>
+      <p style="font-size:.72rem;color:var(--text-muted);text-align:center;margin-top:2px">Your data syncs privately to your own Firebase project.</p>
+    </form>
   </div>
 </div>
 
@@ -629,53 +666,53 @@
   <div class="mb">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
       <h3 style="font-weight:600;font-size:.93rem" id="modal-ac-title">Add Account</h3>
-      <button class="btn-i" onclick="closeModal('modal-ac')"><svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg></button>
+      <button class="btn-i" onclick="closeModal(\'modal-ac\')" aria-label="Close"><svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg></button>
     </div>
     <input type="hidden" id="ac-type"/>
     <div style="display:flex;flex-direction:column;gap:11px">
-      <div><div class="slabel" style="margin-bottom:4px" id="ac-name-lbl">Account Name</div>
+      <div><label for="ac-name" class="slabel" id="ac-name-lbl" style="margin-bottom:4px">Account Name</label>
         <div class="fw"><input id="ac-name" class="fi" type="text" placeholder="e.g. HDFC Savings"/></div></div>
-      <div id="ac-bal-wrap"><div class="slabel" style="margin-bottom:4px" id="ac-bal-lbl">Starting Balance (INR)</div>
+      <div id="ac-bal-wrap"><label for="ac-bal" class="slabel" id="ac-bal-lbl" style="margin-bottom:4px">Starting Balance (INR)</label>
         <div class="fw"><div class="fp">₹</div><input id="ac-bal" class="fi" type="number" min="0" step="0.01" placeholder="0.00"/></div></div>
-      <div id="ac-lim-wrap" class="hidden"><div class="slabel" style="margin-bottom:4px">Credit Limit (INR)</div>
+      <div id="ac-lim-wrap" class="hidden"><label for="ac-lim" class="slabel" style="margin-bottom:4px">Credit Limit (INR)</label>
         <div class="fw"><div class="fp">₹</div><input id="ac-lim" class="fi" type="number" min="0" step="0.01" placeholder="0.00"/></div></div>
-      <div id="ac-due-wrap" class="hidden"><div class="slabel" style="margin-bottom:4px">Current Outstanding Due (INR)</div>
+      <div id="ac-due-wrap" class="hidden"><label for="ac-due" class="slabel" style="margin-bottom:4px">Current Outstanding Due (INR)</label>
         <div class="fw"><div class="fp">₹</div><input id="ac-due" class="fi" type="number" min="0" step="0.01" placeholder="0.00"/></div></div>
       <!-- CC Due Date fields -->
       <div id="ac-duedate-wrap" class="hidden">
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
-          <div><div class="slabel" style="margin-bottom:4px">Bill Due Day (1–31)</div>
+          <div><label for="ac-dueday" class="slabel" style="margin-bottom:4px">Bill Due Day (1–31)</label>
             <div class="fw"><input id="ac-dueday" class="fi" type="number" min="1" max="31" placeholder="e.g. 15"/></div></div>
-          <div><div class="slabel" style="margin-bottom:4px">Remind (days before)</div>
+          <div><label for="ac-reminddays" class="slabel" style="margin-bottom:4px">Remind (days before)</label>
             <div class="fw"><input id="ac-reminddays" class="fi" type="number" min="1" max="30" placeholder="e.g. 5"/></div></div>
         </div>
-        <p style="font-size:.71rem;color:#a8a29e;margin-top:4px">We'll highlight upcoming due dates in the sidebar.</p>
+        <p style="font-size:.72rem;color:var(--text-muted);margin-top:4px">We'll highlight upcoming due dates in the sidebar.</p>
         <!-- Auto-debit -->
         <label style="display:flex;align-items:center;gap:8px;cursor:pointer;margin-top:12px">
           <input type="checkbox" id="ac-ad-on" onchange="toggleAutoDebitFields()" style="accent-color:#1c1917"/>
-          <span style="font-size:.8rem;color:#44403c">Auto-debit this bill from a bank account</span>
+          <span style="font-size:.82rem;color:#44403c">Auto-debit this bill from a bank account</span>
         </label>
         <div id="ac-ad-fields" class="hidden" style="display:flex;flex-direction:column;gap:9px;margin-top:9px">
-          <div><div class="slabel" style="margin-bottom:4px">Pay from</div>
+          <div><label for="ac-ad-bank" class="slabel" style="margin-bottom:4px">Pay from</label>
             <div class="fw"><select id="ac-ad-bank" class="fi"></select></div></div>
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
-            <div><div class="slabel" style="margin-bottom:4px">Debit on day (1–31)</div>
+            <div><label for="ac-ad-day" class="slabel" style="margin-bottom:4px">Debit on day (1–31)</label>
               <div class="fw"><input id="ac-ad-day" class="fi" type="number" min="1" max="31" placeholder="e.g. 15"/></div></div>
-            <div><div class="slabel" style="margin-bottom:4px">Amount</div>
+            <div><label for="ac-ad-mode" class="slabel" style="margin-bottom:4px">Amount</label>
               <div class="fw"><select id="ac-ad-mode" class="fi" onchange="toggleAutoDebitFields()"><option value="total">Full outstanding</option><option value="fixed">Fixed amount</option></select></div></div>
           </div>
-          <div id="ac-ad-fixed-wrap" class="hidden"><div class="slabel" style="margin-bottom:4px">Fixed amount (INR)</div>
+          <div id="ac-ad-fixed-wrap" class="hidden"><label for="ac-ad-fixed" class="slabel" style="margin-bottom:4px">Fixed amount (INR)</label>
             <div class="fw"><div class="fp">₹</div><input id="ac-ad-fixed" class="fi" type="number" min="0" step="0.01" placeholder="0.00"/></div></div>
-          <p style="font-size:.71rem;color:#a8a29e">Logged as a transfer from the bank to this card when you open the app on or after the debit day.</p>
+          <p style="font-size:.72rem;color:var(--text-muted)">Logged as a transfer from the bank to this card when you open the app on or after the debit day.</p>
         </div>
       </div>
       <!-- Net Worth inclusion (bank accounts only) -->
       <div id="ac-nw-wrap" class="hidden">
         <label style="display:flex;align-items:flex-start;gap:8px;cursor:pointer">
           <input type="checkbox" id="ac-include-nw" checked style="accent-color:#1c1917;margin-top:2px"/>
-          <span style="font-size:.8rem;color:#44403c">Include this account in Net Worth &amp; Liquid Cash totals</span>
+          <span style="font-size:.82rem;color:#44403c">Include this account in Net Worth &amp; Liquid Cash totals</span>
         </label>
-        <p style="font-size:.71rem;color:#a8a29e;margin-top:4px;margin-left:22px">Turn off for reconciliation/"dumping" accounts you don't want counted in your headline totals. The account still tracks its own balance.</p>
+        <p style="font-size:.72rem;color:var(--text-muted);margin-top:4px;margin-left:22px">Turn off for reconciliation/"dumping" accounts you don't want counted in your headline totals. The account still tracks its own balance.</p>
       </div>
     </div>
     <div style="display:flex;gap:8px;margin-top:16px">
@@ -690,17 +727,17 @@
   <div class="mb">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
       <h3 style="font-weight:600;font-size:.93rem" id="modal-inv-acc-title">Add Investment Account</h3>
-      <button class="btn-i" onclick="closeModal('modal-inv-acc')"><svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg></button>
+      <button class="btn-i" onclick="closeModal(\'modal-inv-acc\')" aria-label="Close"><svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg></button>
     </div>
     <input type="hidden" id="inv-acc-id"/>
     <div style="display:flex;flex-direction:column;gap:11px">
-      <div><div class="slabel" style="margin-bottom:4px">Account Type</div>
+      <div><label for="inv-acc-type" class="slabel" style="margin-bottom:4px">Account Type</label>
         <select id="inv-acc-type" class="pl">
           <option value="demat">Demat Account</option>
           <option value="mf">Mutual Fund Platform</option>
         </select>
       </div>
-      <div><div class="slabel" style="margin-bottom:4px">Account Name</div>
+      <div><label for="inv-acc-name" class="slabel" style="margin-bottom:4px">Account Name</label>
         <div class="fw"><input id="inv-acc-name" class="fi" type="text" placeholder="e.g. Zerodha, Groww"/></div></div>
     </div>
     <div style="display:flex;gap:8px;margin-top:16px">
@@ -715,28 +752,28 @@
   <div class="mb">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
       <h3 style="font-weight:600;font-size:.93rem" id="modal-inv-hold-title">Add Holding</h3>
-      <button class="btn-i" onclick="closeModal('modal-inv-hold')"><svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg></button>
+      <button class="btn-i" onclick="closeModal(\'modal-inv-hold\')" aria-label="Close"><svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg></button>
     </div>
     <input type="hidden" id="inv-hold-id"/>
     <div style="display:flex;flex-direction:column;gap:11px">
-      <div><div class="slabel" style="margin-bottom:4px">Account</div>
+      <div><label for="inv-hold-acc" class="slabel" style="margin-bottom:4px">Account</label>
         <select id="inv-hold-acc" class="pl" onchange="updateInvHoldCashHint()"></select>
-        <p id="inv-hold-cash-hint" style="font-size:.71rem;color:#a8a29e;margin-top:4px"></p></div>
+        <p id="inv-hold-cash-hint" style="font-size:.72rem;color:var(--text-muted);margin-top:4px"></p></div>
       <div style="display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:8px">
         <div style="min-width:0">
-          <div class="slabel" style="margin-bottom:4px">Funding Source</div>
+          <label for="inv-hold-fund-mode" class="slabel" style="margin-bottom:4px">Funding Source</label>
           <select id="inv-hold-fund-mode" class="pl" onchange="toggleHoldFundingFields()">
             <option value="inv">Investment Account Cash</option>
             <option value="bank">Direct Bank Account (UPI)</option>
           </select>
         </div>
         <div id="inv-hold-bank-wrap" class="hidden" style="min-width:0">
-          <div class="slabel" style="margin-bottom:4px">Bank Account</div>
+          <label for="inv-hold-bank" class="slabel" style="margin-bottom:4px">Bank Account</label>
           <select id="inv-hold-bank" class="pl" onchange="updateInvHoldCashHint()"></select>
         </div>
       </div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
-        <div><div class="slabel" style="margin-bottom:4px">Holding Type</div>
+        <div><label for="inv-hold-type" class="slabel" style="margin-bottom:4px">Holding Type</label>
           <select id="inv-hold-type" class="pl" onchange="onHoldTypeChange()">
             <option value="stock">Stock</option>
             <option value="etf">ETF</option>
@@ -744,60 +781,60 @@
             <option value="sip">Mutual Fund (SIP Series)</option>
           </select>
         </div>
-        <div><div class="slabel" style="margin-bottom:4px">Purchase Date</div>
-          <div class="date-trigger" onclick="openDatePicker('inv-hold-date')"><span id="inv-hold-date-disp">Select date</span><svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg></div>
+        <div><div class="slabel" id="lbl-42" style="margin-bottom:4px">Purchase Date</div>
+          <div aria-labelledby="lbl-42" class="date-trigger" onclick="openDatePicker('inv-hold-date')"><span id="inv-hold-date-disp">Select date</span><svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg></div>
           <input id="inv-hold-date" type="hidden"/></div>
       </div>
-      <div><div class="slabel" style="margin-bottom:4px">Name</div>
+      <div><label for="inv-hold-name" class="slabel" style="margin-bottom:4px">Name</label>
         <div class="fw"><input id="inv-hold-name" class="fi" type="text" placeholder="e.g. HDFC Bank, Parag Parikh Flexi Cap"/></div></div>
       <!-- Stock symbol lookup -->
       <div id="inv-hold-stock-wrap">
-        <div class="slabel" style="margin-bottom:4px">Find NSE Ticker (for live price)</div>
+        <label for="inv-hold-tksearch" class="slabel" style="margin-bottom:4px">Find NSE Ticker (for live price)</label>
         <div style="display:flex;gap:6px">
           <div class="fw" style="flex:1"><input id="inv-hold-tksearch" class="fi" type="text" autocomplete="off" placeholder="Search ticker or name, e.g. RELIANCE, NIFTYBEES" oninput="debouncedSearchTicker()" onkeydown="if(event.key==='Enter'){event.preventDefault();searchTicker();}"/></div>
           <button type="button" class="btn-g" onclick="searchTicker()">Search</button>
         </div>
         <div id="inv-hold-tkresults" style="max-height:140px;overflow-y:auto;margin-top:4px"></div>
         <input type="hidden" id="inv-hold-symbol"/>
-        <p id="inv-hold-tkpicked" style="font-size:.71rem;color:#166534;margin-top:4px"></p>
-        <p style="font-size:.71rem;color:#a8a29e;margin-top:4px">Pick one result from the list. It's used by "Refresh Prices" to fetch the latest NSE quote.</p>
+        <p id="inv-hold-tkpicked" style="font-size:.72rem;color:#166534;margin-top:4px"></p>
+        <p style="font-size:.72rem;color:var(--text-muted);margin-top:4px">Pick one result from the list. It's used by "Refresh Prices" to fetch the latest NSE quote.</p>
       </div>
       <!-- MF scheme lookup -->
       <div id="inv-hold-mf-wrap" class="hidden">
-        <div class="slabel" style="margin-bottom:4px">Find AMFI Scheme (for live NAV)</div>
+        <label for="inv-hold-mfsearch" class="slabel" style="margin-bottom:4px">Find AMFI Scheme (for live NAV)</label>
         <div style="display:flex;gap:6px">
           <div class="fw" style="flex:1"><input id="inv-hold-mfsearch" class="fi" type="text" placeholder="Search fund name, e.g. Parag Parikh Flexi Cap"/></div>
           <button type="button" class="btn-g" onclick="searchMF()">Search</button>
         </div>
         <div id="inv-hold-mfresults" style="max-height:140px;overflow-y:auto;margin-top:4px"></div>
         <input type="hidden" id="inv-hold-schemecode"/>
-        <p id="inv-hold-mfpicked" style="font-size:.71rem;color:#166534;margin-top:4px"></p>
+        <p id="inv-hold-mfpicked" style="font-size:.72rem;color:#166534;margin-top:4px"></p>
       </div>
       <div id="inv-hold-entry-mode-wrap">
-        <div class="slabel" style="margin-bottom:4px">Enter Holding By</div>
+        <label for="inv-hold-entry-mode" class="slabel" style="margin-bottom:4px">Enter Holding By</label>
         <select id="inv-hold-entry-mode" class="pl" onchange="toggleHoldEntryMode()">
           <option value="units">Units / Quantity</option>
           <option value="amount">Amount invested (₹) — units calculated from price/NAV</option>
         </select>
       </div>
       <div style="display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:8px">
-        <div style="min-width:0"><div class="slabel" id="inv-hold-units-label" style="margin-bottom:4px">Units / Quantity</div>
+        <div style="min-width:0"><label for="inv-hold-units" class="slabel" id="inv-hold-units-label" style="margin-bottom:4px">Units / Quantity</label>
           <div class="fw"><input id="inv-hold-units" class="fi" type="number" min="0" step="0.001" placeholder="0" oninput="updateHoldUnitsPreview()"/></div>
-          <p id="inv-hold-units-preview" style="font-size:.71rem;color:#166534;margin-top:4px"></p></div>
-        <div style="min-width:0"><div class="slabel" id="inv-hold-buy-label" style="margin-bottom:4px">Avg. Buy Price (₹/unit)</div>
+          <p id="inv-hold-units-preview" style="font-size:.72rem;color:#166534;margin-top:4px"></p></div>
+        <div style="min-width:0"><label for="inv-hold-buy" class="slabel" id="inv-hold-buy-label" style="margin-bottom:4px">Avg. Buy Price (₹/unit)</label>
           <div id="inv-hold-buy-mode-wrap" style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;width:100%;margin-bottom:6px">
-            <select id="inv-hold-buy-mode" class="pl" style="padding:6px 8px;font-size:.78rem;flex:1;min-width:150px" onchange="toggleHoldPriceMode()">
+            <select id="inv-hold-buy-mode" aria-label="How to get the buy price" class="pl" style="padding:6px 8px;font-size:.78rem;flex:1;min-width:150px" onchange="toggleHoldPriceMode()">
               <option value="manual">Manual entry</option>
               <option value="auto">Auto fetch by date</option>
             </select>
             <button id="inv-hold-buy-fetch-btn" type="button" class="btn-g" style="white-space:nowrap;flex:0 0 auto" onclick="fetchHoldPurchasePrice()">Fetch</button>
           </div>
-          <p id="inv-hold-buy-hint" style="font-size:.71rem;color:#a8a29e;margin:0 0 6px"></p>
+          <p id="inv-hold-buy-hint" style="font-size:.72rem;color:var(--text-muted);margin:0 0 6px"></p>
           <div class="fw"><div class="fp">₹</div><input id="inv-hold-buy" class="fi" type="number" min="0" step="0.01" placeholder="0.00" oninput="updateHoldUnitsPreview()"/></div></div>
       </div>
-      <div><div class="slabel" style="margin-bottom:4px">Current NAV / Price (₹/unit)</div>
+      <div><label for="inv-hold-nav" class="slabel" style="margin-bottom:4px">Current NAV / Price (₹/unit)</label>
         <div class="fw"><div class="fp">₹</div><input id="inv-hold-nav" class="fi" type="number" min="0" step="0.01" placeholder="0.00"/></div>
-        <p style="font-size:.71rem;color:#a8a29e;margin-top:4px">Filled automatically by "Refresh Prices" — you can still edit it manually.</p>
+        <p style="font-size:.72rem;color:var(--text-muted);margin-top:4px">Filled automatically by "Refresh Prices" — you can still edit it manually.</p>
       </div>
     </div>
     <div style="display:flex;gap:8px;margin-top:16px">
@@ -812,25 +849,25 @@
   <div class="mb">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
       <h3 style="font-weight:600;font-size:.93rem">Sell Holding</h3>
-      <button class="btn-i" onclick="closeModal('modal-inv-sell')"><svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg></button>
+      <button class="btn-i" onclick="closeModal(\'modal-inv-sell\')" aria-label="Close"><svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg></button>
     </div>
     <input type="hidden" id="inv-sell-hold-id"/>
     <div style="display:flex;flex-direction:column;gap:11px">
-      <div id="inv-sell-name" style="font-size:.85rem;font-weight:600;color:#292524"></div>
-      <div id="inv-sell-avail" style="font-size:.75rem;color:#a8a29e"></div>
+      <div id="inv-sell-name" style="font-size:.875rem;font-weight:600;color:#292524"></div>
+      <div id="inv-sell-avail" style="font-size:.78rem;color:var(--text-muted)"></div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
-        <div><div class="slabel" style="margin-bottom:4px">Units to Sell</div>
+        <div><label for="inv-sell-units" class="slabel" style="margin-bottom:4px">Units to Sell</label>
           <div class="fw"><input id="inv-sell-units" class="fi" type="number" min="0" step="0.001" placeholder="0" oninput="updateSellPreview()"/></div>
-          <button type="button" onclick="sellAllUnits()" style="font-size:.71rem;color:#1d4ed8;background:none;border:none;cursor:pointer;margin-top:3px;font-family:'DM Sans',sans-serif;padding:0">Sell all units</button>
+          <button type="button" class="btn-link info" style="font-size:.72rem;margin-top:3px" onclick="sellAllUnits()">Sell all units</button>
         </div>
-        <div><div class="slabel" style="margin-bottom:4px">Sell Price (₹/unit)</div>
+        <div><label for="inv-sell-price" class="slabel" style="margin-bottom:4px">Sell Price (₹/unit)</label>
           <div class="fw"><div class="fp">₹</div><input id="inv-sell-price" class="fi" type="number" min="0" step="0.01" placeholder="0.00" oninput="updateSellPreview()"/></div></div>
       </div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
-        <div><div class="slabel" style="margin-bottom:4px">Sale Date</div>
-          <div class="date-trigger" onclick="openDatePicker('inv-sell-date')"><span id="inv-sell-date-disp">Select date</span><svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg></div>
+        <div><div class="slabel" id="lbl-52" style="margin-bottom:4px">Sale Date</div>
+          <div aria-labelledby="lbl-52" class="date-trigger" onclick="openDatePicker('inv-sell-date')"><span id="inv-sell-date-disp">Select date</span><svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg></div>
           <input id="inv-sell-date" type="hidden"/></div>
-        <div><div class="slabel" style="margin-bottom:4px">Credit Proceeds To</div>
+        <div><label for="inv-sell-dest" class="slabel" style="margin-bottom:4px">Credit Proceeds To</label>
           <select id="inv-sell-dest" class="pl"></select></div>
       </div>
       <div id="inv-sell-preview" class="info-box" style="background:#f4f3f0;color:#57534e">Enter units and price to see a preview.</div>
@@ -847,17 +884,17 @@
   <div class="mb wide">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
       <h3 style="font-weight:600;font-size:.93rem">Budget Configuration</h3>
-      <button class="btn-i" onclick="closeModal('modal-bud')"><svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg></button>
+      <button class="btn-i" onclick="closeModal(\'modal-bud\')" aria-label="Close"><svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg></button>
     </div>
     <div style="margin-bottom:14px">
-      <div class="slabel" style="margin-bottom:6px">Overall Monthly Budget</div>
+      <label for="inp-bud" class="slabel" style="margin-bottom:6px">Overall Monthly Budget</label>
       <div class="fw" style="max-width:220px"><div class="fp">₹</div><input id="inp-bud" class="fi" type="number" min="0" step="100" placeholder="e.g. 50000"/></div>
-      <p style="font-size:.72rem;color:#a8a29e;margin-top:4px">Category caps are independent of this total.</p>
+      <p style="font-size:.72rem;color:var(--text-muted);margin-top:4px">Category caps are independent of this total.</p>
     </div>
     <div style="margin-bottom:14px">
-      <div class="slabel" style="margin-bottom:6px">Month Starts On</div>
+      <label for="inp-month-start" class="slabel" style="margin-bottom:6px">Month Starts On</label>
       <select id="inp-month-start" class="pl" style="max-width:220px"></select>
-      <p style="font-size:.72rem;color:#a8a29e;margin-top:4px">Budgets, the month view and monthly analytics run from this day to the day before it next month (e.g. 23rd → 23 Nov – 22 Dec). Handy if you are paid mid-month.</p>
+      <p style="font-size:.72rem;color:var(--text-muted);margin-top:4px">The whole app follows this: budgets, the month view, quick charts and every analytics range. A month runs from this day to the day before it next month (e.g. 23rd → 23 Nov – 22 Dec), and the year and financial year are made of these months. Handy if you are paid mid-month.</p>
     </div>
     <div style="height:1px;background:#f0eeec;margin-bottom:14px"></div>
     <div class="slabel" style="margin-bottom:8px">Category-Wise Monthly Caps</div>
@@ -874,10 +911,10 @@
   <div class="mb" style="max-width:320px">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
       <h3 style="font-weight:600;font-size:.93rem" id="cat-title">Add Category</h3>
-      <button class="btn-i" onclick="closeModal('modal-cat')"><svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg></button>
+      <button class="btn-i" onclick="closeModal(\'modal-cat\')" aria-label="Close"><svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg></button>
     </div>
     <input type="hidden" id="cat-ctx"/>
-    <div class="fw"><input id="inp-cat" class="fi" type="text" placeholder="Category name" onkeydown="if(event.key==='Enter')saveCategory()"/></div>
+    <div class="fw"><input id="inp-cat" aria-label="Category name" class="fi" type="text" placeholder="Category name" onkeydown="if(event.key==='Enter')saveCategory()"/></div>
     <div style="display:flex;gap:8px;margin-top:14px">
       <button class="btn-g" style="flex:1" onclick="closeModal('modal-cat')">Cancel</button>
       <button class="btn-p" style="flex:1" onclick="saveCategory()">Add</button>
@@ -886,16 +923,16 @@
 </div>
 
 <!-- MODAL: Delete Confirm -->
-<div id="modal-confirm" class="mo hidden" onclick="if(event.target.id==='modal-confirm')closeModal('modal-confirm')">
+<div id="modal-confirm" class="mo hidden" aria-labelledby="confirm-title" aria-describedby="confirm-body" onclick="if(event.target.id==='modal-confirm')closeModal('modal-confirm')">
   <div class="confirm-box">
-    <div class="confirm-icon">
-      <svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="#be123c" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+    <div class="confirm-icon" id="confirm-icon" aria-hidden="true">
+      <svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path id="confirm-icon-path" stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
     </div>
-    <h3 style="font-weight:600;font-size:.95rem;margin-bottom:8px">Delete Transaction?</h3>
-    <p id="confirm-body" style="font-size:.82rem;color:#78716c;margin-bottom:18px;line-height:1.5">This action cannot be undone.</p>
+    <h3 id="confirm-title" style="font-weight:600;font-size:.93rem;margin-bottom:8px">Are you sure?</h3>
+    <p id="confirm-body" style="font-size:.82rem;color:var(--text-muted);margin-bottom:18px;line-height:1.5"></p>
     <div style="display:flex;gap:8px">
       <button class="btn-g" style="flex:1" onclick="closeModal('modal-confirm')">Cancel</button>
-      <button class="btn-danger" style="flex:1" id="confirm-ok-btn">Delete</button>
+      <button class="btn-danger" style="flex:1" id="confirm-ok-btn">Confirm</button>
     </div>
   </div>
 </div>
@@ -905,14 +942,14 @@
   <div class="mb">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
       <h3 style="font-weight:600;font-size:.93rem">Settle Up</h3>
-      <button class="btn-i" onclick="closeModal('modal-settle')"><svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg></button>
+      <button class="btn-i" onclick="closeModal(\'modal-settle\')" aria-label="Close"><svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg></button>
     </div>
     <div id="settle-summary" style="margin-bottom:14px;padding:12px;background:#faf9f7;border-radius:9px;border:1px solid #f0eeec"></div>
     <div style="display:flex;flex-direction:column;gap:11px">
-      <div><div class="slabel" style="margin-bottom:4px">Settlement Date</div>
-        <div class="date-trigger" onclick="openDatePicker('settle-date')"><span id="settle-date-disp">Select date</span><svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg></div>
+      <div><div class="slabel" id="lbl-57" style="margin-bottom:4px">Settlement Date</div>
+        <div aria-labelledby="lbl-57" class="date-trigger" onclick="openDatePicker('settle-date')"><span id="settle-date-disp">Select date</span><svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg></div>
         <input id="settle-date" type="hidden"/></div>
-      <div><div class="slabel" style="margin-bottom:4px">Settle Via</div>
+      <div><label for="settle-acc" class="slabel" style="margin-bottom:4px">Settle Via</label>
         <select id="settle-acc" class="pl"></select></div>
       <p id="settle-hint" class="info-box">This will record the net amount as an income/expense in the selected account and mark all outstanding split entries as settled.</p>
     </div>
@@ -928,7 +965,7 @@
   <div class="mb">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
       <h3 style="font-weight:600;font-size:.93rem">Record Split Payment</h3>
-      <button class="btn-i" onclick="closeModal('modal-splitpay')"><svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg></button>
+      <button class="btn-i" onclick="closeModal(\'modal-splitpay\')" aria-label="Close"><svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg></button>
     </div>
     <div style="display:flex;flex-direction:column;gap:11px">
       <div id="sp-net" style="padding:10px 12px;background:#faf9f7;border-radius:9px;border:1px solid #f0eeec;font-size:.82rem"></div>
@@ -936,15 +973,15 @@
         <button class="ttb ae" id="sp-dir-paid" style="flex:1" onclick="setSplitPayDir('paid')">I paid roommates</button>
         <button class="ttb" id="sp-dir-received" style="flex:1" onclick="setSplitPayDir('received')">Roommates paid me</button>
       </div>
-      <div><div class="slabel" style="margin-bottom:4px">Amount</div>
+      <div><label for="sp-amt" class="slabel" style="margin-bottom:4px">Amount</label>
         <input id="sp-amt" type="number" step="0.01" min="0" class="pl" placeholder="0.00" oninput="updateSplitPayTotal()"/>
-        <div id="sp-summary" style="font-size:.74rem;color:#57534e;margin-top:5px"></div></div>
-      <div><div class="slabel" style="margin-bottom:4px">Date</div>
-        <div class="date-trigger" onclick="openDatePicker('sp-date')"><span id="sp-date-disp">Select date</span><svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg></div>
+        <div id="sp-summary" style="font-size:.78rem;color:#57534e;margin-top:5px"></div></div>
+      <div><div class="slabel" id="lbl-60" style="margin-bottom:4px">Date</div>
+        <div aria-labelledby="lbl-60" class="date-trigger" onclick="openDatePicker('sp-date')"><span id="sp-date-disp">Select date</span><svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg></div>
         <input id="sp-date" type="hidden"/></div>
-      <div><div class="slabel" style="margin-bottom:4px" id="sp-acc-label">Paid From</div>
+      <div><label for="sp-acc" class="slabel" id="sp-acc-label" style="margin-bottom:4px">Paid From</label>
         <select id="sp-acc" class="pl"></select></div>
-      <div><div class="slabel" style="margin-bottom:4px">Note (optional)</div>
+      <div><label for="sp-note" class="slabel" style="margin-bottom:4px">Note (optional)</label>
         <input id="sp-note" type="text" class="pl" placeholder="e.g. UPI to Rahul"/></div>
       <p class="info-box">Moves real money in the selected account and adjusts your Splitwise balance. Adjusts your overall net — it isn't tied to specific entries. Paying out reduces what you owe (or adds to what they owe you); receiving does the opposite, so it can also add to your debt. Not counted as spending or income in analytics.</p>
     </div>
@@ -960,12 +997,44 @@
   <div class="mb wide">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
       <h3 style="font-weight:600;font-size:.93rem">Manage Recurring</h3>
-      <button class="btn-i" onclick="closeModal('modal-recurring')"><svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg></button>
+      <button class="btn-i" onclick="closeModal(\'modal-recurring\')" aria-label="Close"><svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg></button>
     </div>
-    <p style="font-size:.74rem;color:#a8a29e;margin-bottom:10px">New rules are created from the Expense/Income form via "Repeat this automatically".</p>
+    <p style="font-size:.78rem;color:var(--text-muted);margin-bottom:10px">New rules are created from the Expense/Income form via "Repeat this automatically".</p>
     <div id="recurring-list" style="display:flex;flex-direction:column;gap:2px;max-height:400px;overflow-y:auto"></div>
     <div style="display:flex;gap:8px;margin-top:16px">
       <button class="btn-g" style="flex:1" onclick="closeModal('modal-recurring')">Close</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: Edit Recurring rule (opens on top of Manage Recurring) -->
+<div id="modal-recurring-edit" class="mo hidden" onclick="if(event.target.id==='modal-recurring-edit')closeModal('modal-recurring-edit')">
+  <div class="mb" style="max-width:380px">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+      <h3 style="font-weight:600;font-size:.93rem">Edit Recurring</h3>
+      <button class="btn-i" onclick="closeModal('modal-recurring-edit')" aria-label="Close"><svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg></button>
+    </div>
+    <input type="hidden" id="re-id"/>
+    <div id="re-meta" style="font-size:.78rem;color:var(--text-muted);margin-bottom:12px"></div>
+    <div style="display:flex;flex-direction:column;gap:11px">
+      <div style="display:grid;grid-template-columns:minmax(0,1fr) 152px;gap:8px">
+        <div style="min-width:0"><label for="re-amt" class="slabel" id="re-amt-label" style="margin-bottom:4px">Amount (INR)</label>
+          <div class="fw"><div class="fp">₹</div><input id="re-amt" class="fi" type="number" min="0" step="0.01" placeholder="0.00"/></div></div>
+        <div style="min-width:0"><div class="slabel" id="re-date-lbl" style="margin-bottom:4px">Next Payment</div>
+          <div class="date-trigger" aria-labelledby="re-date-lbl" onclick="openDatePicker('re-date')"><span id="re-date-disp">Select date</span><svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg></div>
+          <input id="re-date" type="hidden"/></div>
+      </div>
+      <div id="re-share-wrap" class="hidden"><label for="re-share" class="slabel" style="margin-bottom:4px">My Share (INR)</label>
+        <div class="fw"><div class="fp">₹</div><input id="re-share" class="fi" type="number" min="0" step="0.01" placeholder="0.00"/></div></div>
+      <div><label for="re-cat" class="slabel" style="margin-bottom:4px">Category</label>
+        <select id="re-cat" class="pl"></select></div>
+      <div><label for="re-desc" class="slabel" style="margin-bottom:4px">Description</label>
+        <div class="fw"><input id="re-desc" class="fi" type="text" placeholder="e.g. Netflix subscription"/></div></div>
+      <p class="ef-hint" style="margin:0" id="re-hint">Changes apply to future payments only. Entries already logged stay as they are.</p>
+    </div>
+    <div style="display:flex;gap:8px;margin-top:16px">
+      <button class="btn-g" style="flex:1" onclick="closeModal('modal-recurring-edit')">Cancel</button>
+      <button class="btn-p" style="flex:1" onclick="saveRecurringEdit()">Save Changes</button>
     </div>
   </div>
 </div>
@@ -975,28 +1044,28 @@
   <div class="mb">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
       <h3 style="font-weight:600;font-size:.93rem" id="modal-loan-title">Add Loan / EMI</h3>
-      <button class="btn-i" onclick="closeModal('modal-loan')"><svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg></button>
+      <button class="btn-i" onclick="closeModal(\'modal-loan\')" aria-label="Close"><svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg></button>
     </div>
     <input type="hidden" id="loan-id"/>
     <div style="display:flex;flex-direction:column;gap:11px">
-      <div><div class="slabel" style="margin-bottom:4px">Loan Name</div>
+      <div><label for="loan-name" class="slabel" style="margin-bottom:4px">Loan Name</label>
         <div class="fw"><input id="loan-name" class="fi" type="text" placeholder="e.g. Car Loan, Education Loan"/></div></div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
-        <div><div class="slabel" style="margin-bottom:4px">Original Principal (₹)</div>
+        <div><label for="loan-principal" class="slabel" style="margin-bottom:4px">Original Principal (₹)</label>
           <div class="fw"><div class="fp">₹</div><input id="loan-principal" class="fi" type="number" min="0" step="0.01" placeholder="0.00"/></div></div>
-        <div><div class="slabel" style="margin-bottom:4px">Outstanding (₹)</div>
+        <div><label for="loan-outstanding" class="slabel" style="margin-bottom:4px">Outstanding (₹)</label>
           <div class="fw"><div class="fp">₹</div><input id="loan-outstanding" class="fi" type="number" min="0" step="0.01" placeholder="0.00"/></div></div>
       </div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
-        <div><div class="slabel" style="margin-bottom:4px">EMI Amount (₹)</div>
+        <div><label for="loan-emi" class="slabel" style="margin-bottom:4px">EMI Amount (₹)</label>
           <div class="fw"><div class="fp">₹</div><input id="loan-emi" class="fi" type="number" min="0" step="0.01" placeholder="0.00"/></div></div>
-        <div><div class="slabel" style="margin-bottom:4px">Tenure Left (months)</div>
+        <div><label for="loan-tenure" class="slabel" style="margin-bottom:4px">Tenure Left (months)</label>
           <div class="fw"><input id="loan-tenure" class="fi" type="number" min="0" step="1" placeholder="e.g. 24"/></div></div>
       </div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
-        <div><div class="slabel" style="margin-bottom:4px">EMI Due Day (1–31)</div>
+        <div><label for="loan-dueday" class="slabel" style="margin-bottom:4px">EMI Due Day (1–31)</label>
           <div class="fw"><input id="loan-dueday" class="fi" type="number" min="1" max="31" placeholder="e.g. 5"/></div></div>
-        <div><div class="slabel" style="margin-bottom:4px">Remind (days before)</div>
+        <div><label for="loan-reminddays" class="slabel" style="margin-bottom:4px">Remind (days before)</label>
           <div class="fw"><input id="loan-reminddays" class="fi" type="number" min="1" max="30" placeholder="e.g. 5"/></div></div>
       </div>
     </div>
@@ -1012,19 +1081,19 @@
   <div class="mb">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
       <h3 style="font-weight:600;font-size:.93rem">Record EMI Payment</h3>
-      <button class="btn-i" onclick="closeModal('modal-emi-pay')"><svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg></button>
+      <button class="btn-i" onclick="closeModal(\'modal-emi-pay\')" aria-label="Close"><svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg></button>
     </div>
     <input type="hidden" id="emi-loan-id"/>
     <div style="display:flex;flex-direction:column;gap:11px">
-      <div id="emi-pay-info" style="font-size:.8rem;color:#57534e"></div>
-      <div><div class="slabel" style="margin-bottom:4px">Amount (₹)</div>
+      <div id="emi-pay-info" style="font-size:.82rem;color:#57534e"></div>
+      <div><label for="emi-pay-amount" class="slabel" style="margin-bottom:4px">Amount (₹)</label>
         <div class="fw"><div class="fp">₹</div><input id="emi-pay-amount" class="fi" type="number" min="0" step="0.01" placeholder="0.00"/></div></div>
-      <div><div class="slabel" style="margin-bottom:4px">Payment Date</div>
-        <div class="date-trigger" onclick="openDatePicker('emi-pay-date')"><span id="emi-pay-date-disp">Select date</span><svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg></div>
+      <div><div class="slabel" id="lbl-71" style="margin-bottom:4px">Payment Date</div>
+        <div aria-labelledby="lbl-71" class="date-trigger" onclick="openDatePicker('emi-pay-date')"><span id="emi-pay-date-disp">Select date</span><svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg></div>
         <input id="emi-pay-date" type="hidden"/></div>
-      <div><div class="slabel" style="margin-bottom:4px">Pay From</div>
+      <div><label for="emi-pay-acc" class="slabel" style="margin-bottom:4px">Pay From</label>
         <select id="emi-pay-acc" class="pl"></select></div>
-      <p style="font-size:.71rem;color:#a8a29e;line-height:1.4">Logs an expense from the selected account and reduces the loan's outstanding balance by this amount.</p>
+      <p style="font-size:.72rem;color:var(--text-muted);line-height:1.4">Logs an expense from the selected account and reduces the loan's outstanding balance by this amount.</p>
     </div>
     <div style="display:flex;gap:8px;margin-top:16px">
       <button class="btn-g" style="flex:1" onclick="closeModal('modal-emi-pay')">Cancel</button>
@@ -1038,7 +1107,7 @@
   <div class="mb" style="max-width:360px">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
       <h3 style="font-weight:600;font-size:.93rem">Bulk Recategorize</h3>
-      <button class="btn-i" onclick="closeModal('modal-bulk-recat')"><svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg></button>
+      <button class="btn-i" onclick="closeModal(\'modal-bulk-recat\')" aria-label="Close"><svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg></button>
     </div>
     <div id="bulk-recat-body"></div>
     <div style="display:flex;gap:8px;margin-top:16px">
@@ -1053,18 +1122,18 @@
   <div class="mb" style="max-width:360px">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
       <h3 style="font-weight:600;font-size:.93rem">Bulk Tag</h3>
-      <button class="btn-i" onclick="closeModal('modal-bulk-tag')"><svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg></button>
+      <button class="btn-i" onclick="closeModal(\'modal-bulk-tag\')" aria-label="Close"><svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg></button>
     </div>
     <div class="tg" style="margin-bottom:11px">
       <button type="button" class="tp active" id="bulk-tag-add-btn" onclick="setBulkTagMode('add')">Add Tag</button>
       <button type="button" class="tp" id="bulk-tag-remove-btn" onclick="setBulkTagMode('remove')">Remove Tag</button>
     </div>
     <div id="bulk-tag-add-fields">
-      <div class="fw"><input id="bulk-tag-input" class="fi" type="text" placeholder="Type a tag, e.g. Goa Trip"/></div>
+      <div class="fw"><input id="bulk-tag-input" aria-label="Tag" class="fi" type="text" placeholder="Type a tag, e.g. Goa Trip"/></div>
       <div id="bulk-tag-suggest" style="display:flex;flex-wrap:wrap;gap:5px;margin-top:8px"></div>
     </div>
     <div id="bulk-tag-remove-fields" class="hidden">
-      <select id="bulk-tag-remove-select" class="pl"></select>
+      <select id="bulk-tag-remove-select" aria-label="Tag to remove" class="pl"></select>
     </div>
     <div style="display:flex;gap:8px;margin-top:16px">
       <button class="btn-g" style="flex:1" onclick="closeModal('modal-bulk-tag')">Cancel</button>
@@ -1078,31 +1147,31 @@
   <div class="mb">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
       <h3 style="font-weight:600;font-size:.93rem" id="et-title">Edit Transaction</h3>
-      <button class="btn-i" onclick="closeModal('modal-txn-edit')"><svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg></button>
+      <button class="btn-i" onclick="closeModal(\'modal-txn-edit\')" aria-label="Close"><svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg></button>
     </div>
     <input type="hidden" id="et-id"/>
     <div style="display:flex;flex-direction:column;gap:11px">
       <div style="display:grid;grid-template-columns:1fr 152px;gap:8px">
-        <div style="min-width:0"><div class="slabel" style="margin-bottom:4px" id="et-amt-label">Amount (INR)</div>
+        <div style="min-width:0"><label for="et-amt" class="slabel" id="et-amt-label" style="margin-bottom:4px">Amount (INR)</label>
           <div class="fw"><div class="fp">₹</div><input id="et-amt" class="fi" type="number" min="0" step="0.01" placeholder="0.00"/></div></div>
-        <div style="min-width:0"><div class="slabel" style="margin-bottom:4px">Date</div>
-          <div class="date-trigger" onclick="openDatePicker('et-date')"><span id="et-date-disp">Select date</span></div>
+        <div style="min-width:0"><div class="slabel" id="lbl-74" style="margin-bottom:4px">Date</div>
+          <div aria-labelledby="lbl-74" class="date-trigger" onclick="openDatePicker('et-date')"><span id="et-date-disp">Select date</span></div>
           <input id="et-date" type="hidden"/></div>
       </div>
-      <div id="et-share-wrap" class="hidden"><div class="slabel" style="margin-bottom:4px">My Share (INR)</div>
+      <div id="et-share-wrap" class="hidden"><label for="et-share" class="slabel" style="margin-bottom:4px">My Share (INR)</label>
         <div class="fw"><div class="fp">₹</div><input id="et-share" class="fi" type="number" min="0" step="0.01" placeholder="0.00"/></div></div>
-      <div id="et-cat-wrap"><div class="slabel" style="margin-bottom:4px">Category</div><select id="et-cat" class="pl"></select></div>
-      <div id="et-spread-wrap" class="hidden"><div class="slabel" style="margin-bottom:4px">Spread Cost Over</div><select id="et-spread" class="pl"><option value="1">No — this month only</option><option value="2">2 months</option><option value="3">3 months (quarterly)</option><option value="4">4 months</option><option value="6">6 months (half-yearly)</option><option value="12">12 months (yearly)</option></select></div>
+      <div id="et-cat-wrap"><label for="et-cat" class="slabel" style="margin-bottom:4px">Category</label><select id="et-cat" class="pl"></select></div>
+      <div id="et-spread-wrap" class="hidden"><label for="et-spread" class="slabel" style="margin-bottom:4px">Spread Cost Over</label><select id="et-spread" class="pl"><option value="1">No — this month only</option><option value="2">2 months</option><option value="3">3 months (quarterly)</option><option value="4">4 months</option><option value="6">6 months (half-yearly)</option><option value="12">12 months (yearly)</option></select></div>
       <div id="et-acc-wrap" style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
-        <div><div class="slabel" style="margin-bottom:4px">Account Type</div>
+        <div><label for="et-actype" class="slabel" style="margin-bottom:4px">Account Type</label>
           <select id="et-actype" class="pl" onchange="fillEditInst()"><option value="bank">Bank Account</option><option value="cc">Credit Card</option><option value="cash">Cash</option></select></div>
-        <div><div class="slabel" style="margin-bottom:4px">Instrument</div><select id="et-inst" class="pl"></select></div>
+        <div><label for="et-inst" class="slabel" style="margin-bottom:4px">Instrument</label><select id="et-inst" class="pl"></select></div>
       </div>
       <div id="et-tr-wrap" class="hidden" style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
-        <div><div class="slabel" style="margin-bottom:4px">From</div><select id="et-from" class="pl"></select></div>
-        <div><div class="slabel" style="margin-bottom:4px">To</div><select id="et-to" class="pl"></select></div>
+        <div><label for="et-from" class="slabel" style="margin-bottom:4px">From</label><select id="et-from" class="pl"></select></div>
+        <div><label for="et-to" class="slabel" style="margin-bottom:4px">To</label><select id="et-to" class="pl"></select></div>
       </div>
-      <div><div class="slabel" style="margin-bottom:4px" id="et-desc-label">Description</div>
+      <div><label for="et-desc" class="slabel" id="et-desc-label" style="margin-bottom:4px">Description</label>
         <div class="fw"><input id="et-desc" class="fi" type="text" placeholder="Optional"/></div></div>
     </div>
     <div style="display:flex;gap:8px;margin-top:16px">
@@ -1117,7 +1186,7 @@
   <div class="mb" style="max-width:310px">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
       <h3 style="font-weight:600;font-size:.93rem">Select Date</h3>
-      <button class="btn-i" onclick="closeModal('modal-datewheel')"><svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg></button>
+      <button class="btn-i" onclick="closeModal(\'modal-datewheel\')" aria-label="Close"><svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg></button>
     </div>
     <div class="dw-head">
       <button type="button" class="btn-i dw-step" onclick="shiftWeek(-1)" aria-label="Previous week" title="Previous week ( [ )"><svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.2"><path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7"/></svg></button>

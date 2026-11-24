@@ -19,6 +19,10 @@ document.addEventListener('keydown',e=>{
     if(closeTopModal())e.preventDefault();
     return;
   }
+  if((e.ctrlKey||e.metaKey)&&!e.altKey&&!e.shiftKey&&(e.key==='b'||e.key==='B')){
+    if(!document.getElementById('auth-gate').classList.contains('hidden')||anyModalOpen())return;
+    e.preventDefault();if(!e.repeat)toggleSidebar();return;
+  }
   // Ignore other shortcuts while typing in a field or while a modal is open
   if(e.ctrlKey||e.metaKey||e.altKey||e.repeat)return;
   if(!document.getElementById('auth-gate').classList.contains('hidden'))return;

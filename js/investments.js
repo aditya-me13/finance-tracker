@@ -117,7 +117,7 @@ async function fetchHoldPurchasePrice(){
   const symbol=document.getElementById('inv-hold-symbol').value.trim().toUpperCase();
   const schemeCode=document.getElementById('inv-hold-schemecode').value.trim();
   if(type==='sip'){toast('Price fetch is not used for SIP series');return;}
-  if(!date){toast('Select a purchase date');return;}
+  if(!date){fieldError('inv-hold-date','Select a purchase date');return;}
   try{
     const price=await resolveHoldPurchasePrice(type,date,symbol,schemeCode);
     document.getElementById('inv-hold-buy').value=price;
@@ -132,11 +132,11 @@ async function searchMF(){
   const q=document.getElementById('inv-hold-mfsearch').value.trim();
   const wrap=document.getElementById('inv-hold-mfresults');
   if(!q){wrap.innerHTML='';return;}
-  wrap.innerHTML='<div style="font-size:.75rem;color:#a8a29e;padding:4px 2px">Searching…</div>';
+  wrap.innerHTML='<div style="font-size:.78rem;color:var(--text-muted);padding:4px 2px">Searching…</div>';
   try{
     const res=await fetchT(`https://api.mfapi.in/mf/search?q=${encodeURIComponent(q)}`);
     const list=await res.json();
-    if(!Array.isArray(list)||!list.length){wrap.innerHTML='<div style="font-size:.75rem;color:#a8a29e;padding:4px 2px">No matches</div>';return;}
+    if(!Array.isArray(list)||!list.length){wrap.innerHTML='<div style="font-size:.78rem;color:var(--text-muted);padding:4px 2px">No matches</div>';return;}
     wrap.innerHTML=list.slice(0,8).map(f=>{
       const code=esc(String(f.schemeCode||''));
       const name=esc(String(f.schemeName||''));
@@ -147,7 +147,7 @@ async function searchMF(){
       el.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();pickMF(el.dataset.mfCode||'',el.dataset.mfName||'');}});
     });
   }catch(e){
-    wrap.innerHTML='<div style="font-size:.75rem;color:#ef4444;padding:4px 2px">Search failed — try again</div>';
+    wrap.innerHTML='<div style="font-size:.78rem;color:#ef4444;padding:4px 2px">Search failed — try again</div>';
   }
 }
 function pickMF(code,name){
@@ -181,7 +181,7 @@ async function searchTicker(){
   const q=document.getElementById('inv-hold-tksearch').value.trim();
   const type=document.getElementById('inv-hold-type').value;
   const wrap=document.getElementById('inv-hold-tkresults');
-  const msg=(t,c='#a8a29e')=>{wrap.innerHTML=`<div style="font-size:.75rem;color:${c};padding:4px 2px">${t}</div>`;};
+  const msg=(t,c='#a8a29e')=>{wrap.innerHTML=`<div style="font-size:.78rem;color:${c};padding:4px 2px">${t}</div>`;};
   if(!q){wrap.innerHTML='';return;}
   msg('Searching…');
   try{
@@ -238,7 +238,7 @@ function saveInvAccount(){
   const id=document.getElementById('inv-acc-id').value;
   const type=document.getElementById('inv-acc-type').value;
   const name=document.getElementById('inv-acc-name').value.trim();
-  if(!name){toast('Enter an account name');return;}
+  if(!name){fieldError('inv-acc-name','Enter an account name');return;}
   if(id){
     const a=state.investments.accounts.find(x=>x.id===id);
     if(a){a.type=type;a.name=name;}
@@ -253,6 +253,7 @@ function confirmDeleteInvAccount(id){
   const a=state.investments.accounts.find(x=>x.id===id);
   const name=a?a.name:'account';
   const holdCount=state.investments.holdings.filter(h=>h.accountId===id).length;
+  prepConfirm('Delete investment account?','Delete account');
   document.getElementById('confirm-body').textContent=`Delete "${name}"? This will also delete ${holdCount} holding(s) and their linked transactions. You can undo this right after.`;
   document.getElementById('confirm-ok-btn').onclick=()=>{
     const removedAccount=a;
@@ -324,9 +325,9 @@ function renderInvTopSummary(){
           <div class="slabel" style="margin:0">${mainLabel}</div>
           <div class="val" style="color:#1c1917;font-size:clamp(.96rem,3.8vw,1.15rem);margin-top:2px">${mainValue}</div>
         </div>
-        <button type="button" class="btn-g" style="padding:6px 9px;font-size:.74rem;white-space:nowrap" onclick="toggleInvSummaryMode()">${mode==='cash'?'Show invested':'Show cash'}</button>
+        <button type="button" class="btn-g" style="padding:6px 9px;font-size:.78rem;white-space:nowrap" onclick="toggleInvSummaryMode()">${mode==='cash'?'Show invested':'Show cash'}</button>
       </div>
-      <div class="delta" style="color:#a8a29e">${subLine}</div>
+      <div class="delta" style="color:var(--text-muted)">${subLine}</div>
       ${mode==='cash'?'':`<div class="stat-breakdown">${rows.join('')}</div>`}
     </div>`;
 }
@@ -436,11 +437,11 @@ async function _saveInvHoldingImpl(){
   const fundMode=document.getElementById('inv-hold-fund-mode').value;
   const bankId=document.getElementById('inv-hold-bank').value;
   const sourceKey=fundMode==='bank'?`bank:${bankId}`:`inv:${accountId}`;
-  if(!accountId){toast('Select an account');return;}
-  if(!name){toast('Enter a name');return;}
-  if(isExchangeTraded(type)&&!symbol){toast(`Search and select a ${type==='etf'?'ETF':'stock'} ticker from the list`);return;}
+  if(!accountId){fieldError('inv-hold-acc','Select an account');return;}
+  if(!name){fieldError('inv-hold-name','Enter a name');return;}
+  if(isExchangeTraded(type)&&!symbol){fieldError('inv-hold-tksearch',`Search and select a ${type==='etf'?'ETF':'stock'} ticker from the list`);return;}
   if(units<=0){toast(type==='sip'?'Enter monthly SIP amount':(holdEntryMode()==='amount'?'Enter the amount invested':'Enter units/quantity'));return;}
-  if(!date){toast('Select a purchase date');return;}
+  if(!date){fieldError('inv-hold-date','Select a purchase date');return;}
   const isSip=type==='sip';
   const sipAmount=isSip?units:0;
   const sipMonths=isSip?Math.max(0,Math.floor(buyPrice)):0;
@@ -457,8 +458,8 @@ async function _saveInvHoldingImpl(){
   // Validate and fetch SIP data before anything is mutated, so a failure can't leave a half-edited holding
   let sipNav=0;
   if(isSip){
-    if(!schemeCode){toast('Select an AMFI scheme for SIP series');return;}
-    if(!sipMonths){toast('Enter a valid SIP duration');return;}
+    if(!schemeCode){fieldError('inv-hold-mfsearch','Select an AMFI scheme for SIP series');return;}
+    if(!sipMonths){fieldError('inv-hold-buy','Enter a valid SIP duration');return;}
     try{sipNav=nav||await fetchMFNav(schemeCode);}catch(e){toast(e?.message||'Could not fetch NAV');return;}
     if(!(sipNav>0)){toast('NAV unavailable for this scheme');return;}
   }
@@ -540,6 +541,7 @@ async function _saveInvHoldingImpl(){
 
 function confirmDeleteInvHolding(id){
   const h=state.investments.holdings.find(x=>x.id===id);
+  prepConfirm('Delete holding?','Delete holding');
   document.getElementById('confirm-body').textContent=`Delete "${h?h.name:'holding'}"? The invested amount (and any sale proceeds from it) will be removed from your account balances. You can undo this right after.`;
   document.getElementById('confirm-ok-btn').onclick=()=>{
     let removedTxns=[];
@@ -620,11 +622,11 @@ function saveInvSell(){
   const price=Number(document.getElementById('inv-sell-price').value)||0;
   const date=document.getElementById('inv-sell-date').value;
   const dest=document.getElementById('inv-sell-dest').value;
-  if(units<=0){toast('Enter units to sell');return;}
-  if(units>Number(h.units)+1e-6){toast(`Only ${h.units} units available`);return;}
-  if(price<=0){toast('Enter a valid sell price');return;}
-  if(!date){toast('Select a sale date');return;}
-  if(!dest){toast('Select where to credit proceeds');return;}
+  if(units<=0){fieldError('inv-sell-units','Enter units to sell');return;}
+  if(units>Number(h.units)+1e-6){fieldError('inv-sell-units',`Only ${h.units} units available`);return;}
+  if(price<=0){fieldError('inv-sell-price','Enter a valid sell price');return;}
+  if(!date){fieldError('inv-sell-date','Select a sale date');return;}
+  if(!dest){fieldError('inv-sell-dest','Select where to credit proceeds');return;}
   const amount=units*price;
   const costBasis=units*(Number(h.buyPrice)||0);
   state.transactions.push({id:uid(),type:'divest',date,accountId:h.accountId,holdingId:h.id,name:h.name,units,sellPrice:price,amount,costBasis,destKey:dest});
@@ -757,7 +759,7 @@ function renderInvestments(){
     <div class="stat-tile">
       <div class="slabel">${label}</div>
       <div class="val" style="color:${color}">${val}</div>
-      <div class="delta" style="color:#a8a29e">${sub}</div>
+      <div class="delta" style="color:var(--text-muted)">${sub}</div>
     </div>`).join('');
   // One small table instead of repeating the Stock/ETF/MF breakdown inside every tile
   const typeRows=[['Stocks (Equity)',invBuckets.Stock],['ETFs',invBuckets.ETF],['Mutual Funds',invBuckets.MF]].filter(([,v])=>v.invested||v.current);
@@ -795,7 +797,7 @@ function renderInvestments(){
       options:{cutout:'67%',plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>` ${fmt(c.raw)}`}}},responsive:true,maintainAspectRatio:true}
     });
     const totalProfit=profitData.reduce((s,d)=>s+d.value,0);
-    document.getElementById('inv-profit-leg').innerHTML=profitData.map((d,i)=>`<div style="display:flex;align-items:center;gap:5px;min-width:0"><span style="width:8px;height:8px;border-radius:2px;background:${profitFgs[i]};flex-shrink:0"></span><span style="font-size:.75rem;color:#57534e;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(d.label)}</span><span class="num" style="font-size:.7rem;color:#a8a29e">${((d.value/totalProfit)*100).toFixed(0)}%</span></div>`).join('');
+    document.getElementById('inv-profit-leg').innerHTML=profitData.map((d,i)=>`<div style="display:flex;align-items:center;gap:5px;min-width:0"><span style="width:8px;height:8px;border-radius:2px;background:${profitFgs[i]};flex-shrink:0"></span><span style="font-size:.78rem;color:#57534e;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(d.label)}</span><span class="num" style="font-size:.72rem;color:var(--text-muted)">${((d.value/totalProfit)*100).toFixed(0)}%</span></div>`).join('');
   }
 
   const allocData=[
@@ -818,13 +820,13 @@ function renderInvestments(){
       options:{cutout:'67%',plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>' '+fmt(c.raw)}}},responsive:true,maintainAspectRatio:true}
     });
     const totalAlloc=allocData.reduce((s,d)=>s+d.value,0);
-    document.getElementById('inv-alloc-leg').innerHTML=allocData.map((d,i)=>`<div style="display:flex;align-items:center;gap:5px;min-width:0"><span style="width:8px;height:8px;border-radius:2px;background:${allocFgs[i]};flex-shrink:0"></span><span style="font-size:.75rem;color:#57534e;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(d.label)}</span><span class="num" style="font-size:.7rem;color:#a8a29e">${((d.value/totalAlloc)*100).toFixed(0)}%</span></div>`).join('');
+    document.getElementById('inv-alloc-leg').innerHTML=allocData.map((d,i)=>`<div style="display:flex;align-items:center;gap:5px;min-width:0"><span style="width:8px;height:8px;border-radius:2px;background:${allocFgs[i]};flex-shrink:0"></span><span style="font-size:.78rem;color:#57534e;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(d.label)}</span><span class="num" style="font-size:.72rem;color:var(--text-muted)">${((d.value/totalAlloc)*100).toFixed(0)}%</span></div>`).join('');
   }
 
   const wrap=document.getElementById('inv-accounts-wrap');
   if(!accounts.length){
     wrap.innerHTML=`<div class="card" style="text-align:center;padding:32px 16px">
-      <div style="font-size:.85rem;color:#78716c;margin-bottom:10px">No investment accounts yet</div>
+      <div style="font-size:.875rem;color:#78716c;margin-bottom:10px">No investment accounts yet</div>
       <button class="btn-p" onclick="openInvAccModal()">+ Add Your First Account</button>
     </div>`;
     return;
@@ -841,17 +843,17 @@ function renderInvestments(){
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:11px;flex-wrap:wrap;gap:8px">
         <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;min-width:0">
           <span class="sb-dot" style="background:${color};width:9px;height:9px;flex-shrink:0"></span>
-          <span style="font-weight:600;font-size:.88rem">${esc(a.name)}</span>
+          <span style="font-weight:600;font-size:.875rem">${esc(a.name)}</span>
           <span class="badge-sm" style="background:#f4f3f0;color:#78716c">${invAccTypeLabel(a.type)}</span>
           <span class="badge-sm" style="background:#eff6ff;color:#1d4ed8" title="Uninvested cash available">${fmt(availCash)} cash</span>
         </div>
         <div style="display:flex;align-items:center;gap:10px">
           <div style="text-align:right">
-            <div class="num" style="font-size:.85rem;font-weight:600">${fmt(curSum)}</div>
+            <div class="num" style="font-size:.875rem;font-weight:600">${fmt(curSum)}</div>
             <div style="font-size:.68rem;color:${gc2}">${gainSum>=0?'+':''}${fmt(gainSum)} (${gainPctSum>=0?'+':''}${gainPctSum.toFixed(1)}%)</div>
           </div>
           <button class="btn-i" onclick="openInvAccModal('${a.id}')" title="Edit"><svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg></button>
-          <button class="btn-i" onclick="confirmDeleteInvAccount('${a.id}')" title="Delete" onmouseover="this.style.color='#ef4444'" onmouseout="this.style.color='#c4bfba'"><svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg></button>
+          <button class="btn-i danger" onclick="confirmDeleteInvAccount('${a.id}')" title="Delete"><svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg></button>
         </div>
       </div>
       <div class="tg inv-tabs" role="tablist">
@@ -862,11 +864,11 @@ function renderInvestments(){
       <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap">
         <button class="sb-add" style="width:auto;height:auto;padding:5px 10px;border-radius:7px;display:inline-flex;gap:5px;align-items:center;border-style:dashed" onclick="quickTransferIn('${a.id}')">
           <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.5"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/></svg>
-          <span style="font-size:.75rem;font-weight:500">Transfer In</span>
+          <span style="font-size:.78rem;font-weight:500">Transfer In</span>
         </button>
         <button class="sb-add" style="width:auto;height:auto;padding:5px 10px;border-radius:7px;display:inline-flex;gap:5px;align-items:center;border-style:dashed" onclick="openInvHoldModal('${a.id}')">
           <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.5"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/></svg>
-          <span style="font-size:.75rem;font-weight:500">Add Holding</span>
+          <span style="font-size:.78rem;font-weight:500">Add Holding</span>
         </button>
       </div>
     </div>`;
@@ -881,7 +883,7 @@ const holdTypeBadge=h=>{
 };
 const fmtUnits=n=>Number(n||0).toLocaleString('en-IN',{maximumFractionDigits:3});
 function invHoldingsTableHtml(accHoldings){
-  if(!accHoldings.length)return`<div style="font-size:.78rem;color:#c4bfba;padding:10px 4px">No holdings yet</div>`;
+  if(!accHoldings.length)return`<div style="font-size:.78rem;color:var(--text-muted);padding:10px 4px">No holdings yet</div>`;
   // Newest purchase first (SIPs use their latest installment date); undated holdings go last,
   // ties broken by current value
   const rows=accHoldings.map(h=>({h,m:holdMetrics(h)})).sort((x,y)=>(y.h.date||'').localeCompare(x.h.date||'')||y.m.currentValue-x.m.currentValue);
@@ -912,7 +914,7 @@ function invHoldingsTableHtml(accHoldings){
         <td class="r inv-act">
           ${h.units>0?`<button class="btn-i" onclick="openInvSellModal('${h.id}')" title="Sell">${icon('M17 7L7 17M7 17h10M7 17V7')}</button>`:''}
           <button class="btn-i" onclick="openInvHoldModal(null,'${h.id}')" title="Edit">${icon('M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z')}</button>
-          <button class="btn-i" onclick="confirmDeleteInvHolding('${h.id}')" title="Delete">${icon('M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16')}</button>
+          <button class="btn-i danger" onclick="confirmDeleteInvHolding('${h.id}')" title="Delete">${icon('M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16')}</button>
         </td></tr>`;}).join('')}</tbody>
     <tfoot><tr><td>Total · ${rows.length} holding${rows.length===1?'':'s'}</td><td></td><td></td><td></td>
       <td class="r num">${fmt(inv)}</td><td class="r num">${fmt(cur)}</td>
@@ -960,7 +962,7 @@ function invCalendarHtml(id){
   const modeBtns=`<div class="tg ical-modes">
     <button type="button" class="tp${ui.cal==='month'?' active':''}" onclick="setInvCalMode('${id}','month')">Month</button>
     <button type="button" class="tp${ui.cal==='pattern'?' active':''}" onclick="setInvCalMode('${id}','pattern')">Day-of-month pattern</button></div>`;
-  if(!txns.length)return`${modeBtns}<div style="font-size:.78rem;color:#c4bfba;padding:14px 4px">No purchases recorded for this account yet</div>`;
+  if(!txns.length)return`${modeBtns}<div style="font-size:.78rem;color:var(--text-muted);padding:14px 4px">No purchases recorded for this account yet</div>`;
   const chip=(t,showDate)=>{
     const k=invTxnKind(t,holdById);
     return`<div class="ical-chip ${INV_KIND[k].cls}" title="${INV_KIND[k].label}: ${esc(t.name||'Holding')} · ${fmt(t.amount)}${showDate?' · '+fmtDate(t.date):''}">${esc(t.name||'Holding')}</div>`;

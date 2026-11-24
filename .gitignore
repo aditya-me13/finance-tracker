@@ -8,3 +8,4 @@ temp/
 *.ipynb
 
 CLAUDE.md
+.claude/

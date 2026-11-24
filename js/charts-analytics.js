@@ -23,7 +23,7 @@ function renderBarChartFY(fy,exps){
   const fyStartYear=Number(fy);
   const data=Array(12).fill(0);
   exps.forEach(e=>{
-    const[ey,em]=e.date.split('-').map(Number);
+    const em=Number(mkOf(e.date).slice(5,7)); // budget month, so bars match the month view
     const idx=em>=4?em-4:em+8;
     data[idx]+=shareAmount(e);
   });
@@ -78,15 +78,15 @@ function renderQuickCharts(){
 
 /* ── Analytics Date Range ─────────────────────────────────── */
 function getRangeDates(){
-  const y=new Date().getFullYear(),mk=curMK(),cur=mkRange(mk);
+  const mk=curMK(),cur=mkRange(mk);
   let from,to;
   switch(anRange.mode){
     case'this_month':({from,to}=cur);break;
     case'last_month':({from,to}=mkRange(shiftMK(mk,-1)));break;
     case'3_months':from=mkRange(shiftMK(mk,-2)).from;to=cur.to;break;
     case'6_months':from=mkRange(shiftMK(mk,-5)).from;to=cur.to;break;
-    case'this_year':from=`${y}-01-01`;to=`${y}-12-31`;break;
-    case'this_fy':{const fy=curFY();from=`${fy}-04-01`;to=`${Number(fy)+1}-03-31`;break;}
+    case'this_year':({from,to}=yearRange(mk.slice(0,4)));break;
+    case'this_fy':({from,to}=fyRange(curFY()));break;
     case'custom':from=anRange.from||cur.from;to=anRange.to||cur.to;break;
     default:({from,to}=cur);
   }
@@ -176,9 +176,9 @@ function renderBvaChart(exps,from,to){
   if(!allCats.length){destroyChart('bva');empty.classList.remove('hidden');wrap.style.height='80px';return;}
   empty.classList.add('hidden');
   wrap.style.height=Math.max(allCats.length*48+70,220)+'px';
-  // Category budgets are per month; scale them to the number of calendar months in the range
-  let months=1;
-  if(from&&to&&from<=to){const[fy,fm]=from.split('-').map(Number),[ty,tm]=to.split('-').map(Number);months=(ty-fy)*12+(tm-fm)+1;}
+  // Category budgets are per budget month; scale by how many budget months (cycles) the range covers,
+  // so "This month" is exactly 1× even when months start mid-month
+  const months=monthsInRange(from,to)||1;
   const budData=allCats.map(cat=>(state.categoryBudgets[cat]||0)*months);
   const actData=allCats.map(cat=>exps.filter(e=>e.category===cat).reduce((s,e)=>s+shareAmount(e),0));
   destroyChart('bva');

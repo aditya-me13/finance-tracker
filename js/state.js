@@ -160,6 +160,7 @@ function normalizeState(){
 /* UI state */
 let txnType='expense',selExpCat=null,selIncCat=null,viewMK=null,viewFY=null,viewMode='month',activeTab='log',activeView='dashboard';
 let txnFilter={category:'',from:'',to:'',tag:'',search:'',account:''};
+let txnTypesShown=(()=>{const d={expense:true,income:true,transfer:true,invest:true};try{return{...d,...JSON.parse(localStorage.getItem('ft-txn-types')||'{}')};}catch(e){return d;}})();
 let bulkSelectedIds=new Set();
 let bulkTagMode='add';
 let selExpTags=[],selIncTags=[];

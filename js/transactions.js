@@ -94,8 +94,8 @@ function openEditTxn(id){
   shareWrap.classList.toggle('hidden',!(isExp&&t.shared));
   document.getElementById('et-share').value=isExp&&t.shared?(t.myShare??t.amount):'';
   document.getElementById('et-cat-wrap').classList.toggle('hidden',isTr);
-  document.getElementById('et-spread-wrap').classList.toggle('hidden',!isExp);
-  if(isExp){
+  document.getElementById('et-spread-wrap').classList.toggle('hidden',!(isExp||isInc));
+  if(isExp||isInc){
     const sp=document.getElementById('et-spread'),n=String(spreadN(t));
     if(!Array.from(sp.options).some(o=>o.value===n))sp.insertAdjacentHTML('beforeend',`<option value="${n}">${n} months</option>`);
     sp.value=n;
@@ -153,13 +153,13 @@ function saveEditTxn(){
         if(!accOk(type,inst)){toast('No account selected');return;}
         t.acType=type;t.acId=inst;
       }
-      const sp=Number(document.getElementById('et-spread').value)||1;
-      if(sp>1)t.spreadMonths=sp;else delete t.spreadMonths;
     }else{
       const type=document.getElementById('et-actype').value,inst=type==='cash'?'cash':document.getElementById('et-inst').value;
       if(!accOk(type,inst)){toast('No account selected');return;}
       t.destType=type;t.destId=inst;
     }
+    const sp=Number(document.getElementById('et-spread').value)||1;
+    if(sp>1)t.spreadMonths=sp;else delete t.spreadMonths;
     if(t.loanId){
       const loan=state.loans.find(l=>l.id===t.loanId);
       if(loan)loan.outstanding=Math.max(0,(Number(loan.outstanding)||0)+(Number(t.amount)||0)-amt);
@@ -343,7 +343,7 @@ function submitExpense(){
   }
   rememberLastEntry('expense',{acType:document.getElementById('e-actype').value,inst:document.getElementById('e-inst').value,category:selExpCat,date});
   saveState();
-  document.getElementById('e-amt').value='';document.getElementById('e-desc').value='';document.getElementById('e-spread').value='1';
+  document.getElementById('e-amt').value='';document.getElementById('e-desc').value='';document.getElementById('e-spread').value='1';updateMoreOptsSummary('expense');
   resetSplitPanel();resetRecurToggle('expense');resetTagInputs();
   rebuildAll();toast(isSplit?'Shared expense logged':'Expense logged');
 }
@@ -352,20 +352,21 @@ function submitIncome(){
   const dt=document.getElementById('i-actype').value,di=document.getElementById('i-inst').value;
   const desc=document.getElementById('i-desc').value.trim();
   const isRecur=document.getElementById('i-recur-toggle').checked;
+  const spread=Number(document.getElementById('i-spread').value)||1;
   if(!amt||amt<=0){toast('Enter a valid amount');return;}
   if(!date){toast('Select a date');return;}
   if(!selIncCat){toast('Select a source category');return;}
   if((dt==='bank'&&!state.banks.some(b=>b.id===di))||(dt==='cc'&&!state.cards.some(c=>c.id===di))){toast('No account selected');return;}
   const destId=dt==='cash'?'cash':di;
   const tags=selIncTags.slice();
-  state.transactions.push({id:uid(),date,type:'income',amount:amt,destType:dt,destId,category:selIncCat,desc,tags});
+  state.transactions.push({id:uid(),date,type:'income',amount:amt,destType:dt,destId,category:selIncCat,desc,tags,...(spread>1?{spreadMonths:spread}:{})});
   if(isRecur){
     const freq=document.getElementById('i-recur-freq').value;
     createRecurringFromEntry({type:'income',amount:amt,destType:dt,destId,category:selIncCat,desc,tags,frequency:freq,anchorDate:date});
   }
   rememberLastEntry('income',{acType:dt,inst:di,category:selIncCat,date});
-  saveState();document.getElementById('i-amt').value='';document.getElementById('i-desc').value='';
-  resetRecurToggle('income');resetTagInputs();
+  saveState();document.getElementById('i-amt').value='';document.getElementById('i-desc').value='';document.getElementById('i-spread').value='1';
+  resetRecurToggle('income');resetTagInputs();updateMoreOptsSummary('income');
   rebuildAll();toast(dt==='cc'?'Income recorded — card due reduced':'Income recorded');
 }
 function submitTransfer(){
@@ -381,3 +382,21 @@ function submitTransfer(){
   rebuildAll();toast('Transfer recorded');
 }
 
+
+/* "Additional options" accordion: the summary line shows what is set inside it (tags, repeat, spread)
+   so nothing hidden there gets forgotten while it is collapsed */
+function updateMoreOptsSummary(ctx){
+  const p=ctx==='expense'?'e':'i';
+  const el=document.getElementById(p+'-more-sum');if(!el)return;
+  const parts=[];
+  const tags=selTagsFor(ctx);
+  if(tags.length)parts.push(tags.length===1?'#'+tags[0]:`${tags.length} tags`);
+  if(document.getElementById(p+'-recur-toggle')?.checked){
+    const f=document.getElementById(p+'-recur-freq');
+    parts.push('Repeats '+(f?f.value:'monthly'));
+  }
+  const sp=Number(document.getElementById(p+'-spread')?.value)||1;
+  if(sp>1)parts.push(`Spread ${sp} months`);
+  el.textContent=parts.length?parts.join(' · '):'Tags · Repeat · Spread';
+  el.classList.toggle('set',parts.length>0);
+}

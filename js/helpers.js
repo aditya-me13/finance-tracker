@@ -28,10 +28,25 @@ const mkShortLabel=k=>{
   const s=new Date(y,m-1,1).toLocaleDateString('en-IN',{month:'short',year:'2-digit'});
   return sd===1?s:`${sd} ${s}`;
 };
-const fyOf=s=>{const y=Number(s.slice(0,4)),m=Number(s.slice(5,7));return String(m>=4?y:y-1);};
+/* Years are built from the same month cycles: the FY is the April cycle through the March cycle,
+   a calendar year the January cycle through the December cycle (plain dates when months start on 1st) */
+const fyOf=s=>{const k=mkOf(s),y=Number(k.slice(0,4)),m=Number(k.slice(5,7));return String(m>=4?y:y-1);};
 const curFY=()=>fyOf(today());
 const fyLabel=fy=>`FY ${fy}-${String(Number(fy)+1).slice(-2)}`;
-const fyRange=fy=>({from:`${fy}-04-01`,to:`${Number(fy)+1}-03-31`});
+const fyRange=fy=>({from:mkRange(`${fy}-04`).from,to:mkRange(`${Number(fy)+1}-03`).to});
+const yearRange=y=>({from:mkRange(`${y}-01`).from,to:mkRange(`${y}-12`).to});
+/* How many budget months a date range covers. Whole cycles count 1 each; a partly covered cycle
+   counts the share of its days, so monthly budgets scale correctly for any range. */
+function monthsInRange(from,to){
+  if(!from||!to||from>to)return 0;
+  const days=(a,b)=>Math.round((Date.parse(b+'T00:00:00Z')-Date.parse(a+'T00:00:00Z'))/86400000)+1;
+  let n=0;
+  for(let k=mkOf(from),end=mkOf(to);k<=end;k=shiftMK(k,1)){
+    const r=mkRange(k),a=from>r.from?from:r.from,b=to<r.to?to:r.to;
+    n+=days(a,b)/days(r.from,r.to);
+  }
+  return Math.round(n*1000)/1000;
+}
 const fmt=n=>'₹'+Number(n).toLocaleString('en-IN',{minimumFractionDigits:2,maximumFractionDigits:2});
 const esc=s=>String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
 const ordSuffix=n=>{const v=n%100;return(v>=11&&v<=13)?'th':({1:'st',2:'nd',3:'rd'}[n%10]||'th');};
@@ -43,19 +58,19 @@ const realAmount=t=>t.type==='expense'?(t.acType==='shared'?0:Number(t.amount)||
 /* Spread expenses: t.spreadMonths = N (2–24) splits one expense's cost evenly across N consecutive
    month cycles in analytics & budgets (e.g. quarterly maintenance → 3). Balances, cash flow of real
    accounts and the transaction log still use the real date and full amount. */
-const spreadN=t=>{const n=Math.floor(Number(t.spreadMonths));return t.type==='expense'&&n>=2&&n<=24?n:1;};
+const spreadN=t=>{const n=Math.floor(Number(t.spreadMonths));return(t.type==='expense'||t.type==='income')&&n>=2&&n<=24?n:1;};
 const shiftDateMonths=(s,n)=>{
   const y=Number(s.slice(0,4)),m=Number(s.slice(5,7))-1+n,d=Number(s.slice(8,10));
   return dateToStr(new Date(y,m,Math.min(d,new Date(y,m+1,0).getDate())));
 };
-/* Replace each spread expense with N virtual parts (one per month, amount/N each). Read-only: never save these. */
+/* Replace each spread expense/income with N virtual parts (one per month, amount/N each). Read-only: never save these. */
 function expandSpread(list){
   const out=[];
   list.forEach(t=>{
     const n=spreadN(t);
     if(n===1){out.push(t);return;}
     const amt=Number(t.amount)||0,sh=shareAmount(t);
-    for(let i=0;i<n;i++)out.push({...t,date:shiftDateMonths(t.date,i),amount:amt/n,myShare:sh/n,spreadPart:i+1});
+    for(let i=0;i<n;i++)out.push({...t,date:shiftDateMonths(t.date,i),amount:amt/n,...(t.type==='expense'?{myShare:sh/n}:{}),spreadPart:i+1});
   });
   return out;
 }

@@ -143,9 +143,29 @@ function txnAccKeys(t){
   if(t.type==='divest')return[t.destKey||''];
   return[t.fromKey||'',t.toKey||''];
 }
+/* Type checkboxes (Expense / Income / Transfer / Investment) apply to every log view; remembered on this device */
+const txnKind=t=>t.type==='divest'||t.type==='invest'?'invest':t.type;
+const txnTypeShown=t=>txnTypesShown[txnKind(t)]!==false;
+function onTxnTypeToggle(){
+  document.querySelectorAll('.type-filter input[data-type]').forEach(cb=>{txnTypesShown[cb.dataset.type]=cb.checked;});
+  try{localStorage.setItem('ft-txn-types',JSON.stringify(txnTypesShown));}catch(e){}
+  bulkSelectedIds.clear();
+  renderTxnLog();
+}
+function syncTxnTypeCheckboxes(){
+  document.querySelectorAll('.type-filter input[data-type]').forEach(cb=>{
+    cb.checked=txnTypesShown[cb.dataset.type]!==false;
+    cb.parentElement.classList.toggle('off',!cb.checked);
+  });
+}
+function clearTxnSearch(){
+  const el=document.getElementById('txn-filter-search');if(!el)return;
+  el.value='';applyTxnFilter();el.focus();
+}
 function isTxnFilterActive(){return!!(txnFilter.category||txnFilter.from||txnFilter.to||txnFilter.tag||txnFilter.search||txnFilter.account);}
 function txnMatchesFilter(t){
   const{category,from,to,tag,search,account}=txnFilter;
+  if(!txnTypeShown(t))return false;
   if(account&&!txnAccKeys(t).includes(account))return false;
   if(category){
     const idx=category.indexOf(':'),kind=category.slice(0,idx),name=category.slice(idx+1);
@@ -182,6 +202,8 @@ function clearTxnFilter(){
   document.getElementById('txn-filter-to-disp').textContent='To';
   if(document.getElementById('txn-filter-tag'))document.getElementById('txn-filter-tag').value='';
   if(document.getElementById('txn-filter-search'))document.getElementById('txn-filter-search').value='';
+  txnTypesShown={expense:true,income:true,transfer:true,invest:true};
+  try{localStorage.removeItem('ft-txn-types');}catch(e){}
   if(document.getElementById('txn-filter-acc'))document.getElementById('txn-filter-acc').value='';
   txnFilter={category:'',from:'',to:'',tag:'',search:'',account:''};
   bulkSelectedIds.clear();
@@ -212,15 +234,19 @@ function renderTxnLog(){
     document.getElementById('txn-filter-summary-text').textContent=`${txns.length} transaction(s) found`+(parts.length?' · '+parts.join(' · '):'');
     summaryEl.classList.remove('hidden');
   }else{
-    txns=curViewTxns().slice().sort(cmpTxnLog);
+    txns=curViewTxns().filter(txnTypeShown).sort(cmpTxnLog);
     label.textContent=viewMode==='fy'?fyLabel(viewFY):mkLabel(viewMK);
     summaryEl.classList.add('hidden');
     bulkSelectedIds.clear();
   }
   updateBulkBar();
   syncSelectAllCheckbox();
+  syncTxnTypeCheckboxes();
+  const sc=document.getElementById('txn-search-clear');
+  if(sc)sc.classList.toggle('hidden',!txnFilter.search);
   if(!txns.length){
-    list.innerHTML=`<div style="text-align:center;padding:26px 0;font-size:.83rem;color:#a8a29e">No transactions ${filterActive?'match this filter':`this ${viewMode==='fy'?'financial year':'month'}`}.</div>`;
+    const someHidden=Object.values(txnTypesShown).some(v=>v===false);
+    list.innerHTML=`<div style="text-align:center;padding:26px 0;font-size:.83rem;color:#a8a29e">No transactions ${filterActive?'match this filter':`this ${viewMode==='fy'?'financial year':'month'}`}${someHidden?' for the selected types':''}.</div>`;
     return;
   }
   const grouped={};txns.forEach(t=>{if(!grouped[t.date])grouped[t.date]=[];grouped[t.date].push(t);});
@@ -268,7 +294,8 @@ function buildRow(t,canDel,selectable){
     amtStr='&minus;'+fmt(displayAmt);amtCol='#ef4444';
   }else if(t.type==='income'){
     iconBg='#f0fdf4';iconTxt='IN';mainLabel=esc(t.category);
-    subLabel=acLabel(t.destType,t.destId)+(t.splitSettle?` &middot; <span style="color:#7c3aed;font-weight:600">Split settlement — received</span>${t.settled?' <span style="color:#a8a29e">(settled)</span>':''}`:'')+(t.desc?' &middot; '+esc(t.desc):'');
+    const isn=spreadN(t);
+    subLabel=acLabel(t.destType,t.destId)+(isn>1?` &middot; <span style="color:#0e7490;font-weight:600" title="Analytics count ${fmt(Number(t.amount)/isn)} in each of ${isn} months">spread over ${isn} months</span>`:'')+(t.splitSettle?` &middot; <span style="color:#7c3aed;font-weight:600">Split settlement — received</span>${t.settled?' <span style="color:#a8a29e">(settled)</span>':''}`:'')+(t.desc?' &middot; '+esc(t.desc):'');
     amtStr='+'+fmt(t.amount);amtCol='#166534';
   }else if(t.type==='invest'){
     iconBg='#ede9fe';iconTxt='IV';mainLabel='Invested — '+esc(t.name||'Holding');

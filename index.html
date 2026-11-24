@@ -145,144 +145,151 @@
             <button class="ttb" id="tt-transfer" onclick="setTxn('transfer')">Transfer</button>
           </div>
           <!-- EXPENSE -->
-          <div id="form-expense">
-            <div style="display:grid;grid-template-columns:1fr 152px;gap:8px;margin-bottom:9px">
-              <div style="min-width:0"><div class="slabel" style="margin-bottom:4px" id="e-amt-label">Amount (INR)</div>
+          <div id="form-expense" class="ef">
+            <div class="ef-row2">
+              <div class="ef-f"><div class="slabel ef-l" id="e-amt-label">Amount (INR)</div>
                 <div class="fw"><div class="fp">₹</div><input id="e-amt" class="fi" type="number" min="0" step="0.01" placeholder="0.00" oninput="onExpAmtInput()"/></div>
               </div>
-              <div style="min-width:0"><div class="slabel" style="margin-bottom:4px">Date</div>
+              <div class="ef-f"><div class="slabel ef-l">Date</div>
                 <div class="date-trigger" onclick="openDatePicker('e-date')"><span id="e-date-disp">Select date</span><svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg></div>
                 <input id="e-date" type="hidden"/></div>
             </div>
+            <div id="e-acc-row" class="ef-grid2">
+              <div><div class="slabel ef-l">Pay From</div>
+                <select id="e-actype" class="pl" onchange="fillExpInst()">
+                  <option value="bank">Bank Account</option><option value="cc">Credit Card</option><option value="cash">Cash</option>
+                </select>
+              </div>
+              <div><div class="slabel ef-l">Account</div><select id="e-inst" class="pl"></select></div>
+            </div>
+            <div class="ef-field"><div class="slabel ef-l">Category</div><div id="e-chips" class="ef-chips"></div></div>
+            <div class="ef-field"><div class="slabel ef-l">Description (optional)</div>
+              <div class="fw"><input id="e-desc" class="fi" type="text" placeholder="e.g. Lunch at cafe"/></div>
+            </div>
             <!-- Roommate Split -->
-            <div style="margin-bottom:9px">
-              <label style="display:flex;align-items:center;gap:7px;cursor:pointer;font-size:.8rem;color:#44403c">
-                <input type="checkbox" id="e-split-toggle" onchange="toggleSplitPanel()" style="accent-color:#1c1917"/>
-                Split with roommates
-              </label>
-              <div id="e-split-panel" class="hidden" style="margin-top:8px;padding:10px;background:#faf9f7;border:1px solid #f0eeec;border-radius:9px">
+            <div class="ef-field">
+              <label class="ef-check"><input type="checkbox" id="e-split-toggle" onchange="toggleSplitPanel()"/>Split with roommates</label>
+              <div id="e-split-panel" class="ef-panel hidden">
                 <div class="tg" style="margin-bottom:9px">
                   <button type="button" class="tp active" id="e-split-fronted-btn" onclick="setSplitMode('fronted')">I paid the bill</button>
                   <button type="button" class="tp" id="e-split-owed-btn" onclick="setSplitMode('owed')">Someone else paid</button>
                 </div>
                 <div style="display:grid;grid-template-columns:1fr 90px;gap:8px;align-items:end">
-                  <div><div class="slabel" style="margin-bottom:4px">My Share (₹)</div>
+                  <div><div class="slabel ef-l">My Share (₹)</div>
                     <div class="fw"><div class="fp">₹</div><input id="e-my-share" class="fi no-spin" oninput="this.dataset.touched='1'" type="number" min="0" step="0.01" placeholder="0.00"/></div>
                   </div>
-                  <div><div class="slabel" style="margin-bottom:4px">÷ People</div>
+                  <div><div class="slabel ef-l">÷ People</div>
                     <div class="fw"><input id="e-split-people" class="fi no-spin" type="number" min="2" step="1" placeholder="4" style="text-align:center"/></div>
                   </div>
                 </div>
-                <button type="button" onclick="calcEqualShare()" style="font-size:.71rem;color:#1d4ed8;background:none;border:none;cursor:pointer;margin-top:6px;padding:0;font-family:'DM Sans',sans-serif">Split equally →</button>
-                <p id="e-split-fronted-note" style="font-size:.71rem;color:#a8a29e;margin-top:6px;line-height:1.4">The full <b>Total Bill Amount</b> still leaves your account below — only "My Share" counts toward your category spend &amp; budgets.</p>
-                <p id="e-split-owed-note" class="hidden" style="font-size:.71rem;color:#a8a29e;margin-top:6px;line-height:1.4">Enter the <b>Total Bill Amount</b> someone else paid above, and your <b>My Share</b> below. Nothing is deducted from any account — settle it later via "Settle Up".</p>
+                <button type="button" class="ef-link" onclick="calcEqualShare()">Split equally →</button>
+                <p id="e-split-fronted-note" class="ef-hint">The full <b>Total Bill Amount</b> still leaves your account below — only "My Share" counts toward your category spend &amp; budgets.</p>
+                <p id="e-split-owed-note" class="ef-hint hidden">Enter the <b>Total Bill Amount</b> someone else paid above, and your <b>My Share</b> below. Nothing is deducted from any account — settle it later via "Settle Up".</p>
               </div>
             </div>
-            <div id="e-acc-row" style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:9px">
-              <div><div class="slabel" style="margin-bottom:4px">Account Type</div>
-                <select id="e-actype" class="pl" onchange="fillExpInst()">
-                  <option value="bank">Bank Account</option><option value="cc">Credit Card</option><option value="cash">Cash</option>
-                </select>
+            <details class="more-opts" id="e-more">
+              <summary><span class="more-title"><svg class="more-chev" width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/></svg>Additional options</span><span class="more-sum" id="e-more-sum">Tags · Repeat · Spread</span></summary>
+              <div class="more-body">
+                <div class="ef-field">
+                  <div class="slabel ef-l">Tags</div>
+                  <div id="e-tag-chips" class="ef-chips" style="margin-bottom:6px"></div>
+                  <div class="fw"><input id="e-tag-input" class="fi" type="text" placeholder="Type a tag and press Enter, e.g. Goa Trip" onkeydown="if(event.key==='Enter'){event.preventDefault();addTagFromInput('expense');}"/></div>
+                  <div id="e-tag-suggest" class="ef-chips" style="margin-top:6px"></div>
+                </div>
+                <div class="ef-field">
+                  <label class="ef-check"><input type="checkbox" id="e-recur-toggle" onchange="toggleRecurPanel('expense')"/>Repeat this automatically</label>
+                  <div id="e-recur-panel" class="ef-panel hidden">
+                    <div class="slabel ef-l">Frequency</div>
+                    <select id="e-recur-freq" class="pl" onchange="updateMoreOptsSummary('expense')">
+                      <option value="monthly">Monthly (same day each month)</option>
+                      <option value="weekly">Weekly (same weekday)</option>
+                      <option value="daily">Daily</option>
+                    </select>
+                    <p class="ef-hint">This entry is logged now; future occurrences will be auto-logged from the Recurring list.</p>
+                  </div>
+                </div>
+                <div class="ef-field">
+                  <div class="slabel ef-l">Spread Cost Over</div>
+                  <select id="e-spread" class="pl" onchange="updateMoreOptsSummary('expense')"><option value="1">No — this month only</option><option value="2">2 months</option><option value="3">3 months (quarterly)</option><option value="4">4 months</option><option value="6">6 months (half-yearly)</option><option value="12">12 months (yearly)</option></select>
+                  <p class="ef-hint">For quarterly maintenance, yearly subscriptions, etc. Budgets &amp; analytics count an equal part in each month; your account is still charged the full amount on the date above.</p>
+                </div>
               </div>
-              <div><div class="slabel" style="margin-bottom:4px">Instrument</div><select id="e-inst" class="pl"></select></div>
-            </div>
-            <div style="margin-bottom:9px"><div class="slabel" style="margin-bottom:5px">Category</div><div id="e-chips" style="display:flex;flex-wrap:wrap;gap:5px"></div></div>
-            <div style="margin-bottom:9px">
-              <div class="slabel" style="margin-bottom:5px">Tags (optional)</div>
-              <div id="e-tag-chips" style="display:flex;flex-wrap:wrap;gap:5px;margin-bottom:6px"></div>
-              <div class="fw"><input id="e-tag-input" class="fi" type="text" placeholder="Type a tag and press Enter, e.g. Goa Trip" onkeydown="if(event.key==='Enter'){event.preventDefault();addTagFromInput('expense');}"/></div>
-              <div id="e-tag-suggest" style="display:flex;flex-wrap:wrap;gap:5px;margin-top:6px"></div>
-            </div>
-            <div style="margin-bottom:9px">
-              <label style="display:flex;align-items:center;gap:7px;cursor:pointer;font-size:.8rem;color:#44403c">
-                <input type="checkbox" id="e-recur-toggle" onchange="toggleRecurPanel('expense')" style="accent-color:#1c1917"/>
-                Repeat this automatically
-              </label>
-              <div id="e-recur-panel" class="hidden" style="margin-top:8px;padding:10px;background:#faf9f7;border:1px solid #f0eeec;border-radius:9px">
-                <div class="slabel" style="margin-bottom:4px">Frequency</div>
-                <select id="e-recur-freq" class="pl">
-                  <option value="monthly">Monthly (same day each month)</option>
-                  <option value="weekly">Weekly (same weekday)</option>
-                  <option value="daily">Daily</option>
-                </select>
-                <p style="font-size:.71rem;color:#a8a29e;margin-top:6px;line-height:1.4">This entry is logged now; future occurrences will be auto-logged from the Recurring list.</p>
-              </div>
-            </div>
-            <div style="margin-bottom:9px"><div class="slabel" style="margin-bottom:4px">Spread Cost Over</div>
-              <select id="e-spread" class="pl"><option value="1">No — this month only</option><option value="2">2 months</option><option value="3">3 months (quarterly)</option><option value="4">4 months</option><option value="6">6 months (half-yearly)</option><option value="12">12 months (yearly)</option></select>
-              <p style="font-size:.71rem;color:#a8a29e;margin-top:4px;line-height:1.4">For quarterly maintenance, yearly subscriptions, etc. Budgets &amp; analytics count an equal part in each month; your account is still charged the full amount on the date above.</p>
-            </div>
-            <div style="margin-bottom:11px"><div class="slabel" style="margin-bottom:4px">Description (optional)</div>
-              <div class="fw"><input id="e-desc" class="fi" type="text" placeholder="e.g. Lunch at cafe"/></div>
-            </div>
-            <button class="btn-p" style="width:100%" onclick="submitExpense()">Add Expense</button>
+            </details>
+            <button class="btn-p ef-submit" onclick="submitExpense()">Add Expense</button>
           </div>
           <!-- INCOME -->
-          <div id="form-income" class="hidden">
-            <div style="display:grid;grid-template-columns:1fr 152px;gap:8px;margin-bottom:9px">
-              <div style="min-width:0"><div class="slabel" style="margin-bottom:4px">Amount (INR)</div>
+          <div id="form-income" class="ef hidden">
+            <div class="ef-row2">
+              <div class="ef-f"><div class="slabel ef-l">Amount (INR)</div>
                 <div class="fw"><div class="fp">₹</div><input id="i-amt" class="fi" type="number" min="0" step="0.01" placeholder="0.00"/></div>
               </div>
-              <div style="min-width:0"><div class="slabel" style="margin-bottom:4px">Date</div>
+              <div class="ef-f"><div class="slabel ef-l">Date</div>
                 <div class="date-trigger" onclick="openDatePicker('i-date')"><span id="i-date-disp">Select date</span><svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg></div>
                 <input id="i-date" type="hidden"/></div>
             </div>
-            <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:9px">
-              <div><div class="slabel" style="margin-bottom:4px">Credit To</div>
+            <div class="ef-grid2">
+              <div><div class="slabel ef-l">Credit To</div>
                 <select id="i-actype" class="pl" onchange="fillIncInst()">
                   <option value="bank">Bank Account</option><option value="cash">Cash</option><option value="cc">Credit Card</option>
                 </select>
               </div>
-              <div><div class="slabel" style="margin-bottom:4px">Instrument</div><select id="i-inst" class="pl"></select></div>
+              <div><div class="slabel ef-l">Account</div><select id="i-inst" class="pl"></select></div>
             </div>
-            <div id="i-cc-hint" class="info-box hidden" style="margin-bottom:9px;background:#f0fdf4;color:#166534">This reduces the card's outstanding due instead of adding to a bank/cash balance.</div>
-            <div style="margin-bottom:9px"><div class="slabel" style="margin-bottom:5px">Source / Category</div><div id="i-chips" style="display:flex;flex-wrap:wrap;gap:5px"></div></div>
-            <div style="margin-bottom:9px">
-              <div class="slabel" style="margin-bottom:5px">Tags (optional)</div>
-              <div id="i-tag-chips" style="display:flex;flex-wrap:wrap;gap:5px;margin-bottom:6px"></div>
-              <div class="fw"><input id="i-tag-input" class="fi" type="text" placeholder="Type a tag and press Enter" onkeydown="if(event.key==='Enter'){event.preventDefault();addTagFromInput('income');}"/></div>
-              <div id="i-tag-suggest" style="display:flex;flex-wrap:wrap;gap:5px;margin-top:6px"></div>
-            </div>
-            <div style="margin-bottom:9px">
-              <label style="display:flex;align-items:center;gap:7px;cursor:pointer;font-size:.8rem;color:#44403c">
-                <input type="checkbox" id="i-recur-toggle" onchange="toggleRecurPanel('income')" style="accent-color:#1c1917"/>
-                Repeat this automatically
-              </label>
-              <div id="i-recur-panel" class="hidden" style="margin-top:8px;padding:10px;background:#faf9f7;border:1px solid #f0eeec;border-radius:9px">
-                <div class="slabel" style="margin-bottom:4px">Frequency</div>
-                <select id="i-recur-freq" class="pl">
-                  <option value="monthly">Monthly (same day each month)</option>
-                  <option value="weekly">Weekly (same weekday)</option>
-                  <option value="daily">Daily</option>
-                </select>
-                <p style="font-size:.71rem;color:#a8a29e;margin-top:6px;line-height:1.4">This entry is logged now; future occurrences will be auto-logged from the Recurring list.</p>
-              </div>
-            </div>
-            <div style="margin-bottom:11px"><div class="slabel" style="margin-bottom:4px">Description (optional)</div>
+            <div id="i-cc-hint" class="info-box hidden" style="margin-bottom:10px;background:#f0fdf4;color:#166534">This reduces the card's outstanding due instead of adding to a bank/cash balance.</div>
+            <div class="ef-field"><div class="slabel ef-l">Source / Category</div><div id="i-chips" class="ef-chips"></div></div>
+            <div class="ef-field"><div class="slabel ef-l">Description (optional)</div>
               <div class="fw"><input id="i-desc" class="fi" type="text" placeholder="e.g. Monthly salary"/></div>
             </div>
-            <button class="btn-p" style="width:100%;background:#166534" onclick="submitIncome()">Add Income</button>
+            <details class="more-opts" id="i-more">
+              <summary><span class="more-title"><svg class="more-chev" width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/></svg>Additional options</span><span class="more-sum" id="i-more-sum">Tags · Repeat · Spread</span></summary>
+              <div class="more-body">
+                <div class="ef-field">
+                  <div class="slabel ef-l">Tags</div>
+                  <div id="i-tag-chips" class="ef-chips" style="margin-bottom:6px"></div>
+                  <div class="fw"><input id="i-tag-input" class="fi" type="text" placeholder="Type a tag and press Enter" onkeydown="if(event.key==='Enter'){event.preventDefault();addTagFromInput('income');}"/></div>
+                  <div id="i-tag-suggest" class="ef-chips" style="margin-top:6px"></div>
+                </div>
+                <div class="ef-field">
+                  <label class="ef-check"><input type="checkbox" id="i-recur-toggle" onchange="toggleRecurPanel('income')"/>Repeat this automatically</label>
+                  <div id="i-recur-panel" class="ef-panel hidden">
+                    <div class="slabel ef-l">Frequency</div>
+                    <select id="i-recur-freq" class="pl" onchange="updateMoreOptsSummary('income')">
+                      <option value="monthly">Monthly (same day each month)</option>
+                      <option value="weekly">Weekly (same weekday)</option>
+                      <option value="daily">Daily</option>
+                    </select>
+                    <p class="ef-hint">This entry is logged now; future occurrences will be auto-logged from the Recurring list.</p>
+                  </div>
+                </div>
+                <div class="ef-field">
+                  <div class="slabel ef-l">Spread Income Over</div>
+                  <select id="i-spread" class="pl" onchange="updateMoreOptsSummary('income')"><option value="1">No — this month only</option><option value="2">2 months</option><option value="3">3 months (quarterly)</option><option value="4">4 months</option><option value="6">6 months (half-yearly)</option><option value="12">12 months (yearly)</option></select>
+                  <p class="ef-hint">For a quarterly project payment, annual bonus, etc. Analytics count an equal part in each month; the full amount is still credited on the date above.</p>
+                </div>
+              </div>
+            </details>
+            <button class="btn-p ef-submit" style="background:#166534" onclick="submitIncome()">Add Income</button>
           </div>
           <!-- TRANSFER -->
-          <div id="form-transfer" class="hidden">
-            <div style="display:grid;grid-template-columns:1fr 152px;gap:8px;margin-bottom:9px">
-              <div style="min-width:0"><div class="slabel" style="margin-bottom:4px">Amount (INR)</div>
+          <div id="form-transfer" class="ef hidden">
+            <div class="ef-row2">
+              <div class="ef-f"><div class="slabel ef-l">Amount (INR)</div>
                 <div class="fw"><div class="fp">₹</div><input id="t-amt" class="fi" type="number" min="0" step="0.01" placeholder="0.00"/></div>
               </div>
-              <div style="min-width:0"><div class="slabel" style="margin-bottom:4px">Date</div>
+              <div class="ef-f"><div class="slabel ef-l">Date</div>
                 <div class="date-trigger" onclick="openDatePicker('t-date')"><span id="t-date-disp">Select date</span><svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg></div>
                 <input id="t-date" type="hidden"/></div>
             </div>
-            <div style="display:grid;grid-template-columns:1fr auto 1fr;gap:6px;align-items:end;margin-bottom:9px">
-              <div><div class="slabel" style="margin-bottom:4px">From</div><select id="t-from" class="pl" style="width:100%"></select></div>
+            <div class="ef-field" style="display:grid;grid-template-columns:1fr auto 1fr;gap:6px;align-items:end">
+              <div><div class="slabel ef-l">From</div><select id="t-from" class="pl" style="width:100%"></select></div>
               <div style="padding-bottom:11px;color:#c4bfba"><svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M17 8l4 4m0 0l-4 4m4-4H3"/></svg></div>
-              <div><div class="slabel" style="margin-bottom:4px">To</div><select id="t-to" class="pl" style="width:100%"></select></div>
+              <div><div class="slabel ef-l">To</div><select id="t-to" class="pl" style="width:100%"></select></div>
             </div>
-            <div style="margin-bottom:9px"><div class="slabel" style="margin-bottom:4px">Note (optional)</div>
+            <div class="ef-field"><div class="slabel ef-l">Note (optional)</div>
               <div class="fw"><input id="t-note" class="fi" type="text" placeholder="e.g. ATM withdrawal"/></div>
             </div>
-            <div class="info-box" style="margin-bottom:11px">Transfers update balances only — excluded from charts and budget.</div>
-            <button class="btn-p" style="width:100%;background:#1d4ed8" onclick="submitTransfer()">Record Transfer</button>
+            <div class="info-box" style="margin-bottom:12px">Transfers update balances only — excluded from charts and budget.</div>
+            <button class="btn-p ef-submit" style="background:#1d4ed8" onclick="submitTransfer()">Record Transfer</button>
           </div>
         </div>
         <!-- Budget -->
@@ -347,7 +354,15 @@
           <div style="margin-bottom:11px">
             <div class="fw" style="margin-bottom:8px">
               <div class="fp"><svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-4.35-4.35M17 11a6 6 0 11-12 0 6 6 0 0112 0z"/></svg></div>
-              <input id="txn-filter-search" class="fi" type="text" placeholder="Search description, category, amount, or tag…" oninput="applyTxnFilter()"/>
+              <input id="txn-filter-search" class="fi" type="text" placeholder="Search description, category, amount, or tag…" oninput="applyTxnFilter()" onkeydown="if(event.key==='Escape'&&this.value){event.preventDefault();clearTxnSearch();}"/>
+              <button type="button" id="txn-search-clear" class="fw-clear hidden" onclick="clearTxnSearch()" title="Clear search" aria-label="Clear search"><svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg></button>
+            </div>
+            <div class="type-filter" role="group" aria-label="Show transaction types">
+              <span class="slabel">Show</span>
+              <label class="tf-chip tf-expense"><input type="checkbox" data-type="expense" checked onchange="onTxnTypeToggle()"/>Expense</label>
+              <label class="tf-chip tf-income"><input type="checkbox" data-type="income" checked onchange="onTxnTypeToggle()"/>Income</label>
+              <label class="tf-chip tf-transfer"><input type="checkbox" data-type="transfer" checked onchange="onTxnTypeToggle()"/>Transfer</label>
+              <label class="tf-chip tf-invest"><input type="checkbox" data-type="invest" checked onchange="onTxnTypeToggle()"/>Investment</label>
             </div>
             <div style="display:flex;flex-wrap:wrap;gap:6px;align-items:center;padding:10px;background:#faf9f7;border-radius:9px;border:1px solid #f0eeec">
               <select id="txn-filter-cat" class="pl" style="width:auto;padding:6px 9px;font-size:.78rem" onchange="applyTxnFilter()">
@@ -857,7 +872,7 @@
     <div style="margin-bottom:14px">
       <div class="slabel" style="margin-bottom:6px">Month Starts On</div>
       <select id="inp-month-start" class="pl" style="max-width:220px"></select>
-      <p style="font-size:.72rem;color:#a8a29e;margin-top:4px">Budgets, the month view and monthly analytics run from this day to the day before it next month (e.g. 23rd → 23 Nov – 22 Dec). Handy if you are paid mid-month.</p>
+      <p style="font-size:.72rem;color:#a8a29e;margin-top:4px">The whole app follows this: budgets, the month view, quick charts and every analytics range. A month runs from this day to the day before it next month (e.g. 23rd → 23 Nov – 22 Dec), and the year and financial year are made of these months. Handy if you are paid mid-month.</p>
     </div>
     <div style="height:1px;background:#f0eeec;margin-bottom:14px"></div>
     <div class="slabel" style="margin-bottom:8px">Category-Wise Monthly Caps</div>

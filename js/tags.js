@@ -26,6 +26,7 @@ function renderTagChips(ctx){
     chip.onclick=()=>addTag(ctx,tag);
     suggestWrap.appendChild(chip);
   });
+  if(typeof updateMoreOptsSummary==='function')updateMoreOptsSummary(ctx);
 }
 function addTag(ctx,rawTag){
   const tag=String(rawTag).trim();

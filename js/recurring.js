@@ -2,11 +2,13 @@
 function toggleRecurPanel(ctx){
   const on=document.getElementById(ctx==='expense'?'e-recur-toggle':'i-recur-toggle').checked;
   document.getElementById(ctx==='expense'?'e-recur-panel':'i-recur-panel').classList.toggle('hidden',!on);
+  if(typeof updateMoreOptsSummary==='function')updateMoreOptsSummary(ctx);
 }
 function resetRecurToggle(ctx){
   const toggle=document.getElementById(ctx==='expense'?'e-recur-toggle':'i-recur-toggle');
   toggle.checked=false;
   document.getElementById(ctx==='expense'?'e-recur-panel':'i-recur-panel').classList.add('hidden');
+  if(typeof updateMoreOptsSummary==='function')updateMoreOptsSummary(ctx);
 }
 function createRecurringFromEntry(opts){
   const d=new Date(opts.anchorDate+'T00:00:00');

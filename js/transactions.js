@@ -94,6 +94,12 @@ function openEditTxn(id){
   shareWrap.classList.toggle('hidden',!(isExp&&t.shared));
   document.getElementById('et-share').value=isExp&&t.shared?(t.myShare??t.amount):'';
   document.getElementById('et-cat-wrap').classList.toggle('hidden',isTr);
+  document.getElementById('et-spread-wrap').classList.toggle('hidden',!isExp);
+  if(isExp){
+    const sp=document.getElementById('et-spread'),n=String(spreadN(t));
+    if(!Array.from(sp.options).some(o=>o.value===n))sp.insertAdjacentHTML('beforeend',`<option value="${n}">${n} months</option>`);
+    sp.value=n;
+  }
   document.getElementById('et-acc-wrap').classList.toggle('hidden',isTr||owed);
   document.getElementById('et-tr-wrap').classList.toggle('hidden',!isTr);
   document.getElementById('et-desc-label').textContent=isTr?'Note':'Description';
@@ -147,6 +153,8 @@ function saveEditTxn(){
         if(!accOk(type,inst)){toast('No account selected');return;}
         t.acType=type;t.acId=inst;
       }
+      const sp=Number(document.getElementById('et-spread').value)||1;
+      if(sp>1)t.spreadMonths=sp;else delete t.spreadMonths;
     }else{
       const type=document.getElementById('et-actype').value,inst=type==='cash'?'cash':document.getElementById('et-inst').value;
       if(!accOk(type,inst)){toast('No account selected');return;}
@@ -197,7 +205,7 @@ function setTxn(type){
 }
 
 function calculateCumulativeTotal(selectedCats){
-  return curViewTxns()
+  return curViewATxns()
     .filter(t=>t.type==='expense'&&selectedCats.includes(t.category))
     .reduce((sum,t)=>sum+shareAmount(t),0);
 }
@@ -305,6 +313,7 @@ function submitExpense(){
   const desc=document.getElementById('e-desc').value.trim();
   const isSplit=document.getElementById('e-split-toggle').checked;
   const isRecur=document.getElementById('e-recur-toggle').checked;
+  const spread=Number(document.getElementById('e-spread').value)||1,spreadField=spread>1?{spreadMonths:spread}:{};
   if(!amt||amt<=0){toast('Enter a valid amount');return;}
   if(!date){toast('Select a date');return;}
   if(!selExpCat){toast('Select a category');return;}
@@ -320,13 +329,13 @@ function submitExpense(){
   let acType,acId;
   if(isSplit&&expSplitMode==='owed'){
     acType='shared';acId=null;
-    state.transactions.push({id:uid(),date,type:'expense',amount:amt,acType,acId,category:selExpCat,desc,myShare,shared:true,sharedMode:'owed',settled:false,tags});
+    state.transactions.push({id:uid(),date,type:'expense',amount:amt,acType,acId,category:selExpCat,desc,myShare,shared:true,sharedMode:'owed',settled:false,tags,...spreadField});
   }else{
     acType=document.getElementById('e-actype').value;
     const ai=document.getElementById('e-inst').value;
     if((acType==='bank'&&!state.banks.some(b=>b.id===ai))||(acType==='cc'&&!state.cards.some(c=>c.id===ai))){toast('No account selected');return;}
     acId=acType==='cash'?'cash':ai;
-    state.transactions.push({id:uid(),date,type:'expense',amount:amt,acType,acId,category:selExpCat,desc,myShare,shared:isSplit,sharedMode:isSplit?'fronted':undefined,settled:isSplit?false:undefined,tags});
+    state.transactions.push({id:uid(),date,type:'expense',amount:amt,acType,acId,category:selExpCat,desc,myShare,shared:isSplit,sharedMode:isSplit?'fronted':undefined,settled:isSplit?false:undefined,tags,...spreadField});
   }
   if(isRecur){
     const freq=document.getElementById('e-recur-freq').value;
@@ -334,7 +343,7 @@ function submitExpense(){
   }
   rememberLastEntry('expense',{acType:document.getElementById('e-actype').value,inst:document.getElementById('e-inst').value,category:selExpCat,date});
   saveState();
-  document.getElementById('e-amt').value='';document.getElementById('e-desc').value='';
+  document.getElementById('e-amt').value='';document.getElementById('e-desc').value='';document.getElementById('e-spread').value='1';
   resetSplitPanel();resetRecurToggle('expense');resetTagInputs();
   rebuildAll();toast(isSplit?'Shared expense logged':'Expense logged');
 }

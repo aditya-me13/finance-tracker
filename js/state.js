@@ -154,6 +154,8 @@ function normalizeState(){
   }
   state.cards.forEach(c=>{
     if(!c.autoDebit)c.autoDebit={enabled:false,bankId:'',day:0,mode:'total',fixedAmount:0,lastRunDate:''};
+    // Older cards have no creation date: start judging overdue from today (never flag past cycles we can't verify)
+    if(!c.createdAt)c.createdAt=today();
   });
 }
 

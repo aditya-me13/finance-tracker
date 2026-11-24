@@ -160,7 +160,10 @@ function openRecurringModal(){
             </select></label>`}
         </div>
         <span class="num" style="font-size:.82rem;font-weight:500;color:${amtColor};flex-shrink:0;margin-left:8px">${amtDisplay}</span>
-        <button class="btn-i" title="${r.active?'Pause':'Resume'}" style="margin-left:6px" onclick="toggleRecurringActive('${r.id}')">
+        <button class="btn-i" title="Edit" aria-label="Edit ${esc(r.name)}" style="margin-left:6px" onclick="openRecurringEdit('${r.id}')">
+          <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
+        </button>
+        <button class="btn-i" title="${r.active?'Pause':'Resume'}" style="margin-left:2px" onclick="toggleRecurringActive('${r.id}')">
           ${r.active?'<svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M10 9v6m4-6v6m7-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>':'<svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M14.752 11.168l-6.518-3.76A1 1 0 007 8.24v7.52a1 1 0 001.234.97l6.518-1.762a1 1 0 00.748-.968v-2.832a1 1 0 00-.748-.968z"/></svg>'}
         </button>
         <button class="btn-i danger" title="Delete" style="margin-left:2px" onclick="deleteRecurring('${r.id}')">
@@ -170,6 +173,59 @@ function openRecurringModal(){
     }).join('');
   }
   openModal('modal-recurring');
+}
+/* ── Edit a rule: amount, next payment date, description ──── */
+/* The date before `dateStr` by one period of rule r, chosen so that nextRecurDate(r, result) === dateStr */
+function prevRecurDate(r,dateStr){
+  const d=new Date(dateStr+'T00:00:00');
+  if(r.frequency==='daily')d.setDate(d.getDate()-1);
+  else if(r.frequency==='weekly')d.setDate(d.getDate()-7);
+  else{const day=d.getDate();d.setDate(1);d.setMonth(d.getMonth()-1);d.setDate(Math.min(day,daysInMonth(d.getFullYear(),d.getMonth())));}
+  return dateToStr(d);
+}
+function openRecurringEdit(id){
+  const r=(state.recurring||[]).find(x=>x.id===id);if(!r)return;
+  const isExp=r.type==='expense',isShared=isExp&&r.shared;
+  document.getElementById('re-id').value=id;
+  document.getElementById('re-meta').textContent=`${r.category} · ${recurFreqLabel(r)}${r.active?'':' · Paused'}`;
+  document.getElementById('re-amt-label').textContent=isShared?'Total Bill (INR)':'Amount (INR)';
+  document.getElementById('re-amt').value=r.amount;
+  document.getElementById('re-share-wrap').classList.toggle('hidden',!isShared);
+  document.getElementById('re-share').value=isShared?(r.myShare!==undefined?r.myShare:r.amount):'';
+  document.getElementById('re-desc').value=r.desc||'';
+  document.getElementById('re-desc').placeholder=r.category;
+  setDateVal('re-date',nextRecurDate(r,r.lastGeneratedDate||r.startDate));
+  openModal('modal-recurring-edit');
+}
+function saveRecurringEdit(){
+  const r=(state.recurring||[]).find(x=>x.id===document.getElementById('re-id').value);
+  if(!r){closeModal('modal-recurring-edit');return;}
+  const amt=Number(document.getElementById('re-amt').value);
+  if(!(amt>0)){fieldError('re-amt','Enter a valid amount');return;}
+  const isShared=r.type==='expense'&&r.shared;
+  let share=amt;
+  if(isShared){
+    share=Number(document.getElementById('re-share').value);
+    if(!(share>0)){fieldError('re-share','Enter your share amount');return;}
+    if(share>amt){fieldError('re-share','Your share cannot exceed the total bill');return;}
+  }
+  const next=document.getElementById('re-date').value;
+  if(!next){fieldError('re-date','Select the next payment date');return;}
+  if(next<=today()){fieldError('re-date','Pick a date after today');return;}
+  const desc=document.getElementById('re-desc').value.trim();
+
+  r.amount=amt;
+  if(r.type==='expense')r.myShare=share;
+  r.desc=desc;r.name=desc||r.category;
+  // Re-anchor the schedule on the chosen date: monthly keeps that day of the month, weekly that weekday
+  const nd=new Date(next+'T00:00:00');
+  r.dayOfMonth=nd.getDate();r.weekday=nd.getDay();
+  r.lastGeneratedDate=prevRecurDate(r,next);
+  if(!r.startDate||r.startDate>r.lastGeneratedDate)r.startDate=r.lastGeneratedDate;
+
+  saveState();closeModal('modal-recurring-edit');
+  openRecurringModal();rebuildAll();
+  toast('Recurring payment updated');
 }
 function toggleRecurringActive(id){
   const r=state.recurring.find(x=>x.id===id);

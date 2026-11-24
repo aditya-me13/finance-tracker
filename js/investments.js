@@ -24,10 +24,26 @@ function toggleHoldEntryMode(){
 function updateHoldUnitsPreview(){
   const el=document.getElementById('inv-hold-units-preview');
   if(!el)return;
-  if(holdEntryMode()!=='amount'){el.textContent='';return;}
-  const amt=Number(document.getElementById('inv-hold-units').value)||0;
+  // Live conversion under the first field: units → total amount, amount → units, SIP → total over the duration
+  const val=Number(document.getElementById('inv-hold-units').value)||0;
   const price=Number(document.getElementById('inv-hold-buy').value)||0;
-  el.textContent=amt>0&&price>0?`≈ ${(amt/price).toFixed(4)} units at ${fmt(price)}/unit`:'Enter the price/NAV (or use Fetch) to calculate units.';
+  const type=document.getElementById('inv-hold-type').value,mode=holdEntryMode();
+  const u=n=>Number(n).toLocaleString('en-IN',{maximumFractionDigits:4});
+  let msg='',ok=false;
+  if(type==='sip'){
+    const months=Math.floor(price);
+    if(val>0&&months>0){msg=`= ${fmt(val*months)} total (${fmt(val)} × ${months} month${months===1?'':'s'})`;ok=true;}
+    else if(val>0)msg='Enter the duration to see the total invested.';
+  }else if(mode==='amount'){
+    if(val>0&&price>0){msg=`≈ ${u(val/price)} units at ${fmt(price)}/unit`;ok=true;}
+    else if(val>0)msg='Enter the price/NAV (or use Fetch) to calculate units.';
+  }else{
+    if(val>0&&price>0){msg=`= ${fmt(val*price)} total (${u(val)} × ${fmt(price)})`;ok=true;}
+    else if(val>0)msg='Enter the buy price (or use Fetch) to see the total amount.';
+  }
+  el.textContent=msg;
+  el.style.color=ok?'#166534':'#a8a29e';
+  el.style.fontWeight=ok?'600':'400';
 }
 
 function toggleHoldLookupFields(){

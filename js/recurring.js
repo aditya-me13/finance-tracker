@@ -7,9 +7,20 @@ function toggleRecurPanel(ctx){
 function resetRecurToggle(ctx){
   const toggle=document.getElementById(ctx==='expense'?'e-recur-toggle':'i-recur-toggle');
   toggle.checked=false;
+  resetRecurRemind(ctx);
   document.getElementById(ctx==='expense'?'e-recur-panel':'i-recur-panel').classList.add('hidden');
   if(typeof updateMoreOptsSummary==='function')updateMoreOptsSummary(ctx);
 }
+/* How many days before a scheduled occurrence it shows under "Due This Month" (0 = never).
+   Rules saved before this setting existed use the default. Daily rules never remind. */
+const RECUR_REMIND_DEFAULT=2;
+const recurRemindDays=r=>r.frequency==='daily'?0:(Number.isFinite(Number(r.remindDays))&&r.remindDays!==''&&r.remindDays!==null&&r.remindDays!==undefined?Number(r.remindDays):RECUR_REMIND_DEFAULT);
+function setRecurRemind(id,val){
+  const r=(state.recurring||[]).find(x=>x.id===id);if(!r)return;
+  r.remindDays=Number(val);saveState();rebuildAll();
+  toast(r.remindDays?`Reminder set ${r.remindDays} day${r.remindDays>1?'s':''} before`:'Reminder turned off');
+}
+function resetRecurRemind(ctx){const el=document.getElementById(ctx==='expense'?'e-recur-remind':'i-recur-remind');if(el)el.value=String(RECUR_REMIND_DEFAULT);}
 function createRecurringFromEntry(opts){
   const d=new Date(opts.anchorDate+'T00:00:00');
   state.recurring.push({
@@ -25,6 +36,7 @@ function createRecurringFromEntry(opts){
     desc:opts.desc,
     tags:(opts.tags||[]).slice(),
     frequency:opts.frequency,
+    remindDays:Number.isFinite(opts.remindDays)?opts.remindDays:RECUR_REMIND_DEFAULT,
     dayOfMonth:d.getDate(),
     weekday:d.getDay(),
     startDate:opts.anchorDate,
@@ -117,10 +129,11 @@ function renderRecurringWidget(){
   if(!list.length){sec.style.display='none';return;}
   sec.style.display='block';
   const activeCount=list.filter(r=>r.active).length;
+  if(typeof setFoldSum==='function')setFoldSum('recurring',`${activeCount} active`);
   body.innerHTML=`
     <div style="padding:3px 8px 2px">
       <div style="font-size:.78rem;color:#57534e">${activeCount} active rule${activeCount===1?'':'s'}${list.length>activeCount?` (${list.length-activeCount} paused)`:''}</div>
-      <button class="btn-g" style="width:100%;margin-top:8px;padding:6px 0;font-size:.76rem" onclick="openRecurringModal()">Manage Recurring</button>
+      <button class="btn-g" style="width:100%;margin-top:8px;padding:6px 0;font-size:.78rem" onclick="openRecurringModal()">Manage Recurring</button>
     </div>`;
 }
 function recurFreqLabel(r){
@@ -131,7 +144,7 @@ function recurFreqLabel(r){
 function openRecurringModal(){
   const wrap=document.getElementById('recurring-list');
   const list=state.recurring||[];
-  if(!list.length){wrap.innerHTML='<div style="text-align:center;padding:20px 0;font-size:.83rem;color:#a8a29e">No recurring transactions yet — check "Repeat this automatically" on an Expense/Income entry to create one.</div>';}
+  if(!list.length){wrap.innerHTML='<div style="text-align:center;padding:20px 0;font-size:.82rem;color:var(--text-muted)">No recurring transactions yet — check "Repeat this automatically" on an Expense/Income entry to create one.</div>';}
   else{
     wrap.innerHTML=list.map(r=>{
       const nextDue=nextRecurDate(r,r.lastGeneratedDate||r.startDate);
@@ -139,14 +152,18 @@ function openRecurringModal(){
       const amtColor=r.type==='expense'?'#ef4444':'#166534';
       return`<div class="bud-row" style="align-items:flex-start;padding:9px 0">
         <div style="flex:1;min-width:0">
-          <div style="font-size:.83rem;font-weight:500;color:#292524">${esc(r.name)} ${!r.active?'<span class="badge-sm" style="background:#f4f3f0;color:#a8a29e;margin-left:4px">Paused</span>':''}</div>
-          <div style="font-size:.71rem;color:#a8a29e;margin-top:2px">${esc(r.category)} &middot; ${recurFreqLabel(r)} &middot; next ${fmtDate(nextDue)}</div>
+          <div style="font-size:.82rem;font-weight:500;color:#292524">${esc(r.name)} ${!r.active?'<span class="badge-sm" style="background:#f4f3f0;color:var(--text-muted);margin-left:4px">Paused</span>':''}</div>
+          <div style="font-size:.72rem;color:var(--text-muted);margin-top:2px">${esc(r.category)} &middot; ${recurFreqLabel(r)} &middot; next ${fmtDate(nextDue)}</div>
+          ${r.frequency==='daily'?'':`<label style="display:inline-flex;align-items:center;gap:6px;margin-top:6px;font-size:.72rem;color:var(--text-muted)">Remind
+            <select class="pl" style="width:auto;padding:3px 8px;font-size:.72rem" aria-label="Reminder for ${esc(r.name)}" onchange="setRecurRemind('${r.id}',this.value)">
+              ${[[0,"Don't remind me"],[1,'1 day before'],[2,'2 days before'],[3,'3 days before'],[5,'5 days before'],[7,'7 days before']].map(([v,l])=>`<option value="${v}"${recurRemindDays(r)===v?' selected':''}>${l}</option>`).join('')}
+            </select></label>`}
         </div>
-        <span class="num" style="font-size:.8rem;font-weight:500;color:${amtColor};flex-shrink:0;margin-left:8px">${amtDisplay}</span>
+        <span class="num" style="font-size:.82rem;font-weight:500;color:${amtColor};flex-shrink:0;margin-left:8px">${amtDisplay}</span>
         <button class="btn-i" title="${r.active?'Pause':'Resume'}" style="margin-left:6px" onclick="toggleRecurringActive('${r.id}')">
           ${r.active?'<svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M10 9v6m4-6v6m7-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>':'<svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M14.752 11.168l-6.518-3.76A1 1 0 007 8.24v7.52a1 1 0 001.234.97l6.518-1.762a1 1 0 00.748-.968v-2.832a1 1 0 00-.748-.968z"/></svg>'}
         </button>
-        <button class="btn-i" title="Delete" style="margin-left:2px" onmouseover="this.style.color='#ef4444'" onmouseout="this.style.color='#c4bfba'" onclick="deleteRecurring('${r.id}')">
+        <button class="btn-i danger" title="Delete" style="margin-left:2px" onclick="deleteRecurring('${r.id}')">
           <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
         </button>
       </div>`;

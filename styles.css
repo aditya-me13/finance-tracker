@@ -428,3 +428,23 @@ html.theme-anim,html.theme-anim *{transition:background-color .3s,color .3s,bord
 .sb-fold-sum.neg{color:#ef4444}.sb-fold-sum.pos{color:#166534}
 .sb-sec.folded .sb-add{display:none}
 .sb-fold{flex-shrink:0}.sb-fold .slabel{white-space:nowrap}
+
+/* ── Credit card rows: name + amount, thin limit bar, one quiet meta line ── */
+.cc-row{flex-direction:column;align-items:stretch;gap:0;padding:8px 8px 9px}
+.cc-top{display:flex;align-items:center;gap:7px;min-width:0}
+.cc-top .sb-name{flex:1;font-weight:500;color:var(--text)}
+.cc-bar{height:3px;background:#efedeb;border-radius:2px;margin:7px 0 0 14px;overflow:hidden}
+.cc-bar i{display:block;height:100%;border-radius:2px;background:#a8a29e;transition:width .4s ease}
+.cc-bar i.warn{background:#f59e0b}.cc-bar i.bad{background:#ef4444}
+.cc-meta{display:flex;align-items:baseline;justify-content:space-between;gap:8px;margin:5px 0 0 14px;font-size:.68rem;color:var(--text-muted);white-space:nowrap}
+.cc-meta>span:first-child{overflow:hidden;text-overflow:ellipsis}
+.cc-meta b{font-weight:500;color:var(--text-2)}
+/* hidden edit/delete buttons must not leave a gap: space them with margins that only exist on hover */
+.cc-top{gap:0}.cc-top .sb-dot{margin-right:8px}.cc-top .sb-amt{margin-left:8px}
+.cc-row:hover .cc-top .btn-i,.cc-row:focus-within .cc-top .btn-i{margin-left:2px}
+.cc-st{font-weight:500}
+.cc-st.warn{color:#b45309}.cc-st.bad{color:#dc2626;font-weight:600}
+#sb-cards .cc-row+.cc-row{margin-top:2px}
+/* Sidebar section headings: darker and heavier so each accordion stands out */
+.sb-head .slabel{color:var(--text);font-weight:700;font-size:.7rem;letter-spacing:.06em}
+.sb-fold-chev{color:var(--text-2)}

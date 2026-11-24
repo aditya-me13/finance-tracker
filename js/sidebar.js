@@ -128,27 +128,29 @@ function renderSidebar(){
   sbC.innerHTML=!state.cards.length?'<div style="font-size:.78rem;color:var(--text-muted);padding:3px 8px">No cards yet</div>':
     state.cards.map((c,i)=>{
       const due=bal.cd[c.id]||0,lim=Number(c.limit)||0;
-      const avail=lim>0?lim-due:null,pct=lim>0?Math.min((due/lim)*100,100):0;
-      const cls=pct>80?'po':pct>50?'pw':'ps';
+      const avail=lim>0?lim-due:null,pct=lim>0?Math.max(0,Math.min((due/lim)*100,100)):0;
       const di=getCardDueInfo(c,bal),ds=di.ds,isOverdue=di.overdue>0;
       const ad=c.autoDebit,ab=ad&&ad.enabled?state.banks.find(b=>b.id===ad.bankId):null;
-      const badgeCls={ok:'due-ok',soon:'due-soon',urgent:'due-urgent',overdue:'due-overdue'}[ds?.status||'ok'];
-      const badge=isOverdue?`<span class="due-badge due-overdue">Overdue ${di.overdueDays}d &middot; ${fmt(di.overdue)} unpaid</span>`
-        :due<=0.004&&ds?`<span class="due-badge due-ok">Nothing due</span>`
-        :ad&&ad.enabled&&ab?`<span class="due-badge due-ok" title="Auto-debit on the ${ad.day}${ordSuffix(ad.day)} from ${esc(ab.name)}">Auto Debit On</span>`
-        :ds?`<span class="due-badge ${badgeCls}">${ds.label}</span>`:'';
-      return`<div class="sb-item" style="flex-direction:column;align-items:flex-start;gap:5px">
-        <div style="display:flex;align-items:center;gap:8px;width:100%">
-          <span class="sb-dot" style="background:${CDOTS[i%CDOTS.length]};flex-shrink:0"></span>
-          <span class="sb-name" style="flex:1" title="${esc(c.name)}">${esc(c.name)}</span>
-          <span class="sb-amt${due>0?' neg':''}" title="${isOverdue?'Overdue: '+fmt(di.overdue)+' from the bill due '+fmtDate(di.lastDue):'Outstanding'}">${fmt(due)}</span>
-          <button class="btn-i" onclick="openEditModal('cc','${c.id}')" title="Edit" style="padding:2px;flex-shrink:0"><svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg></button>
-          <button class="btn-i danger" onclick="confirmDeleteAccount('cc','${c.id}')" title="Delete" style="padding:2px;flex-shrink:0"><svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg></button>
+      // One short status, plain text; colour only when it needs attention
+      let st='',stCls='',stTip='';
+      if(isOverdue){st=`Overdue ${di.overdueDays}d`;stCls='bad';stTip=`${fmt(di.overdue)} unpaid from the bill due ${fmtDate(di.lastDue)}`;}
+      else if(due<=0.004&&ds){st='No dues';}
+      else if(ad&&ad.enabled&&ab){st='Auto Debit On';stTip=`Auto-debit on the ${ad.day}${ordSuffix(ad.day)} from ${ab.name}`;}
+      else if(ds){st=ds.label;stCls=ds.status==='urgent'?'bad':ds.status==='soon'?'warn':'';}
+      const rupees=n=>'₹'+Math.round(n).toLocaleString('en-IN');
+      const barCls=pct>80?'bad':pct>50?'warn':'';
+      return`<div class="sb-item cc-row">
+        <div class="cc-top">
+          <span class="sb-dot" style="background:${CDOTS[i%CDOTS.length]};margin-top:0"></span>
+          <span class="sb-name" title="${esc(c.name)}">${esc(c.name)}</span>
+          <span class="sb-amt${due>0?' neg':''}" title="Outstanding">${fmt(due)}</span>
+          <button class="btn-i" onclick="openEditModal('cc','${c.id}')" title="Edit card"><svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg></button>
+          <button class="btn-i danger" onclick="confirmDeleteAccount('cc','${c.id}')" title="Delete card"><svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg></button>
         </div>
-        ${badge?`<div style="padding-left:15px">${badge}</div>`:''}
-        ${avail!==null?`<div style="padding-left:15px;width:100%">
-          <div class="pt" style="height:3px"><div class="pf ${cls}" style="width:${pct}%"></div></div>
-          <div style="font-size:.68rem;color:var(--text-muted);margin-top:2px">${fmt(avail)} available</div>
+        ${avail!==null?`<div class="cc-bar" title="${Math.round(pct)}% of ${rupees(lim)} limit used"><i class="${barCls}" style="width:${pct}%"></i></div>`:''}
+        ${avail!==null||st?`<div class="cc-meta">
+          <span>${avail!==null?`<b class="num">${rupees(avail)}</b> available`:''}</span>
+          ${st?`<span class="cc-st ${stCls}"${stTip?` title="${esc(stTip)}"`:''}>${st}</span>`:''}
         </div>`:''}
       </div>`;
     }).join('');

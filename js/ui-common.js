@@ -86,13 +86,14 @@ function setDateVal(id,iso){
     disp.textContent=fmtDMY(iso);
     const rel=iso?relDayLabel(iso):'';
     const d=iso?new Date(iso+'T00:00:00'):null;
-    disp.parentElement.title=d?`${DAY_LONG[d.getDay()]}, ${d.getDate()} ${MONTH_NAMES[d.getMonth()]} ${d.getFullYear()}${rel?' · '+rel:''}`:'';
+    const off=iso?marketClosedReason(iso):'';
+    disp.parentElement.title=d?`${DAY_LONG[d.getDay()]}, ${d.getDate()} ${MONTH_NAMES[d.getMonth()]} ${d.getFullYear()}${rel?' · '+rel:''}${off?' · market closed':''}`:'';
   }
 }
 function daysInMonth(year,monthIdx){return new Date(year,monthIdx+1,0).getDate();}
-function buildWheelCol(el,items,selIdx){
+function buildWheelCol(el,items,selIdx,classes){
   const spacer='<div class="wheel-spacer"></div>';
-  el.innerHTML=spacer+items.map((label,i)=>`<div class="wheel-item${i===selIdx?' sel':''}">${label}</div>`).join('')+spacer;
+  el.innerHTML=spacer+items.map((label,i)=>`<div class="wheel-item${classes&&classes[i]?' '+classes[i]:''}${i===selIdx?' sel':''}">${label}</div>`).join('')+spacer;
   el._items=items;
   el._kbIdx=undefined;
   el.scrollTop=selIdx*WHEEL_ITEM_H;
@@ -155,7 +156,9 @@ function onWheelScroll(el){
 function buildDayWheel(year,monthIdx,day){
   const dc=daysInMonth(year,monthIdx);
   const items=Array.from({length:dc},(_,i)=>`${pad(i+1)} ${DAY_SHORT[new Date(year,monthIdx,i+1).getDay()]}`);
-  buildWheelCol(document.getElementById('wheel-day'),items,Math.min(day,dc)-1);
+  // Days the stock market is shut (weekends + NSE holidays) are tinted
+  const cls=Array.from({length:dc},(_,i)=>marketClosedReason(`${year}-${pad(monthIdx+1)}-${pad(i+1)}`)?'mkt-off':'');
+  buildWheelCol(document.getElementById('wheel-day'),items,Math.min(day,dc)-1,cls);
 }
 function syncDayWheel(){
   const dEl=document.getElementById('wheel-day'),mEl=document.getElementById('wheel-month'),yEl=document.getElementById('wheel-year');
@@ -186,7 +189,10 @@ function updateDwPreview(){
   const span=s.getMonth()===e.getMonth()?`${mon(e)} ${e.getFullYear()}`
     :s.getFullYear()===e.getFullYear()?`${mon(s).slice(0,3)} – ${mon(e).slice(0,3)} ${e.getFullYear()}`
     :`${mon(s).slice(0,3)} ${s.getFullYear()} – ${mon(e).slice(0,3)} ${e.getFullYear()}`;
-  if(p)p.innerHTML=`<div class="dw-dow">${nth(s)} Mon to ${nth(e)} Sun</div><div class="dw-full">${span} · <b>${DAY_SHORT[d.getDay()]} ${d.getDate()}</b>${rel?` <span class="dw-rel">${rel}</span>`:''}</div>`;
+  const off=marketClosedReason(iso),wkday=d.getDay()===0||d.getDay()===6;
+  const sipHint=_dateTargetId==='inv-hold-date'?` — SIP buys on ${fmtDMY(nextMarketDay(iso))}`:'';
+  const offNote=off?`<div class="dw-mkt">Market closed${wkday?'':' · '+esc(off)}${sipHint}</div>`:'';
+  if(p)p.innerHTML=`<div class="dw-dow">${nth(s)} Mon to ${nth(e)} Sun</div><div class="dw-full">${span} · <b>${DAY_SHORT[d.getDay()]} ${d.getDate()}</b>${rel?` <span class="dw-rel">${rel}</span>`:''}</div>${offNote}`;
   document.querySelectorAll('#dw-quick .dw-q').forEach(b=>b.classList.toggle('sel',b.dataset.iso===iso));
 }
 // Sunday that ends the Monday-first week containing iso
@@ -201,7 +207,9 @@ function renderDwQuick(){
     const top=iso===t?'Today':iso===y?'Yest':DAY_SHORT[d.getDay()];
     // Show the month on the first chip and wherever a new month starts, so a shifted week is easy to read
     const mon=(i===0||d.getDate()===1)?`<i>${MONTH_NAMES[d.getMonth()].slice(0,3)}</i>`:'<i>&nbsp;</i>';
-    return`<button type="button" class="dw-q" data-iso="${iso}" onclick="pickQuickDate('${iso}')" aria-label="${DAY_LONG[d.getDay()]} ${d.getDate()} ${MONTH_NAMES[d.getMonth()]}">${mon}<span>${top}</span><b>${d.getDate()}</b></button>`;
+    const off=marketClosedReason(iso),hol=off&&off!=='Saturday'&&off!=='Sunday';
+    const tip=off?` · market closed${hol?' ('+esc(off)+')':''}`:'';
+    return`<button type="button" class="dw-q${off?' mkt-off':''}${hol?' mkt-hol':''}" data-iso="${iso}" onclick="pickQuickDate('${iso}')" title="${DAY_LONG[d.getDay()]} ${d.getDate()} ${MONTH_NAMES[d.getMonth()]}${tip}" aria-label="${DAY_LONG[d.getDay()]} ${d.getDate()} ${MONTH_NAMES[d.getMonth()]}${tip}">${mon}<span>${top}</span><b>${d.getDate()}</b></button>`;
   }).join('');
 }
 // ‹ › buttons: slide the whole strip (and the selected date) by one week

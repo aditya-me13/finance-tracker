@@ -14,8 +14,8 @@ function renderBarChart(mk,exps){
     type:'bar',
     data:{labels:dates.map(d=>String(Number(d.slice(8,10)))),datasets:[{data,backgroundColor:'#e7e5e4',borderRadius:3,hoverBackgroundColor:'#a8a29e'}]},
     options:{...baseOpts({plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>' '+fmt(c.raw)}}}}),
-      scales:{x:{grid:{display:false},ticks:{font:{family:'DM Mono',size:9},color:'#c4bfba',maxTicksLimit:10}},
-        y:{grid:{color:'#f4f3f0'},ticks:{font:{family:'DM Mono',size:9},color:'#c4bfba',callback:v=>v>=1000?`₹${(v/1000).toFixed(0)}k`:`₹${v}`}}}}
+      scales:{x:{grid:{display:false},ticks:{font:{family:'DM Mono',size:10},color:'#78716c',maxTicksLimit:10}},
+        y:{grid:{color:'#f4f3f0'},ticks:{font:{family:'DM Mono',size:10},color:'#78716c',callback:v=>v>=1000?`₹${(v/1000).toFixed(0)}k`:`₹${v}`}}}}
   });
 }
 
@@ -34,16 +34,16 @@ function renderBarChartFY(fy,exps){
     type:'bar',
     data:{labels,datasets:[{data,backgroundColor:'#e7e5e4',borderRadius:3,hoverBackgroundColor:'#a8a29e'}]},
     options:{...baseOpts({plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>' '+fmt(c.raw)}}}}),
-      scales:{x:{grid:{display:false},ticks:{font:{family:'DM Mono',size:9},color:'#c4bfba'}},
-        y:{grid:{color:'#f4f3f0'},ticks:{font:{family:'DM Mono',size:9},color:'#c4bfba',callback:v=>v>=1000?`₹${(v/1000).toFixed(0)}k`:`₹${v}`}}}}
+      scales:{x:{grid:{display:false},ticks:{font:{family:'DM Mono',size:10},color:'#78716c'}},
+        y:{grid:{color:'#f4f3f0'},ticks:{font:{family:'DM Mono',size:10},color:'#78716c',callback:v=>v>=1000?`₹${(v/1000).toFixed(0)}k`:`₹${v}`}}}}
   });
 }
 
 function buildDonut(key,canvasId,legId,labels,data,bgs,fgs,emptyMsg){
   const empty=!labels.length;
   const leg=document.getElementById(legId);
-  leg.innerHTML=empty?`<span style="font-size:.77rem;color:#c4bfba">${emptyMsg}</span>`:
-    (()=>{const tot=data.reduce((a,b)=>a+b,0);return labels.map((l,i)=>`<div style="display:flex;align-items:center;gap:5px;margin-bottom:2px"><span style="width:8px;height:8px;border-radius:2px;background:${fgs[i]};flex-shrink:0"></span><span style="font-size:.75rem;color:#57534e;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(l)}</span><span class="num" style="font-size:.7rem;color:#a8a29e">${tot>0?((data[i]/tot)*100).toFixed(0):0}%</span></div>`).join('');})();
+  leg.innerHTML=empty?`<span style="font-size:.78rem;color:var(--text-muted)">${emptyMsg}</span>`:
+    (()=>{const tot=data.reduce((a,b)=>a+b,0);return labels.map((l,i)=>`<div style="display:flex;align-items:center;gap:5px;margin-bottom:2px"><span style="width:8px;height:8px;border-radius:2px;background:${fgs[i]};flex-shrink:0"></span><span style="font-size:.78rem;color:#57534e;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(l)}</span><span class="num" style="font-size:.72rem;color:var(--text-muted)">${tot>0?((data[i]/tot)*100).toFixed(0):0}%</span></div>`).join('');})();
   destroyChart(key);
   CH[key]=new Chart(document.getElementById(canvasId).getContext('2d'),{
     type:'doughnut',
@@ -66,8 +66,8 @@ function renderQuickCharts(){
   const shT=exps.filter(e=>e.acType==='shared').reduce((s,e)=>s+shareAmount(e),0);
   const me=[['Bank',bkT,'#dbeafe','#3b82f6'],['Cash',caT,'#dcfce7','#22c55e'],['Credit Card',ccT,'#fef3c7','#f59e0b'],['Roommate Split',shT,'#ede9fe','#7c3aed']].filter(e=>e[1]>0);
   const ml=document.getElementById('mode-leg');
-  if(!me.length){ml.innerHTML='<span style="font-size:.77rem;color:#c4bfba">No data</span>';}
-  else{const tot=me.reduce((s,e)=>s+e[1],0);ml.innerHTML=me.map(([l,v,,fg])=>`<div style="display:flex;align-items:center;gap:5px"><span style="width:8px;height:8px;border-radius:2px;background:${fg};flex-shrink:0"></span><span style="font-size:.75rem;color:#57534e;flex:1">${l}</span><span class="num" style="font-size:.7rem;color:#a8a29e">${((v/tot)*100).toFixed(0)}%</span></div>`).join('');}
+  if(!me.length){ml.innerHTML='<span style="font-size:.78rem;color:var(--text-muted)">No data</span>';}
+  else{const tot=me.reduce((s,e)=>s+e[1],0);ml.innerHTML=me.map(([l,v,,fg])=>`<div style="display:flex;align-items:center;gap:5px"><span style="width:8px;height:8px;border-radius:2px;background:${fg};flex-shrink:0"></span><span style="font-size:.78rem;color:#57534e;flex:1">${l}</span><span class="num" style="font-size:.72rem;color:var(--text-muted)">${((v/tot)*100).toFixed(0)}%</span></div>`).join('');}
   destroyChart('qMode');
   CH.qMode=new Chart(document.getElementById('chart-mode').getContext('2d'),{
     type:'doughnut',
@@ -164,7 +164,7 @@ function renderStatTiles(totalSpent,totalInc,surplus,exps,incs,trueSpent,fronted
     <div class="stat-tile">
       <div class="slabel">${label}</div>
       <div class="val" style="color:${color}">${val}</div>
-      <div class="delta" style="color:#a8a29e">${sub}</div>
+      <div class="delta" style="color:var(--text-muted)">${sub}</div>
     </div>`).join('');
 }
 
@@ -192,7 +192,7 @@ function renderBvaChart(exps,from,to){
       plugins:{legend:{display:true,position:'top',labels:{font:{family:'DM Sans',size:11},color:'#78716c',boxWidth:10,boxHeight:10}},
         tooltip:{callbacks:{label:c=>`${c.dataset.label}: ${fmt(c.raw)}`}}},
       scales:{
-        x:{grid:{color:'#f4f3f0'},ticks:{font:{family:'DM Mono',size:9},color:'#c4bfba',callback:v=>v>=1000?`₹${(v/1000).toFixed(0)}k`:`₹${v}`}},
+        x:{grid:{color:'#f4f3f0'},ticks:{font:{family:'DM Mono',size:10},color:'#78716c',callback:v=>v>=1000?`₹${(v/1000).toFixed(0)}k`:`₹${v}`}},
         y:{grid:{display:false},ticks:{font:{family:'DM Sans',size:11},color:'#57534e'}}
       }}
   });
@@ -242,7 +242,7 @@ function renderCashflowChart(from,to,surplus){
       plugins:{legend:{display:true,position:'top',labels:{font:{family:'DM Sans',size:11},color:'#78716c',boxWidth:10,boxHeight:10}},
         tooltip:{callbacks:{label:c=>`${c.dataset.label}: ${fmt(c.raw)}`}}},
       scales:{x:{grid:{display:false},ticks:{font:{family:'DM Sans',size:10},color:'#a8a29e'}},
-        y:{grid:{color:'#f4f3f0'},ticks:{font:{family:'DM Mono',size:9},color:'#c4bfba',callback:v=>v>=1000?`₹${(v/1000).toFixed(0)}k`:`₹${v}`}}}}
+        y:{grid:{color:'#f4f3f0'},ticks:{font:{family:'DM Mono',size:10},color:'#78716c',callback:v=>v>=1000?`₹${(v/1000).toFixed(0)}k`:`₹${v}`}}}}
   });
 }
 
@@ -272,7 +272,7 @@ function renderHistChart(){
       plugins:{legend:{display:true,position:'top',labels:{font:{family:'DM Sans',size:11},color:'#78716c',boxWidth:10,boxHeight:10}},
         tooltip:{callbacks:{label:c=>`${c.dataset.label}: ${fmt(c.raw)}`}}},
       scales:{x:{grid:{display:false},ticks:{font:{family:'DM Sans',size:10},color:'#a8a29e'}},
-        y:{grid:{color:'#f4f3f0'},stacked:true,ticks:{font:{family:'DM Mono',size:9},color:'#c4bfba',callback:v=>v>=1000?`₹${(v/1000).toFixed(0)}k`:`₹${v}`}}}}
+        y:{grid:{color:'#f4f3f0'},stacked:true,ticks:{font:{family:'DM Mono',size:10},color:'#78716c',callback:v=>v>=1000?`₹${(v/1000).toFixed(0)}k`:`₹${v}`}}}}
   });
 }
 
@@ -297,8 +297,8 @@ function renderTrendChart(exps,from,to){
     options:{responsive:true,maintainAspectRatio:false,
       plugins:{legend:{display:true,position:'top',labels:{font:{family:'DM Sans',size:10},color:'#78716c',boxWidth:10,boxHeight:8}},
         tooltip:{callbacks:{label:c=>`${c.dataset.label}: ${fmt(c.raw)}`}}},
-      scales:{x:{grid:{display:false},ticks:{font:{family:'DM Mono',size:8},color:'#c4bfba',maxTicksLimit:12}},
-        y:{grid:{color:'#f4f3f0'},ticks:{font:{family:'DM Mono',size:9},color:'#c4bfba',callback:v=>v>=1000?`₹${(v/1000).toFixed(0)}k`:`₹${v}`}}}}
+      scales:{x:{grid:{display:false},ticks:{font:{family:'DM Mono',size:10},color:'#78716c',maxTicksLimit:12}},
+        y:{grid:{color:'#f4f3f0'},ticks:{font:{family:'DM Mono',size:10},color:'#78716c',callback:v=>v>=1000?`₹${(v/1000).toFixed(0)}k`:`₹${v}`}}}}
   });
 }
 
@@ -307,7 +307,7 @@ function renderTopCategories(exps){
   const sorted=Object.entries(totals).sort((a,b)=>b[1]-a[1]).slice(0,6);
   const maxV=sorted[0]?.[1]||1;
   const wrap=document.getElementById('an-top-cats');
-  if(!sorted.length){wrap.innerHTML='<div style="font-size:.82rem;color:#c4bfba;text-align:center;padding:20px 0">No data</div>';return;}
+  if(!sorted.length){wrap.innerHTML='<div style="font-size:.82rem;color:var(--text-muted);text-align:center;padding:20px 0">No data</div>';return;}
   wrap.innerHTML=sorted.map(([cat,val])=>{
     const ci=state.categories.expense.indexOf(cat),col=cpal(ci>=0?ci:0);
     const pct=(val/maxV)*100;
@@ -315,7 +315,7 @@ function renderTopCategories(exps){
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
         <div style="display:flex;align-items:center;gap:5px">
           <span style="width:7px;height:7px;border-radius:50%;background:${col.fg};flex-shrink:0;display:inline-block"></span>
-          <span style="font-size:.8rem;color:#292524">${esc(cat)}</span>
+          <span style="font-size:.82rem;color:#292524">${esc(cat)}</span>
         </div>
         <span class="num" style="font-size:.78rem;color:#57534e">${fmt(val)}</span>
       </div>
@@ -364,7 +364,7 @@ function renderNetWorthChart(){
     options:{responsive:true,maintainAspectRatio:false,
       plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>`Net Worth: ${fmt(c.raw)}`}}},
       scales:{x:{grid:{display:false},ticks:{font:{family:'DM Sans',size:10},color:'#a8a29e'}},
-        y:{grid:{color:'#f4f3f0'},ticks:{font:{family:'DM Mono',size:9},color:'#c4bfba',callback:v=>v>=1000?`₹${(v/1000).toFixed(0)}k`:`₹${v}`}}}}
+        y:{grid:{color:'#f4f3f0'},ticks:{font:{family:'DM Mono',size:10},color:'#78716c',callback:v=>v>=1000?`₹${(v/1000).toFixed(0)}k`:`₹${v}`}}}}
   });
 }
 
@@ -378,14 +378,14 @@ function renderSavingsRate(totalSpent,totalInc){
   wrap.innerHTML=`
     <div>
       <div style="font-size:2rem;font-weight:700;font-family:'DM Mono',monospace;color:${color};letter-spacing:-.03em">${rate.toFixed(1)}%</div>
-      <div style="font-size:.78rem;color:#a8a29e;margin-top:2px">Savings Rate · <span style="color:${color};font-weight:500">${label}</span></div>
+      <div style="font-size:.78rem;color:var(--text-muted);margin-top:2px">Savings Rate · <span style="color:${color};font-weight:500">${label}</span></div>
     </div>
     <div class="pt" style="margin-top:4px"><div class="pf" style="width:${pct}%;background:${color};opacity:.7;transition:width .5s ease"></div></div>
-    <div style="display:flex;justify-content:space-between;font-size:.73rem;color:#a8a29e;margin-top:2px">
+    <div style="display:flex;justify-content:space-between;font-size:.72rem;color:var(--text-muted);margin-top:2px">
       <span>Saved: ${fmt(Math.max(0,surplus))}</span>
       <span>Income: ${fmt(totalInc)}</span>
     </div>
-    <div style="background:#f4f3f0;border-radius:8px;padding:10px 12px;font-size:.75rem;color:#78716c;line-height:1.5">
+    <div style="background:#f4f3f0;border-radius:8px;padding:10px 12px;font-size:.78rem;color:#78716c;line-height:1.5">
       ${rate>=30?'Great discipline. Keep building your emergency fund.':rate>=10?'Decent savings. Try to cut one category to improve.':'Consider reviewing your largest expense categories.'}
     </div>`;
 }

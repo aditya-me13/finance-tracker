@@ -44,6 +44,7 @@ function syncSelectAllCheckbox(){
 function bulkDeleteSelected(){
   if(!bulkSelectedIds.size){toast('Select at least one transaction');return;}
   const ids=Array.from(bulkSelectedIds);
+  prepConfirm(`Delete ${ids.length} transaction${ids.length>1?'s':''}?`,`Delete ${ids.length}`);
   document.getElementById('confirm-body').textContent=`Delete ${ids.length} selected transaction(s)? You can undo this right after.`;
   document.getElementById('confirm-ok-btn').onclick=()=>{
     const removed=state.transactions.filter(t=>ids.includes(t.id));
@@ -67,7 +68,7 @@ function openBulkRecatModal(){
   const body=document.getElementById('bulk-recat-body');
   const btn=document.getElementById('bulk-recat-confirm-btn');
   if(types.size>1){
-    body.innerHTML=`<p style="font-size:.8rem;color:#ef4444;line-height:1.5">Your selection includes both expenses and income. Narrow your filter to just one type (e.g. pick any Expense category) before bulk recategorizing.</p>`;
+    body.innerHTML=`<p style="font-size:.82rem;color:#ef4444;line-height:1.5">Your selection includes both expenses and income. Narrow your filter to just one type (e.g. pick any Expense category) before bulk recategorizing.</p>`;
     btn.disabled=true;btn.style.opacity='.5';
   }else{
     const type=[...types][0];
@@ -124,7 +125,7 @@ function confirmBulkTag(){
   if(!ids.length)return;
   if(bulkTagMode==='add'){
     const raw=document.getElementById('bulk-tag-input').value.trim();
-    if(!raw){toast('Enter a tag');return;}
+    if(!raw){fieldError('bulk-tag-input','Enter a tag');return;}
     if(!state.tags.some(t=>t.toLowerCase()===raw.toLowerCase()))state.tags.push(raw);
     const canonical=state.tags.find(t=>t.toLowerCase()===raw.toLowerCase())||raw;
     let count=0;
@@ -138,7 +139,7 @@ function confirmBulkTag(){
     toast(`Added "${canonical}" to ${count} transaction(s)`);
   }else{
     const tag=document.getElementById('bulk-tag-remove-select').value;
-    if(!tag){toast('No tag selected');return;}
+    if(!tag){fieldError('bulk-tag-remove-select','No tag selected');return;}
     let count=0;
     state.transactions.forEach(t=>{
       if(ids.includes(t.id)&&(t.tags||[]).includes(tag)){

@@ -97,11 +97,59 @@ function toast(msg,ms=2400,action=null){
 function showUndoToast(msg,restoreFn){
   toast(msg,5000,{label:'Undo',onClick:restoreFn});
 }
+/* ── Confirm dialog: one modal, re-labelled per use so the title and button
+   always name the action that will actually happen ─────────────────────── */
+const _CONFIRM_ICONS={
+  danger:'M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16',
+  warn:'M12 9v4m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z'
+};
+function prepConfirm(title,okLabel,tone='danger'){
+  document.getElementById('confirm-title').textContent=title;
+  const ok=document.getElementById('confirm-ok-btn');ok.textContent=okLabel;
+  document.getElementById('confirm-icon').className='confirm-icon '+tone;
+  document.getElementById('confirm-icon-path').setAttribute('d',_CONFIRM_ICONS[tone]||_CONFIRM_ICONS.danger);
+}
+
+/* ── Inline field errors: message sits under the field, field is marked invalid
+   and focused; cleared as soon as the user edits it ──────────────────────── */
+function _fieldBox(el){return el.closest('.fw')||(el.type==='hidden'?el.previousElementSibling:null)||el;}
+function clearFieldError(el){
+  if(typeof el==='string')el=document.getElementById(el);if(!el)return;
+  const box=_fieldBox(el);box.classList.remove('is-invalid');el.removeAttribute('aria-invalid');
+  const msg=el.id&&document.getElementById(el.id+'-err');if(msg)msg.remove();
+  if(el.getAttribute('aria-describedby')===el.id+'-err')el.removeAttribute('aria-describedby');
+}
+function fieldError(id,msg){
+  const el=document.getElementById(id);
+  if(!el||el.offsetParent===null&&el.type!=='hidden'){toast(msg);return false;}
+  clearFieldError(el);
+  const box=_fieldBox(el);
+  box.classList.add('is-invalid');el.setAttribute('aria-invalid','true');
+  const p=document.createElement('p');p.className='field-err';p.setAttribute('role','alert');p.id=id+'-err';p.textContent=msg;
+  // In a horizontal row (input + button) put the message under the whole row
+  const par=box.parentElement,cs=par&&getComputedStyle(par);
+  const anchor=cs&&cs.display==='flex'&&cs.flexDirection==='row'&&par.children.length>1?par:box;
+  anchor.insertAdjacentElement('afterend',p);
+  el.setAttribute('aria-describedby',p.id);
+  const off=()=>{clearFieldError(el);box.removeEventListener('input',off);box.removeEventListener('change',off);box.removeEventListener('click',off);};
+  box.addEventListener('input',off);box.addEventListener('change',off);
+  if(box!==el||el.classList.contains('ef-chips'))box.addEventListener('click',off);
+  const focusEl=box.matches('input,select,textarea,[tabindex]')?box:box.querySelector('input:not([type=hidden]),select,button,[tabindex]');
+  if(focusEl&&focusEl.focus)focusEl.focus();
+  return false;
+}
+/* Close the dialog-specific errors when a modal is reopened */
+function clearErrorsIn(root){root.querySelectorAll('.field-err').forEach(p=>p.remove());root.querySelectorAll('.is-invalid').forEach(b=>b.classList.remove('is-invalid'));root.querySelectorAll('[aria-invalid]').forEach(e=>e.removeAttribute('aria-invalid'));}
+
 let _modalReturnFocus=[];
 function openModal(id){
   const el=document.getElementById(id);
   el.setAttribute('role','dialog');el.setAttribute('aria-modal','true');
+  if(!el.hasAttribute('aria-labelledby')&&!el.hasAttribute('aria-label')){
+    const h=el.querySelector('h3');if(h){if(!h.id)h.id=id+'-title';el.setAttribute('aria-labelledby',h.id);}
+  }
   _modalReturnFocus.push({id,el:document.activeElement});
+  clearErrorsIn(el);
   el.classList.remove('hidden');
   const first=el.querySelector('input:not([type=hidden]),select,textarea,button.btn-p');
   if(first&&first.focus)setTimeout(()=>first.focus(),30);
@@ -111,4 +159,15 @@ function closeModal(id){
   const i=_modalReturnFocus.map(m=>m.id).lastIndexOf(id);
   if(i>=0){const[{el}]=_modalReturnFocus.splice(i,1);if(el&&el.focus&&document.contains(el))el.focus();}
 }
-
+/* Keep Tab / Shift+Tab inside the top-most open dialog */
+document.addEventListener('keydown',e=>{
+  if(e.key!=='Tab')return;
+  const open=[...document.querySelectorAll('.mo:not(.hidden)')];if(!open.length)return;
+  const box=open[open.length-1].querySelector('.mb,.confirm-box')||open[open.length-1];
+  const f=[...box.querySelectorAll('button,input:not([type=hidden]),select,textarea,a[href],[tabindex]:not([tabindex="-1"]),summary')].filter(x=>!x.disabled&&x.offsetParent!==null);
+  if(!f.length)return;
+  const first=f[0],last=f[f.length-1];
+  if(!box.contains(document.activeElement)){e.preventDefault();first.focus();}
+  else if(e.shiftKey&&document.activeElement===first){e.preventDefault();last.focus();}
+  else if(!e.shiftKey&&document.activeElement===last){e.preventDefault();first.focus();}
+});

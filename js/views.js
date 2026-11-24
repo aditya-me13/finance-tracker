@@ -194,6 +194,18 @@ function applyTxnFilter(){
   bulkSelectedIds.clear();
   renderTxnLog();
 }
+function toggleAdvFilters(force){
+  const box=document.getElementById('adv-filters'),btn=document.getElementById('adv-filters-btn');
+  const open=typeof force==='boolean'?force:box.classList.contains('hidden');
+  box.classList.toggle('hidden',!open);btn.setAttribute('aria-expanded',String(open));
+}
+function syncFilterControls(){
+  const adv=['category','tag','account','from','to'].filter(k=>txnFilter[k]).length;
+  const typesOff=Object.values(txnTypesShown).some(v=>v===false);
+  const cnt=document.getElementById('adv-filters-cnt');if(cnt)cnt.textContent=adv?String(adv):'';
+  const clr=document.getElementById('txn-clear-filter');if(clr)clr.classList.toggle('hidden',!(adv||txnFilter.search||typesOff));
+  if(adv)toggleAdvFilters(true);
+}
 function clearTxnFilter(){
   document.getElementById('txn-filter-cat').value='';
   setDateVal('txn-filter-from','');
@@ -241,12 +253,13 @@ function renderTxnLog(){
   }
   updateBulkBar();
   syncSelectAllCheckbox();
+  syncFilterControls();
   syncTxnTypeCheckboxes();
   const sc=document.getElementById('txn-search-clear');
   if(sc)sc.classList.toggle('hidden',!txnFilter.search);
   if(!txns.length){
     const someHidden=Object.values(txnTypesShown).some(v=>v===false);
-    list.innerHTML=`<div style="text-align:center;padding:26px 0;font-size:.83rem;color:#a8a29e">No transactions ${filterActive?'match this filter':`this ${viewMode==='fy'?'financial year':'month'}`}${someHidden?' for the selected types':''}.</div>`;
+    list.innerHTML=`<div style="text-align:center;padding:26px 0;font-size:.82rem;color:var(--text-muted)">No transactions ${filterActive?'match this filter':`this ${viewMode==='fy'?'financial year':'month'}`}${someHidden?' for the selected types':''}.</div>`;
     return;
   }
   const grouped={};txns.forEach(t=>{if(!grouped[t.date])grouped[t.date]=[];grouped[t.date].push(t);});
@@ -258,8 +271,8 @@ function renderTxnLog(){
     const hdr=document.createElement('div');
     hdr.style.cssText='display:flex;align-items:center;justify-content:space-between;padding:5px 11px 3px';
     hdr.innerHTML=`<span class="slabel">${fmtDate(date)}</span><div style="display:flex;gap:8px">
-      ${dayInc?`<span class="num" style="font-size:.7rem;color:#166534">+${fmt(dayInc)}</span>`:''}
-      ${dayExps?`<span class="num" style="font-size:.7rem;color:#a8a29e">${fmt(dayExps)}</span>`:''}
+      ${dayInc?`<span class="num" style="font-size:.72rem;color:#166534">+${fmt(dayInc)}</span>`:''}
+      ${dayExps?`<span class="num" style="font-size:.72rem;color:var(--text-muted)">${fmt(dayExps)}</span>`:''}
     </div>`;
     list.appendChild(hdr);
     // Zebra stripes restart under each date header
@@ -275,7 +288,7 @@ function buildRow(t,canDel,selectable){
     iconBg=col.bg;iconTxt=t.category.slice(0,2).toUpperCase();mainLabel=esc(t.category);
     let splitNote='';
     let displayAmt=t.amount;
-    const settledNote=t.shared?(t.settled?` <span style="color:#a8a29e">(settled)</span>`:''):'';
+    const settledNote=t.shared?(t.settled?` <span style="color:var(--text-muted)">(settled)</span>`:''):'';
     if(t.acType==='shared'){
       const totalNote=Number(t.amount)&&Number(t.amount)!==Number(t.myShare)?` &middot; total bill ${fmt(t.amount)}`:'';
       splitNote=` &middot; <span style="color:#7c3aed;font-weight:600">Owed via Splitwise</span>${totalNote}${settledNote}`;
@@ -287,7 +300,7 @@ function buildRow(t,canDel,selectable){
       const al=(typeof buildSplitAllocMap==='function'?buildSplitAllocMap()[t.id]:0)||0;
       if(al>0.004)splitNote+=` <span style="color:#166534">(${fmt(al)} settled)</span>`;
     }
-    if(t.splitSettle)splitNote=` &middot; <span style="color:#7c3aed;font-weight:600">Split settlement — you paid</span>${t.settled?' <span style="color:#a8a29e">(settled)</span>':''}`;
+    if(t.splitSettle)splitNote=` &middot; <span style="color:#7c3aed;font-weight:600">Split settlement — you paid</span>${t.settled?' <span style="color:var(--text-muted)">(settled)</span>':''}`;
     const sn=spreadN(t);
     if(sn>1)splitNote+=` &middot; <span style="color:#0e7490;font-weight:600" title="Budgets &amp; analytics count ${fmt(shareAmount(t)/sn)} in each of ${sn} months">spread over ${sn} months</span>`;
     subLabel=acLabel(t.acType,t.acId)+splitNote+(t.desc?' &middot; '+esc(t.desc):'');
@@ -295,7 +308,7 @@ function buildRow(t,canDel,selectable){
   }else if(t.type==='income'){
     iconBg='#f0fdf4';iconTxt='IN';mainLabel=esc(t.category);
     const isn=spreadN(t);
-    subLabel=acLabel(t.destType,t.destId)+(isn>1?` &middot; <span style="color:#0e7490;font-weight:600" title="Analytics count ${fmt(Number(t.amount)/isn)} in each of ${isn} months">spread over ${isn} months</span>`:'')+(t.splitSettle?` &middot; <span style="color:#7c3aed;font-weight:600">Split settlement — received</span>${t.settled?' <span style="color:#a8a29e">(settled)</span>':''}`:'')+(t.desc?' &middot; '+esc(t.desc):'');
+    subLabel=acLabel(t.destType,t.destId)+(isn>1?` &middot; <span style="color:#0e7490;font-weight:600" title="Analytics count ${fmt(Number(t.amount)/isn)} in each of ${isn} months">spread over ${isn} months</span>`:'')+(t.splitSettle?` &middot; <span style="color:#7c3aed;font-weight:600">Split settlement — received</span>${t.settled?' <span style="color:var(--text-muted)">(settled)</span>':''}`:'')+(t.desc?' &middot; '+esc(t.desc):'');
     amtStr='+'+fmt(t.amount);amtCol='#166534';
   }else if(t.type==='invest'){
     iconBg='#ede9fe';iconTxt='IV';mainLabel='Invested — '+esc(t.name||'Holding');
@@ -318,13 +331,13 @@ function buildRow(t,canDel,selectable){
     <div class="txnico" style="background:${iconBg};color:#57534e">${iconTxt}</div>
     <div style="flex:1;min-width:0">
       <div style="font-size:.82rem;color:#292524;font-weight:500">${mainLabel}${tagPillsHtml(t.tags)}</div>
-      <div style="font-size:.72rem;color:#a8a29e;margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${subLabel}</div>
+      <div style="font-size:.72rem;color:var(--text-muted);margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${subLabel}</div>
     </div>
-    <span class="num" style="font-size:.83rem;font-weight:500;color:${amtCol};flex-shrink:0">${amtStr}</span>
+    <span class="num" style="font-size:.82rem;font-weight:500;color:${amtCol};flex-shrink:0">${amtStr}</span>
     ${canDel&&EDITABLE_TXN(t)?`<button class="btn-i" onclick="openEditTxn('${t.id}')" title="Edit" style="flex-shrink:0;margin-left:2px">
       <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
     </button>`:''}
-    ${canDel?`<button class="btn-i" onclick="confirmDelete('${t.id}')" title="Delete" style="flex-shrink:0;margin-left:2px">
+    ${canDel?`<button class="btn-i danger" onclick="confirmDelete('${t.id}')" title="Delete" style="flex-shrink:0;margin-left:2px">
       <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
     </button>`:''}`;
   return row;

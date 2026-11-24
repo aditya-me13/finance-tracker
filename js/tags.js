@@ -11,7 +11,7 @@ function renderTagChips(ctx){
     const i=state.tags.indexOf(tag),col=cpal(i>=0?i:0);
     const chip=document.createElement('span');
     chip.className='chip';chip.style.background=col.bg;chip.style.color=col.fg;chip.style.cursor='default';
-    chip.innerHTML=`${esc(tag)} <button type="button" style="background:none;border:none;color:inherit;cursor:pointer;font-weight:700;padding:0 0 0 5px;font-size:.85rem;line-height:1" title="Remove tag">&times;</button>`;
+    chip.innerHTML=`${esc(tag)} <button type="button" style="background:none;border:none;color:inherit;cursor:pointer;font-weight:700;padding:0 0 0 5px;font-size:.875rem;line-height:1" title="Remove tag">&times;</button>`;
     chip.querySelector('button').onclick=()=>removeTag(ctx,tag);
     chipsWrap.appendChild(chip);
   });

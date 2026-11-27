@@ -312,10 +312,14 @@
         <div class="card">
           <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:9px">
             <span style="font-weight:600;font-size:.875rem">Monthly Budget</span>
-            <button type="button" class="btn-link" onclick="openBudgetModal()">Edit budgets</button>
+            <span style="display:flex;align-items:center;gap:4px">
+              <button type="button" class="btn-link" onclick="openBudgetModal()">Edit budgets</button>
+              <span id="b-src"></span>
+            </span>
           </div>
+          <div class="slabel" id="b-period" style="margin:-4px 0 7px"></div>
           <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:5px">
-            <span style="font-size:.78rem;color:#78716c">Spent this month</span>
+            <span style="font-size:.78rem;color:#78716c" id="b-spent-label">Spent this month</span>
             <span class="num" id="b-spent" style="font-size:.82rem;font-weight:500">₹0.00</span>
           </div>
           <div class="pt" style="margin-bottom:5px"><div id="b-bar" class="pf ps" style="width:0%"></div></div>
@@ -332,6 +336,7 @@
             <span style="font-weight:600;font-size:.875rem">Category Budgets</span>
             <button type="button" class="btn-link" onclick="openBudgetModal()" aria-label="Edit category budgets">Edit</button>
           </div>
+          <div class="slabel" id="cat-bud-src" style="margin:-6px 0 9px"></div>
           <div id="cat-bud-list" style="display:flex;flex-direction:column;gap:8px"></div>
         </div>
         <!-- Weekly -->

@@ -27,14 +27,14 @@ function updateViewLabel(){
 function onMonthChange(){
   viewMK=document.getElementById('month-sel').value;
   updateViewLabel();
-  renderCumulativeCategoryWidget();
-  renderTxnLog();if(activeTab==='charts')renderQuickCharts();
+  renderBudget();renderCumulativeCategoryWidget();
+  bulkSelectedIds.clear();renderTxnLog();if(activeTab==='charts')renderQuickCharts();
 }
 function onFYChange(){
   viewFY=document.getElementById('fy-sel').value;
   updateViewLabel();
-  renderCumulativeCategoryWidget();
-  renderTxnLog();if(activeTab==='charts')renderQuickCharts();
+  renderBudget();renderCumulativeCategoryWidget();
+  bulkSelectedIds.clear();renderTxnLog();if(activeTab==='charts')renderQuickCharts();
 }
 function setViewMode(mode){
   viewMode=mode;
@@ -43,8 +43,8 @@ function setViewMode(mode){
   document.getElementById('month-sel').classList.toggle('hidden',mode!=='month');
   document.getElementById('fy-sel').classList.toggle('hidden',mode!=='fy');
   updateViewLabel();
-  renderCumulativeCategoryWidget();
-  renderTxnLog();if(activeTab==='charts')renderQuickCharts();
+  renderBudget();renderCumulativeCategoryWidget();
+  bulkSelectedIds.clear();renderTxnLog();if(activeTab==='charts')renderQuickCharts();
 }
 
 /* ── View switching ───────────────────────────────────────── */
@@ -162,8 +162,18 @@ function clearTxnSearch(){
   const el=document.getElementById('txn-filter-search');if(!el)return;
   el.value='';applyTxnFilter();el.focus();
 }
-function isTxnFilterActive(){return!!(txnFilter.category||txnFilter.from||txnFilter.to||txnFilter.tag||txnFilter.search||txnFilter.account);}
+function isTxnFilterActive(){return!!(txnFilter.calc||txnFilter.category||txnFilter.from||txnFilter.to||txnFilter.tag||txnFilter.search||txnFilter.account);}
+/* Budget drill-down (txnFilter.calc): the expenses a budget/spend figure counts — Splitwise settlements
+   excluded, and a spread expense included when any of its monthly parts falls in the range */
+function calcMatches(t){
+  const{cats}=txnFilter.calc,{from,to}=txnFilter;
+  if(t.type!=='expense'||t.splitSettle||(cats&&!cats.includes(t.category)))return false;
+  const n=spreadN(t);
+  for(let i=0;i<n;i++){const d=n>1?shiftDateMonths(t.date,i):t.date;if(d>=from&&d<=to)return true;}
+  return false;
+}
 function txnMatchesFilter(t){
+  if(txnFilter.calc)return calcMatches(t);
   const{category,from,to,tag,search,account}=txnFilter;
   if(!txnTypeShown(t))return false;
   if(account&&!txnAccKeys(t).includes(account))return false;
@@ -181,6 +191,12 @@ function txnMatchesFilter(t){
     if(!haystack.includes(q))return false;
   }
   return true;
+}
+/* Transactions matching the filter. With no explicit From/To the filter searches inside the
+   month cycle (or FY) picked in the selector, not all time. */
+function filteredTxns(){
+  const hasRange=!!(txnFilter.from||txnFilter.to);
+  return(hasRange?state.transactions:curViewTxns()).filter(txnMatchesFilter);
 }
 function applyTxnFilter(){
   txnFilter={
@@ -217,11 +233,13 @@ function clearTxnFilter(){
   txnTypesShown={expense:true,income:true,transfer:true,invest:true};
   try{localStorage.removeItem('ft-txn-types');}catch(e){}
   if(document.getElementById('txn-filter-acc'))document.getElementById('txn-filter-acc').value='';
-  txnFilter={category:'',from:'',to:'',tag:'',search:'',account:''};
+  txnFilter={category:'',from:'',to:'',tag:'',search:'',account:'',calc:null};
   bulkSelectedIds.clear();
   renderTxnLog();
 }
 
+/* Amount a log row shows: Splitwise "owed" expenses show your share (you paid nothing), the rest the full amount paid */
+const logAmt=t=>t.type==='expense'&&t.acType==='shared'?shareAmount(t):Number(t.amount)||0;
 function renderTxnLog(){
   const list=document.getElementById('txn-list');
   const filterActive=isTxnFilterActive();
@@ -229,19 +247,26 @@ function renderTxnLog(){
   const label=document.getElementById('log-month-label');
   let txns;
   if(filterActive){
-    txns=state.transactions.filter(txnMatchesFilter).slice().sort(cmpTxnLog);
+    txns=filteredTxns().sort(cmpTxnLog);
     const catSel=document.getElementById('txn-filter-cat');
-    const catText=txnFilter.category?catSel.options[catSel.selectedIndex].textContent:'All Categories';
-    const rangeText=(txnFilter.from||txnFilter.to)?`${txnFilter.from?fmtDate(txnFilter.from):'…'} – ${txnFilter.to?fmtDate(txnFilter.to):'…'}`:'All time';
+    const cc=txnFilter.calc&&txnFilter.calc.cats;
+    const catText=txnFilter.calc?(cc?cc.join(', '):'All expenses'):txnFilter.category?catSel.options[catSel.selectedIndex].textContent:'All Categories';
+    const rangeText=(txnFilter.from||txnFilter.to)?`${txnFilter.from?fmtDate(txnFilter.from):'…'} – ${txnFilter.to?fmtDate(txnFilter.to):'…'}`:(viewMode==='fy'?fyLabel(viewFY):mkLabel(viewMK));
     const tagText=txnFilter.tag?` · #${txnFilter.tag}`:'';
     const searchText=txnFilter.search?` · "${txnFilter.search}"`:'';
     const accSel=document.getElementById('txn-filter-acc');
     const accText=txnFilter.account&&accSel?` · ${accSel.options[accSel.selectedIndex].textContent}`:'';
     label.textContent=`Filtered: ${catText} · ${rangeText}${tagText}${accText}${searchText}`;
-    const expSum=txns.filter(t=>t.type==='expense'&&!t.splitSettle).reduce((s,t)=>s+Number(t.amount),0);
+    const exps=txns.filter(t=>t.type==='expense'&&!t.splitSettle);
+    const expSum=exps.reduce((s,t)=>s+logAmt(t),0),shareSum=exps.reduce((s,t)=>s+shareAmount(t),0);
     const incSum=txns.filter(t=>t.type==='income'&&!t.splitSettle).reduce((s,t)=>s+Number(t.amount),0);
     const parts=[];
     if(expSum)parts.push(`Expenses: ${fmt(expSum)}`);
+    if(txnFilter.calc){
+      // The figure on the budget/spend card: your share, spread parts in this range only
+      const counted=sumShare(calcExps(txnFilter.calc.cats,txnFilter.from,txnFilter.to));
+      if(Math.abs(counted-expSum)>0.004||!expSum)parts.push(`Counted toward budget: ${fmt(counted)}`);
+    }else if(Math.abs(shareSum-expSum)>0.004)parts.push(`Your share: ${fmt(shareSum)}`);
     if(incSum)parts.push(`Income: ${fmt(incSum)}`);
     document.getElementById('txn-filter-summary-text').textContent=`${txns.length} transaction(s) found`+(parts.length?' · '+parts.join(' · '):'');
     summaryEl.classList.remove('hidden');
@@ -266,7 +291,7 @@ function renderTxnLog(){
   const dates=Object.keys(grouped).sort().reverse();
   list.innerHTML='';
   dates.forEach(date=>{
-    const dayExps=grouped[date].filter(t=>t.type==='expense'&&!t.splitSettle).reduce((s,t)=>s+Number(t.amount),0);
+    const dayExps=grouped[date].filter(t=>t.type==='expense'&&!t.splitSettle).reduce((s,t)=>s+logAmt(t),0);
     const dayInc=grouped[date].filter(t=>t.type==='income'&&!t.splitSettle).reduce((s,t)=>s+Number(t.amount),0);
     const hdr=document.createElement('div');
     hdr.style.cssText='display:flex;align-items:center;justify-content:space-between;padding:5px 11px 3px';

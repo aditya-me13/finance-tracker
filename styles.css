@@ -448,3 +448,6 @@ html.theme-anim,html.theme-anim *{transition:background-color .3s,color .3s,bord
 /* Sidebar section headings: darker and heavier so each accordion stands out */
 .sb-head .slabel{color:var(--text);font-weight:700;font-size:.7rem;letter-spacing:.06em}
 .sb-fold-chev{color:var(--text-2)}
+
+.calc-src-btn{min-width:22px;min-height:22px;padding:2px}
+.calc-src-btn:hover{color:var(--text);background:var(--surface-alt)}

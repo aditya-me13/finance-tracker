@@ -1,12 +1,37 @@
 /* ── Budget ───────────────────────────────────────────────── */
+/* The period every spend widget measures: the month cycle (or FY) picked in the log's selector.
+   Budgets are per month, so they scale by how many month cycles the period covers (FY → 12). */
+function spendPeriod(){
+  if(viewMode==='fy'&&viewFY){const r=fyRange(viewFY);return{...r,label:fyLabel(viewFY),months:monthsInRange(r.from,r.to),isFY:true};}
+  const mk=viewMK||curMK(),r=mkRange(mk);
+  return{...r,label:mkLabel(mk),months:1,isFY:false,isCurrent:mk===curMK()};
+}
+/* Expenses counted by budgets & category spend: your share (shareAmount), spread parts placed in
+   their own cycle, Splitwise settlements excluded (their cost is already counted on the original bill).
+   cats = null for all categories, else an array of category names. */
+function spendExps(cats){const{from,to}=spendPeriod();return calcExps(cats,from,to);}
+function calcExps(cats,from,to){
+  return aTxnsInRange(from,to).filter(t=>t.type==='expense'&&!t.splitSettle&&(!cats||cats.includes(t.category)));
+}
+const sumShare=list=>list.reduce((s,t)=>s+shareAmount(t),0);
+/* Small ↗ button that opens the transactions a figure was calculated from */
+function calcSrcBtn(onclick,what){
+  return`<button type="button" class="btn-i calc-src-btn" onclick="${onclick}" title="Show the transactions behind ${esc(what)} in the log" aria-label="Show the transactions behind ${esc(what)} in the log">
+    <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.2"><path stroke-linecap="round" stroke-linejoin="round" d="M7 17L17 7M8 7h9v9"/></svg></button>`;
+}
 function renderBudget(){
-  const mk=curMK(),exps=aTxnsForMK(mk).filter(t=>t.type==='expense'&&!t.splitSettle);
-  const spent=exps.reduce((s,t)=>s+shareAmount(t),0);
-  const bud=Number(state.monthlyBudget)||0,pct=bud>0?Math.min((spent/bud)*100,100):0;
+  const per=spendPeriod(),exps=spendExps(null);
+  const spent=sumShare(exps);
+  const bud=(Number(state.monthlyBudget)||0)*per.months,pct=bud>0?Math.min((spent/bud)*100,100):0;
   const warn=bud>0&&spent>=bud*.8,over=bud>0&&spent>=bud;
+  const sl=document.getElementById('b-spent-label');
+  if(sl)sl.textContent=per.isFY?'Spent this FY':per.isCurrent?'Spent this month':'Spent in month';
+  const pl=document.getElementById('b-period');if(pl)pl.textContent=per.label;
+  const bs=document.getElementById('b-src');if(bs)bs.innerHTML=calcSrcBtn("showCalcInLog(null)",'the monthly budget total');
+  const cbs=document.getElementById('cat-bud-src');if(cbs)cbs.textContent=per.label;
   document.getElementById('b-spent').textContent=fmt(spent);
-  document.getElementById('b-spent').style.color=over?'#ef4444':warn?'#d97706':'#1c1917';
-  document.getElementById('b-label').textContent=`Overall: ${fmt(bud)}`;
+  document.getElementById('b-spent').style.color=over?'#ef4444':warn?'#d97706':'';
+  document.getElementById('b-label').textContent=`Overall: ${fmt(bud)}`+(per.isFY?` (${fmt(Number(state.monthlyBudget)||0)} × ${per.months})`:'');
   document.getElementById('b-pct').textContent=`${pct.toFixed(0)}%`;
   document.getElementById('b-pct').style.color=over?'#ef4444':warn?'#d97706':'#a8a29e';
   const bar=document.getElementById('b-bar');
@@ -17,8 +42,8 @@ function renderBudget(){
   if(!budCats.length){catList.innerHTML='<div style="font-size:.78rem;color:var(--text-muted);text-align:center;padding:12px 0">No category budgets — click Edit to configure</div>';return;}
   catList.innerHTML='';
   budCats.forEach(cat=>{
-    const catBud=state.categoryBudgets[cat]||0;
-    const catSpent=exps.filter(e=>e.category===cat).reduce((s,e)=>s+shareAmount(e),0);
+    const catBud=(state.categoryBudgets[cat]||0)*per.months;
+    const catSpent=sumShare(exps.filter(e=>e.category===cat));
     const cpct=catBud>0?Math.min((catSpent/catBud)*100,100):0;
     const cw=catBud>0&&catSpent>=catBud*.8,co=catBud>0&&catSpent>=catBud;
     const ci=state.categories.expense.indexOf(cat),col=cpal(ci>=0?ci:0);
@@ -31,11 +56,34 @@ function renderBudget(){
           ${cw&&!co?'<span style="font-size:.68rem;background:#fef3c7;color:#92400e;padding:1px 6px;border-radius:99px;font-weight:500;flex-shrink:0">Warning</span>':''}
           ${co?'<span style="font-size:.68rem;background:#fee2e2;color:#be123c;padding:1px 6px;border-radius:99px;font-weight:500;flex-shrink:0">Over Budget</span>':''}
         </div>
-        <span class="num" style="font-size:.72rem;color:${co?'#ef4444':cw?'#d97706':'#78716c'};flex-shrink:0">${fmt(catSpent)} / ${fmt(catBud)}</span>
+        <div style="display:flex;align-items:center;gap:2px;flex-shrink:0">
+          <span class="num" style="font-size:.72rem;color:${co?'#ef4444':cw?'#d97706':'#78716c'}">${fmt(catSpent)} / ${fmt(catBud)}</span>
+          <span class="cat-src"></span>
+        </div>
       </div>
       <div class="pt"><div class="pf ${co?'po':cw?'pw':'ps'}" style="width:${cpct}%"></div></div>`;
+    // Category names are user text: pass via a closure, not inline onclick
+    const src=card.querySelector('.cat-src');src.innerHTML=calcSrcBtn('',cat+' spend');
+    src.firstElementChild.onclick=()=>showCalcInLog([cat]);
     catList.appendChild(card);
   });
+}
+
+/* ── Calculation drill-down: filter the transaction log to exactly the expenses behind a figure.
+   cats = null → every expense (monthly budget), else those categories. The log rows stay editable. */
+function showCalcInLog(cats){
+  const{from,to}=spendPeriod();
+  document.getElementById('txn-filter-cat').value=cats&&cats.length===1?'exp:'+cats[0]:'';
+  setDateVal('txn-filter-from',from);setDateVal('txn-filter-to',to);
+  const tag=document.getElementById('txn-filter-tag');if(tag)tag.value='';
+  const q=document.getElementById('txn-filter-search');if(q)q.value='';
+  const acc=document.getElementById('txn-filter-acc');if(acc)acc.value='';
+  txnFilter={category:cats&&cats.length===1?'exp:'+cats[0]:'',from,to,tag:'',search:'',account:'',calc:{cats:cats?cats.slice():null}};
+  bulkSelectedIds.clear();
+  if(activeView!=='dashboard')switchView('dashboard');
+  if(activeTab!=='log')switchTab('log');
+  renderTxnLog();
+  const log=document.getElementById('view-log');if(log)log.scrollIntoView({behavior:'smooth',block:'start'});
 }
 
 function openBudgetModal(){

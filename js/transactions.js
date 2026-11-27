@@ -205,23 +205,23 @@ function setTxn(type){
 }
 
 function calculateCumulativeTotal(selectedCats){
-  return curViewATxns()
-    .filter(t=>t.type==='expense'&&selectedCats.includes(t.category))
-    .reduce((sum,t)=>sum+shareAmount(t),0);
+  return sumShare(spendExps(selectedCats)); // same rules as the budget cards (see spendExps)
 }
 
+function cumulativeActiveCats(){return cumulativeCatSelection.length?cumulativeCatSelection:(state.categories.expense||[]).slice(0,1);}
 function renderCumulativeCategoryWidget(){
   const wrap=document.getElementById('cumulative-cat-widget');
   if(!wrap)return;
   const cats=state.categories.expense||[];
-  const activeCats=cumulativeCatSelection.length?cumulativeCatSelection:cats.slice(0,1);
+  const activeCats=cumulativeActiveCats();
   const total=calculateCumulativeTotal(activeCats);
   const scopeLabel=viewMode==='fy'?fyLabel(viewFY):mkLabel(viewMK);
-  const scopeText=viewMode==='fy'?'Current FY total':'Current month total';
+  const scopeText=viewMode==='fy'?'FY total':'Month total';
   wrap.innerHTML=`
     <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:10px">
       <span style="font-weight:600;font-size:.875rem">Cumulative Category Spend</span>
-      <span class="slabel">${scopeLabel}</span>
+      <span style="display:flex;align-items:center;gap:2px"><span class="slabel">${scopeLabel}</span>
+        ${calcSrcBtn("showCalcInLog(cumulativeActiveCats())",'this total')}</span>
     </div>
     <div style="margin-bottom:10px">
       <div style="font-size:.72rem;color:#78716c;margin-bottom:6px">Select categories</div>

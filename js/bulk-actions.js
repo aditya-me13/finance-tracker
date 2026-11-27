@@ -4,7 +4,7 @@
    filter changes, since "select all" only ever means the current
    filtered set. ──────────────────────────────────────────── */
 function bulkSelectableTxns(){
-  return state.transactions.filter(txnMatchesFilter).filter(t=>t.type==='expense'||t.type==='income');
+  return filteredTxns().filter(t=>t.type==='expense'||t.type==='income');
 }
 function toggleBulkSelect(id,checked){
   if(checked)bulkSelectedIds.add(id);else bulkSelectedIds.delete(id);

@@ -70,7 +70,7 @@ function expandSpread(list){
     const n=spreadN(t);
     if(n===1){out.push(t);return;}
     const amt=Number(t.amount)||0,sh=shareAmount(t);
-    for(let i=0;i<n;i++)out.push({...t,date:shiftDateMonths(t.date,i),amount:amt/n,...(t.type==='expense'?{myShare:sh/n}:{}),spreadPart:i+1});
+    for(let i=0;i<n;i++)out.push({...t,date:shiftDateMonths(t.date,i),origDate:t.date,amount:amt/n,...(t.type==='expense'?{myShare:sh/n}:{}),spreadPart:i+1});
   });
   return out;
 }

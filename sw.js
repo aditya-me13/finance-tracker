@@ -4,6 +4,7 @@ const APP_SHELL=[
   './index.html',
   './styles.css',
   './manifest.json',
+  './js/sync.js',
   './js/state.js',
   './js/helpers.js',
   './js/market-days.js',

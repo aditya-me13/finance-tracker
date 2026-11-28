@@ -56,6 +56,13 @@ function nextRecurDate(r,fromDateStr){
   }
   return dateToStr(d);
 }
+/* Generated entries get an id made from their source and date, so if two devices both generate the
+   same due payment before syncing, the merge sees one transaction instead of two. A random id is
+   used only if that id is somehow taken already. */
+function recTxnId(kind,srcId,date){
+  const id=`${kind}_${srcId}_${date}`;
+  return state.transactions.some(t=>t.id===id)?uid():id;
+}
 function generateDueRecurring(){
   const todayStr=today();
   let count=0;
@@ -65,9 +72,9 @@ function generateDueRecurring(){
     let guard=0;
     while(cursor<=todayStr&&guard<500){
       if(r.type==='expense'){
-        state.transactions.push({id:uid(),date:cursor,type:'expense',amount:r.amount,acType:r.acType,acId:r.acId,category:r.category,desc:r.desc||r.name,myShare:r.myShare!==undefined?r.myShare:r.amount,tags:(r.tags||[]).slice(),recurringId:r.id,...(r.shared?{shared:true,sharedMode:r.sharedMode,settled:false}:{})});
+        state.transactions.push({id:recTxnId('rec',r.id,cursor),date:cursor,type:'expense',amount:r.amount,acType:r.acType,acId:r.acId,category:r.category,desc:r.desc||r.name,myShare:r.myShare!==undefined?r.myShare:r.amount,tags:(r.tags||[]).slice(),recurringId:r.id,...(r.shared?{shared:true,sharedMode:r.sharedMode,settled:false}:{})});
       }else{
-        state.transactions.push({id:uid(),date:cursor,type:'income',amount:r.amount,destType:r.destType,destId:r.destId,category:r.category,desc:r.desc||r.name,tags:(r.tags||[]).slice(),recurringId:r.id});
+        state.transactions.push({id:recTxnId('rec',r.id,cursor),date:cursor,type:'income',amount:r.amount,destType:r.destType,destId:r.destId,category:r.category,desc:r.desc||r.name,tags:(r.tags||[]).slice(),recurringId:r.id});
       }
       r.lastGeneratedDate=cursor;
       count++;
@@ -103,7 +110,7 @@ function generateDueAutoDebits(){
       const amount=ad.mode==='fixed'?Math.min(Number(ad.fixedAmount)||0,owed):owed;
       const amt=Math.round(amount*100)/100;
       if(amt>0){
-        state.transactions.push({id:uid(),date:cursor,type:'transfer',amount:amt,fromKey:'bank:'+ad.bankId,toKey:'cc:'+c.id,note:'Auto-debit: '+c.name,autoDebitCardId:c.id,tags:[]});
+        state.transactions.push({id:recTxnId('ad',c.id,cursor),date:cursor,type:'transfer',amount:amt,fromKey:'bank:'+ad.bankId,toKey:'cc:'+c.id,note:'Auto-debit: '+c.name,autoDebitCardId:c.id,tags:[]});
         count++;
       }
       ad.lastRunDate=cursor;

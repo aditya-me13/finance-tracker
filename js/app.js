@@ -183,6 +183,7 @@ function boot(){
   generateDueAutoDebits();
   rebuildAll();
   updateRangeDisplay();
+  _appBooted=true; // live sync may redraw from now on
 }
 
 /* ── PWA: register service worker (safe no-op if unsupported) ── */

@@ -1,4 +1,4 @@
-const CACHE_NAME='finance-tracker-v23';
+const CACHE_NAME='finance-tracker-v24';
 const APP_SHELL=[
   './',
   './index.html',
@@ -26,6 +26,7 @@ const APP_SHELL=[
   './icons/icon-192.png',
   './icons/icon-512.png',
   './icons/icon-512-maskable.png',
+  './icons/apple-touch-icon.png',
 ];
 
 /* Versioned third-party libraries the page needs to start. Their URLs are pinned to a

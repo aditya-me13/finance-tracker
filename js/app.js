@@ -155,6 +155,8 @@ const MOON_PATH='M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z';
 function applyTheme(mode){
   document.documentElement.classList.toggle('dark',mode==='dark');
   document.getElementById('theme-icon').setAttribute('d',mode==='dark'?MOON_PATH:SUN_PATH);
+  // Browser / phone status bar colour follows the app theme (dark mode inverts the white top bar)
+  const tc=document.querySelector('meta[name="theme-color"]');if(tc)tc.setAttribute('content',mode==='dark'?'#000000':'#ffffff');
 }
 function toggleTheme(){
   // brief colour transition on toggle only, so normal interactions stay snappy
@@ -175,7 +177,7 @@ function boot(){
   document.getElementById('rng-from').value=`${y}-${m}-01`;
   document.getElementById('rng-to').value=t;
   const mq=window.matchMedia('(max-width:860px)');
-  const setGrid=()=>{document.getElementById('dash-grid').style.gridTemplateColumns=mq.matches?'1fr':'360px 1fr';};
+  const setGrid=()=>{document.getElementById('dash-grid').style.gridTemplateColumns=mq.matches?'minmax(0,1fr)':'360px minmax(0,1fr)';};
   mq.addEventListener('change',setGrid);setGrid();
   generateDueRecurring();
   generateDueAutoDebits();

@@ -39,19 +39,78 @@ const IDOTS=['#0ea5e9','#8b5cf6','#f59e0b','#14b8a6','#ec4899','#6366f1'];
 const DEF_EXP=['Food','Travel','Shopping','Bills','Entertainment','Investment'];
 const DEF_INC=['Salary','Freelance','Refund','Interest','Gift','Other'];
 
-/* ── Local cache (instant load / offline fallback) + cloud sync ── */
+/* ── Local cache (instant load / offline) + cloud sync ─────────────────────
+   Both devices keep a full copy. Every save is stored on this device at once, then merged into
+   the cloud copy inside a Firestore transaction (re-reads the latest cloud copy first), so two
+   devices never overwrite each other: they merge item by item (see js/sync.js). A live listener
+   merges changes from the other device into this one within a second or two. */
 /* Cache is namespaced per user so several accounts can share one browser */
 const cacheKey=()=>currentUid?'ft_v4_'+currentUid:null;
-const loadLocalCache=()=>{try{const k=cacheKey();if(!k)return null;const r=localStorage.getItem(k);if(r)return JSON.parse(r);}catch(e){}return null;};
-let _saveTimer=null;
-/* Cloud pushes stay disabled until the cloud copy has been read successfully; otherwise an
-   offline/failed load followed by an edit would overwrite the real cloud document with defaults. */
-let _cloudReady=false;
 const tsKey=()=>currentUid?'ft_v4_ts_'+currentUid:null;
+const metaKey=()=>currentUid?'ft_v4_meta_'+currentUid:null;
+const loadLocalCache=()=>{try{const k=cacheKey();if(!k)return null;const r=localStorage.getItem(k);if(r)return JSON.parse(r);}catch(e){}return null;};
 const getLocalTs=()=>{try{return Number(localStorage.getItem(tsKey()))||0;}catch(e){return 0;}};
-function pushToCloud(){
-  const ts=getLocalTs()||Date.now();
-  return db.collection('users').doc(currentUid).set({data:JSON.stringify(state),updatedAt:ts});
+const userDoc=()=>db.collection('users').doc(currentUid);
+let _saveTimer=null;
+/* Pushes wait until the cloud copy has been read once, so a device that started offline with an
+   empty cache never pushes its blank defaults as if they were newer edits. */
+let _cloudReady=false;
+let _syncMeta=emptySyncMeta();   // per item / field change times (js/sync.js)
+let _syncBase=null;              // the data as of the previous save, to see what changed
+let _pushing=null,_pushAgain=false,_liveUnsub=null,_appBooted=false;
+
+function saveLocal(){
+  try{
+    localStorage.setItem(cacheKey(),JSON.stringify(state));
+    localStorage.setItem(metaKey(),JSON.stringify(_syncMeta));
+    localStorage.setItem(tsKey(),String(Date.now()));
+  }catch(e){}
+}
+/* Merge a cloud copy into this device's data. Returns true when the cloud lacks something this
+   device has (so it should push). render: redraw if the data changed. */
+function mergeCloudDoc(d,render){
+  const R=d&&d.data?JSON.parse(d.data):null;
+  const Rm=d&&d.meta?JSON.parse(d.meta):null;
+  const m=mergeStates(state,_syncMeta,R,Rm);
+  const before=syncCanon(state),changed=syncCanon(m.state)!==before;
+  state=m.state;_syncMeta=m.meta;
+  normalizeState();
+  _syncBase=syncClone(state);
+  saveLocal();
+  if(changed&&render&&_appBooted){rebuildAll();}
+  return !R||syncCanon(state)!==syncCanon(R)||syncCanon(m.meta)!==syncCanon(normSyncMeta(Rm));
+}
+/* Merge this device's data into the cloud copy atomically, then take the merged result. */
+async function pushToCloud(){
+  if(!currentUid||!_cloudReady)return;
+  if(_pushing){_pushAgain=true;return _pushing;}
+  _pushing=(async()=>{
+    try{
+      let written=null;
+      await db.runTransaction(async tx=>{
+        const snap=await tx.get(userDoc());
+        const d=snap.exists?snap.data():null;
+        const R=d&&d.data?JSON.parse(d.data):null,Rm=d&&d.meta?JSON.parse(d.meta):null;
+        const m=mergeStates(state,_syncMeta,R,Rm);
+        written={data:JSON.stringify(m.state),meta:JSON.stringify(m.meta),updatedAt:Date.now()};
+        tx.set(userDoc(),written);
+      });
+      // Edits made while the transaction ran are kept: merge, don't overwrite
+      if(written)mergeCloudDoc(written,true);
+    }finally{
+      _pushing=null;
+      if(_pushAgain){_pushAgain=false;pushToCloud().catch(()=>{});}
+    }
+  })();
+  return _pushing;
+}
+function schedulePush(ms){
+  clearTimeout(_saveTimer);
+  if(!_cloudReady){_saveTimer=null;return;}
+  _saveTimer=setTimeout(()=>{
+    _saveTimer=null;
+    pushToCloud().catch(()=>toast('Saved on this device — will sync when back online'));
+  },ms);
 }
 function _flushCloud(){
   if(!_saveTimer||!_cloudReady)return;
@@ -60,6 +119,8 @@ function _flushCloud(){
 }
 document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='hidden')_flushCloud();});
 window.addEventListener('pagehide',_flushCloud);
+// Back online: push anything saved while offline (the live listener also catches up on its own)
+window.addEventListener('online',()=>{if(currentUid&&_cloudReady)schedulePush(500);});
 /* createdAt orders same-day transactions in the log (newest on top). Any transaction pushed
    without one gets stamped here, so every creation path is covered. */
 function stampCreatedAt(){
@@ -70,41 +131,51 @@ function saveState(){
   if(typeof resetSplitAllocMemo==='function')resetSplitAllocMemo();
   stampCreatedAt();
   if(!currentUid)return;
-  try{localStorage.setItem(cacheKey(),JSON.stringify(state));localStorage.setItem(tsKey(),String(Date.now()));}catch(e){}
-  clearTimeout(_saveTimer);
+  _syncMeta=stampChanges(_syncBase,state,_syncMeta,Date.now());
+  _syncBase=syncClone(state);
+  saveLocal();
   if(!_cloudReady){
-    _saveTimer=null;
-    toast('Offline — saved on this device. Reload when online to sync.');
+    clearTimeout(_saveTimer);_saveTimer=null;
+    toast('Offline — saved on this device. It will sync when you are back online.');
     return;
   }
-  _saveTimer=setTimeout(()=>{
-    _saveTimer=null;
-    pushToCloud().catch(()=>toast('Cloud sync failed — saved locally, will retry next change'));
-  },700);
+  schedulePush(700);
+}
+/* Live updates from the other device. Snapshots caused by this device's own pending write
+   are skipped; a cache-only "no document" while offline is not taken as the truth. */
+function startLiveSync(){
+  if(_liveUnsub)_liveUnsub();
+  _liveUnsub=userDoc().onSnapshot(snap=>{
+    if(snap.metadata.hasPendingWrites)return;
+    if(snap.metadata.fromCache&&!snap.exists)return;
+    const first=!_cloudReady;
+    if(!snap.metadata.fromCache)_cloudReady=true;
+    const need=mergeCloudDoc(snap.exists?snap.data():null,true);
+    if(_cloudReady&&need)schedulePush(first?100:400);
+  },()=>{});
 }
 async function loadStateFromCloud(){
   _cloudReady=false;
-  try{
-    const snap=await db.collection('users').doc(currentUid).get();
-    const cloud=snap.exists&&snap.data()&&snap.data().data?snap.data():null;
-    const local=loadLocalCache();
-    // Prefer whichever copy was written last. A local copy newer than the cloud one means a
-    // push never landed (closed tab, failed sync), so keep it and push it up.
-    if(local&&(!cloud||getLocalTs()>(Number(cloud.updatedAt)||0))){
-      state=local;
-      _cloudReady=true;
-      normalizeState();
-      pushToCloud().catch(()=>toast('Cloud sync failed — saved locally, will retry next change'));
-      return;
-    }
-    if(cloud)state=JSON.parse(cloud.data);
-    _cloudReady=true;
-  }catch(e){
-    const local=loadLocalCache();
-    if(local)state=local;
-    toast('Could not reach cloud — showing local copy');
-  }
+  const local=loadLocalCache();
+  let meta=null;try{meta=JSON.parse(localStorage.getItem(metaKey())||'null');}catch(e){}
+  const legacy=local&&!meta; // cached before item-level sync existed
+  _syncMeta=normSyncMeta(meta);
+  if(local)state=local;
   normalizeState();
+  _syncBase=syncClone(state);
+  try{
+    const snap=await userDoc().get();
+    const d=snap.exists?snap.data():null;
+    // An older cached copy that is newer than the cloud never got pushed: mark its additions and
+    // edits as newer so the merge keeps them (deletions can't be told apart, so nothing is dropped)
+    if(legacy&&d&&d.data&&getLocalTs()>(Number(d.updatedAt)||0))
+      _syncMeta=stampChanges(JSON.parse(d.data),state,_syncMeta,getLocalTs(),true);
+    _cloudReady=true;
+    if(mergeCloudDoc(d,false))pushToCloud().catch(()=>toast('Cloud sync failed — saved on this device, will retry'));
+  }catch(e){
+    toast(local?'Could not reach cloud — showing this device\'s copy':'Could not reach cloud');
+  }
+  startLiveSync();
 }
 
 let state={banks:[],cards:[],cash:{startBalance:0},categories:{expense:[...DEF_EXP],income:[...DEF_INC]},monthlyBudget:0,categoryBudgets:{},transactions:[],investments:{accounts:[],holdings:[]},tags:[],loans:[],recurring:[]};

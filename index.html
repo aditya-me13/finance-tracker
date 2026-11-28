@@ -2,18 +2,22 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8"/>
-<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover"/>
+<!-- iPhone: stop Safari zooming in when a small input is focused (pinch-zoom still works on iOS) -->
+<script>if(/iPhone|iPad|iPod/.test(navigator.userAgent)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1)){document.querySelector('meta[name=viewport]').content+=', maximum-scale=1';}</script>
 <title>Finance Tracker</title>
 <script>try{var m=localStorage.getItem('ft-theme')||(matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light');if(m==='dark')document.documentElement.classList.add('dark');}catch(e){}</script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet"/>
 <link rel="stylesheet" href="styles.css"/>
 <link rel="manifest" href="manifest.json"/>
-<meta name="theme-color" content="#1c1917"/>
+<meta name="theme-color" content="#ffffff"/>
 <link rel="icon" href="icons/icon-192.png"/>
-<link rel="apple-touch-icon" href="icons/icon-192.png"/>
+<link rel="apple-touch-icon" sizes="180x180" href="icons/apple-touch-icon.png"/>
 <meta name="apple-mobile-web-app-capable" content="yes"/>
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+<meta name="mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-status-bar-style" content="default"/>
+<meta name="format-detection" content="telephone=no"/>
 <meta name="apple-mobile-web-app-title" content="Finance"/>
 </head>
 <body>
@@ -146,7 +150,7 @@
 
   <!-- DASHBOARD -->
   <div id="view-dashboard">
-    <div id="dash-grid" style="display:grid;grid-template-columns:360px 1fr;gap:15px;align-items:start">
+    <div id="dash-grid" style="display:grid;grid-template-columns:360px minmax(0,1fr);gap:15px;align-items:start">
       <!-- LEFT -->
       <div style="display:flex;flex-direction:column;gap:13px">
         <!-- Form -->
@@ -431,7 +435,7 @@
             </div>
             <div style="height:180px"><canvas id="chart-bar"></canvas></div>
           </div>
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:13px">
+          <div class="stack-sm" style="display:grid;grid-template-columns:1fr 1fr;gap:13px">
             <div class="card">
               <span style="font-weight:600;font-size:.875rem;display:block;margin-bottom:10px">By Category</span>
               <div style="width:150px;height:150px;margin:0 auto 10px"><canvas id="chart-donut"></canvas></div>
@@ -497,7 +501,7 @@
     <!-- Section B: Cash Flow -->
     <div style="margin-bottom:14px">
       <div class="an-sec-title">Cash Flow Breakdowns</div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
+      <div class="stack-sm" style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
         <div class="card">
           <div style="font-weight:600;font-size:.875rem;margin-bottom:12px">Expense Breakdown</div>
           <div style="display:flex;gap:14px;align-items:flex-start;flex-wrap:wrap">
@@ -559,7 +563,7 @@
     <!-- Section E: Daily Heatmap / Trend + Top Categories -->
     <div style="margin-bottom:14px">
       <div class="an-sec-title">Daily Spending Trend &amp; Top Categories</div>
-      <div style="display:grid;grid-template-columns:3fr 2fr;gap:14px">
+      <div class="stack-sm" style="display:grid;grid-template-columns:3fr 2fr;gap:14px">
         <div class="card">
           <div style="font-weight:600;font-size:.875rem;margin-bottom:12px">Daily Expense Trend</div>
           <div style="height:200px;position:relative">
@@ -577,7 +581,7 @@
     <!-- Section F: Net Worth Trend -->
     <div style="margin-bottom:14px">
       <div class="an-sec-title">Net Worth &amp; Savings Rate</div>
-      <div style="display:grid;grid-template-columns:2fr 1fr;gap:14px">
+      <div class="stack-sm" style="display:grid;grid-template-columns:2fr 1fr;gap:14px">
         <div class="card">
           <div style="font-weight:600;font-size:.875rem;margin-bottom:12px">Monthly Net Worth Trend</div>
           <div style="height:200px;position:relative">
@@ -616,7 +620,7 @@
     <div style="margin-bottom:14px">
       <div class="an-sec-title">Portfolio Allocation</div>
       <div class="card">
-        <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px">
+        <div class="stack-sm" style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px">
           <div class="alloc-pane">
             <span style="font-weight:600;font-size:.875rem;display:block;margin-bottom:10px">MF vs Stock vs ETF Profit Share</span>
             <div style="width:150px;height:150px;margin:0 auto 10px;position:relative">
@@ -1227,6 +1231,7 @@
 <script src="https://www.gstatic.com/firebasejs/12.15.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/12.15.0/firebase-firestore-compat.js"></script>
 
+<script src="js/sync.js"></script>
 <script src="js/state.js"></script>
 <script src="js/helpers.js"></script>
 <script src="js/market-days.js"></script>

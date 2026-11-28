@@ -25,7 +25,7 @@ body{font-family:'DM Sans',sans-serif;background:#f4f3f0;color:#1c1917;min-heigh
 .topbar{grid-column:1/-1;background:#fff;border-bottom:1px solid #ebe9e6;display:flex;align-items:center;justify-content:space-between;padding:0 18px;position:sticky;top:0;z-index:40}
 .sidebar{background:#fff;border-right:1px solid #ebe9e6;overflow-y:auto;overflow-x:hidden;min-width:0;padding:14px 0 24px;position:sticky;top:50px;height:calc(100vh - 50px)}
 .main{overflow-y:auto;padding:18px}
-@media(max-width:860px){.shell{grid-template-columns:1fr}.sidebar{position:static;height:auto;border-right:none;border-top:1px solid #ebe9e6;order:2;scroll-margin-top:60px}.main{order:1;padding-bottom:84px}#dash-grid{grid-template-columns:1fr!important}.mob-summary{display:flex!important}#fab{display:flex!important}}
+@media(max-width:860px){.shell{grid-template-columns:1fr}.sidebar{position:static;height:auto;border-right:none;border-top:1px solid #ebe9e6;order:2;scroll-margin-top:60px}.main{order:1;padding-bottom:84px}#dash-grid{grid-template-columns:minmax(0,1fr)!important}.mob-summary{display:flex!important}#fab{display:flex!important}}
 @media(max-width:600px){
   .shell{grid-template-rows:auto 1fr}
   .topbar{flex-wrap:wrap;height:auto;min-height:50px;padding:9px 12px;row-gap:8px}
@@ -451,3 +451,45 @@ html.theme-anim,html.theme-anim *{transition:background-color .3s,color .3s,bord
 
 .calc-src-btn{min-width:22px;min-height:22px;padding:2px}
 .calc-src-btn:hover{color:var(--text);background:var(--surface-alt)}
+#dash-grid>*{min-width:0}
+
+/* ── Phones & the iPhone home-screen app ─────────────────────
+   Safe areas: notch / Dynamic Island at the top, home indicator at the bottom
+   (env() is 0 on desktops and older phones, so nothing changes there). */
+.topbar{padding-top:env(safe-area-inset-top);padding-left:max(18px,env(safe-area-inset-left));padding-right:max(18px,env(safe-area-inset-right))}
+#fab{bottom:calc(18px + env(safe-area-inset-bottom));right:calc(16px + env(safe-area-inset-right))}
+#toast{bottom:calc(22px + env(safe-area-inset-bottom))}
+.mo{padding:max(16px,env(safe-area-inset-top)) max(16px,env(safe-area-inset-right)) max(16px,env(safe-area-inset-bottom)) max(16px,env(safe-area-inset-left))}
+html{-webkit-text-size-adjust:100%;text-size-adjust:100%}
+button,a,label,.chip,.date-trigger,.txnrow{-webkit-tap-highlight-color:transparent}
+@media(max-width:860px){
+  .main{padding-bottom:calc(84px + env(safe-area-inset-bottom))}
+  .sidebar{padding-bottom:calc(24px + env(safe-area-inset-bottom))}
+}
+@media(max-width:600px){
+  .topbar{padding-top:calc(9px + env(safe-area-inset-top));padding-left:max(12px,env(safe-area-inset-left));padding-right:max(12px,env(safe-area-inset-right))}
+  .main{padding-left:max(12px,env(safe-area-inset-left));padding-right:max(12px,env(safe-area-inset-right))}
+  /* Log toolbar: type chips on one line, Filters / Clear on the next */
+  .filter-row .type-filter{flex-basis:100%}
+  /* Category budget rows: the amount drops under the name instead of squeezing it */
+  .cat-bud-card>div:first-child{flex-wrap:wrap;row-gap:2px}
+  .cat-bud-card>div:first-child>div:first-child{flex:1 1 auto}
+  /* Bigger touch targets for icon buttons */
+  .btn-i{min-width:32px;min-height:32px}
+  .calc-src-btn{min-width:30px;min-height:30px}
+}
+/* No hover on touch screens: show row actions that are otherwise revealed on hover */
+@media(hover:none){
+  .sb-item .btn-i{width:28px;min-width:28px;opacity:.6}
+  .txnrow .btn-i{opacity:.6}
+}
+/* Running as an installed app: no text-selection callouts on taps, no rubber-band past the top bar */
+@media(display-mode:standalone){
+  body{overscroll-behavior-y:none;-webkit-touch-callout:none}
+  input,textarea,[contenteditable]{-webkit-touch-callout:default}
+}
+/* Side-by-side card pairs (quick charts, analytics, allocation) stack on phones */
+@media(max-width:600px){.stack-sm{grid-template-columns:minmax(0,1fr)!important}.stack-sm>*{min-width:0}}
+canvas{max-width:100%}
+@media(max-width:600px){.stack-sm .alloc-pane+.alloc-pane{border-left:none;padding-left:4px;border-top:1px solid var(--border-soft);padding-top:14px}}
+@media(max-width:380px){.nav-tabs{min-width:0;max-width:100%}.nav-tab{min-width:0;padding:6px 2px;font-size:.74rem}.main{padding-left:max(10px,env(safe-area-inset-left));padding-right:max(10px,env(safe-area-inset-right))}}
